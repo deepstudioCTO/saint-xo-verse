@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "saint-xo-request-lab",
+  "main": "./workers/app.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./build/client"
+  },
+  "placement": {
+    "mode": "targeted",
+    "region": "aws:ap-northeast-2"
+  }
+}
