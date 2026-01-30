@@ -9,6 +9,8 @@ interface PageLayoutProps {
   showBack?: boolean;
   backTo?: string;
   onBackClick?: () => void;
+  showHome?: boolean;
+  showGallery?: boolean;
 
   // FloatingBar props
   floatingLeft?: React.ReactNode;
@@ -21,6 +23,7 @@ interface PageLayoutProps {
   // Options
   hideHeader?: boolean;
   hideFloatingBar?: boolean;
+  hideCta?: boolean;
 }
 
 export function PageLayout({
@@ -29,6 +32,8 @@ export function PageLayout({
   showBack,
   backTo,
   onBackClick,
+  showHome,
+  showGallery,
   floatingLeft,
   floatingRight,
   ctaText,
@@ -37,6 +42,7 @@ export function PageLayout({
   onCtaClick,
   hideHeader = false,
   hideFloatingBar = false,
+  hideCta = false,
 }: PageLayoutProps) {
   return (
     <div className="min-h-screen bg-[--color-bg] flex flex-col">
@@ -47,6 +53,8 @@ export function PageLayout({
           showBack={showBack}
           backTo={backTo}
           onBackClick={onBackClick}
+          showHome={showHome}
+          showGallery={showGallery}
         />
       )}
 
@@ -60,10 +68,10 @@ export function PageLayout({
         <FloatingBar
           leftContent={floatingLeft}
           rightContent={floatingRight}
-          ctaText={ctaText}
-          ctaTo={ctaTo}
+          ctaText={hideCta ? undefined : ctaText}
+          ctaTo={hideCta ? undefined : ctaTo}
           ctaDisabled={ctaDisabled}
-          onCtaClick={onCtaClick}
+          onCtaClick={hideCta ? undefined : onCtaClick}
         />
       )}
     </div>

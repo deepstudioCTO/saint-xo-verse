@@ -125,12 +125,12 @@ export function VideoUploadButton({
         {isUploading ? (
           <>
             <LoadingSpinner />
-            업로드 중...
+            Uploading...
           </>
         ) : (
           <>
             <PlusIcon />
-            영상 추가
+            Add Video
           </>
         )}
       </Button>

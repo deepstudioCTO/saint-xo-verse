@@ -3,9 +3,11 @@ import { useRef, useState } from "react";
 interface GenerationGridItemProps {
   generation: {
     id: string;
+    type?: string;
     memberId: string | null;
     musicId: string | null;
     videoUrl: string | null;
+    outputUrl?: string | null;
     status: string;
     createdAt: string;
     thumbnailUrl?: string | null;
@@ -33,6 +35,7 @@ export function GenerationGridItem({
   const isCompleted = generation.status === "completed";
   const isFailed = generation.status === "failed";
   const isPending = generation.status === "pending" || generation.status === "processing";
+  const isImage = generation.type === "image";
 
   // Upscale states
   const isUpscaling = generation.upscaleStatus === "pending" || generation.upscaleStatus === "processing";
@@ -43,10 +46,13 @@ export function GenerationGridItem({
     ? generation.upscaledVideoUrl
     : generation.videoUrl;
 
+  // For images, use outputUrl
+  const displayImageUrl = generation.outputUrl;
+
   const handleMouseEnter = () => {
     if (!isCompleted) return;
     setIsHovering(true);
-    if (videoRef.current) {
+    if (!isImage && videoRef.current) {
       videoRef.current.currentTime = 0;
       videoRef.current.play().catch(() => {});
     }
@@ -54,7 +60,7 @@ export function GenerationGridItem({
 
   const handleMouseLeave = () => {
     setIsHovering(false);
-    if (videoRef.current) {
+    if (!isImage && videoRef.current) {
       videoRef.current.pause();
       videoRef.current.currentTime = 0;
     }
@@ -115,8 +121,8 @@ export function GenerationGridItem({
         </div>
       )}
 
-      {/* Video (for completed) */}
-      {isCompleted && displayVideoUrl && (
+      {/* Video (for completed video type) */}
+      {isCompleted && !isImage && displayVideoUrl && (
         <>
           {/* Thumbnail/first frame */}
           <video
@@ -139,6 +145,18 @@ export function GenerationGridItem({
             }`}
           />
         </>
+      )}
+
+      {/* Image (for completed image type) */}
+      {isCompleted && isImage && displayImageUrl && (
+        <img
+          src={displayImageUrl}
+          alt={characterName}
+          crossOrigin="anonymous"
+          className={`absolute inset-0 w-full h-full object-cover transition-all duration-200 ${
+            isActive ? "grayscale-0" : "grayscale"
+          }`}
+        />
       )}
 
       {/* Placeholder for pending/processing */}
@@ -171,16 +189,23 @@ export function GenerationGridItem({
         </div>
       )}
 
-      {/* Upscale badge */}
-      {isCompleted && isUpscaling && (
+      {/* Upscale badge (video only) */}
+      {isCompleted && !isImage && isUpscaling && (
         <div className="absolute top-2 right-2 z-30 flex items-center gap-1 px-1.5 py-0.5 bg-purple-600/90 rounded text-[9px] font-medium text-white">
           <div className="w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
           <span>Upscaling</span>
         </div>
       )}
-      {isCompleted && isUpscaled && !isUpscaling && (
+      {isCompleted && !isImage && isUpscaled && !isUpscaling && (
         <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-green-600/90 rounded text-[9px] font-bold text-white">
           HD
+        </div>
+      )}
+
+      {/* Image type badge */}
+      {isCompleted && isImage && (
+        <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-blue-600/90 rounded text-[9px] font-bold text-white">
+          IMG
         </div>
       )}
 

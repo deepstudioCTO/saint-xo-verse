@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useLoaderData, Link } from "react-router";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import type { Route } from "./+types/gallery";
 import { PageLayout } from "~/components/layout";
 import { LargeTitle, Counter } from "~/components/ui";
@@ -12,9 +12,10 @@ import {
   DialogDescription,
   DialogFooter,
 } from "~/components/ui/dialog";
-import { GenerationGridItem, VideoDetailModal } from "~/components/gallery";
-import { CHARACTERS_BY_ID, TRACKS_BY_ID } from "~/lib/data";
-import { getDb, generations, motionVideos } from "~/lib/db.server";
+import { GenerationGridItem, VideoDetailModal, ImageDetailModal, ResultUploadDialog } from "~/components/gallery";
+import { CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById, type Character } from "~/lib/data";
+import { getDb, generations, motionVideos, conceptImages, characters } from "~/lib/db.server";
+import { asc } from "drizzle-orm";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Gallery - Saint XO Verse" },
@@ -22,77 +23,198 @@ export const meta: Route.MetaFunction = () => [
 
 interface Generation {
   id: string;
+  type: string;
   memberId: string | null;
   musicId: string | null;
   motionVideoId: string | null;
+  conceptImageId: string | null;
   videoUrl: string | null;
+  outputUrl: string | null;
   status: string;
   createdAt: string;
   motionName: string | null;
+  conceptImageName: string | null;
   errorMessage: string | null;
+  prompt: string | null;
   // Upscale fields
   upscaleStatus: string | null;
   upscaleModel: string | null;
   upscaledVideoUrl: string | null;
 }
 
+interface MotionVideoOption {
+  id: string;
+  name: string;
+}
+
+interface ConceptImageOption {
+  id: string;
+  name: string | null;
+}
+
 interface LoaderData {
   generations: Generation[];
+  motionVideos: MotionVideoOption[];
+  conceptImages: ConceptImageOption[];
+  characters: Character[];
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
   const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-  // Query all generations (newest first)
+  // Query all generations (newest first - client will re-sort based on user selection)
   const allGenerations = await db
     .select()
     .from(generations)
     .orderBy(desc(generations.createdAt));
 
-  // Query motion video names
-  const generationsWithMotion: Generation[] = await Promise.all(
-    allGenerations.map(async (gen) => {
-      let motionName = null;
-      if (gen.motionVideoId) {
-        const [mv] = await db
-          .select({ name: motionVideos.name })
-          .from(motionVideos)
-          .where(eq(motionVideos.id, gen.motionVideoId))
-          .limit(1);
-        motionName = mv?.name || null;
-      }
-      return {
-        id: gen.id,
-        memberId: gen.memberId,
-        musicId: gen.musicId,
-        motionVideoId: gen.motionVideoId,
-        videoUrl: gen.videoUrl,
-        status: gen.status,
-        createdAt: gen.createdAt.toISOString(),
-        motionName,
-        errorMessage: gen.errorMessage,
-        upscaleStatus: gen.upscaleStatus,
-        upscaleModel: gen.upscaleModel,
-        upscaledVideoUrl: gen.upscaledVideoUrl,
-      };
-    })
-  );
+  // Query all motion videos for dropdown
+  const allMotionVideos = await db
+    .select({ id: motionVideos.id, name: motionVideos.name })
+    .from(motionVideos)
+    .orderBy(desc(motionVideos.createdAt));
 
-  return { generations: generationsWithMotion };
+  // Query all concept images for dropdown
+  const allConceptImages = await db
+    .select({ id: conceptImages.id, name: conceptImages.name })
+    .from(conceptImages)
+    .orderBy(desc(conceptImages.createdAt));
+
+  // Query all characters for dropdown and display
+  const allCharacters = await db
+    .select()
+    .from(characters)
+    .orderBy(asc(characters.displayOrder));
+
+  // Build lookup maps
+  const motionVideoMap = new Map(allMotionVideos.map((mv) => [mv.id, mv.name]));
+  const conceptImageMap = new Map(allConceptImages.map((ci) => [ci.id, ci.name]));
+
+  // Build generations with names
+  const generationsWithNames: Generation[] = allGenerations.map((gen) => {
+    const motionName = gen.motionVideoId
+      ? motionVideoMap.get(gen.motionVideoId) || null
+      : null;
+    const conceptImageName = gen.conceptImageId
+      ? conceptImageMap.get(gen.conceptImageId) || null
+      : null;
+    return {
+      id: gen.id,
+      type: gen.type,
+      memberId: gen.memberId,
+      musicId: gen.musicId,
+      motionVideoId: gen.motionVideoId,
+      conceptImageId: gen.conceptImageId,
+      videoUrl: gen.videoUrl,
+      outputUrl: gen.outputUrl,
+      status: gen.status,
+      createdAt: gen.createdAt.toISOString(),
+      motionName,
+      conceptImageName,
+      errorMessage: gen.errorMessage,
+      prompt: gen.prompt,
+      upscaleStatus: gen.upscaleStatus,
+      upscaleModel: gen.upscaleModel,
+      upscaledVideoUrl: gen.upscaledVideoUrl,
+    };
+  });
+
+  // Map characters to our type
+  const characterList: Character[] = allCharacters.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    video: c.video,
+    poster: c.poster,
+    displayOrder: c.displayOrder,
+  }));
+
+  return {
+    generations: generationsWithNames,
+    motionVideos: allMotionVideos,
+    conceptImages: allConceptImages,
+    characters: characterList,
+  };
 }
 
+type SortBy = "recent" | "character" | "action";
+type TypeFilter = "all" | "video" | "image";
+
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: "recent", label: "Recent" },
+  { value: "character", label: "Character" },
+  { value: "action", label: "Action" },
+];
+
+const TYPE_FILTERS: { value: TypeFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "video", label: "Videos" },
+  { value: "image", label: "Images" },
+];
+
 export default function Gallery() {
-  const { generations: initialGenerations } = useLoaderData<LoaderData>();
+  const { generations: initialGenerations, motionVideos: motionVideoOptions, conceptImages: conceptImageOptions, characters: loadedCharacters } = useLoaderData<LoaderData>();
+
+  // Create character lookup map from loaded data or fallback to defaults
+  const charactersById = loadedCharacters.length > 0
+    ? createCharactersById(loadedCharacters)
+    : CHARACTERS_BY_ID;
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
 
   const [generations, setGenerations] = useState<Generation[]>(initialGenerations);
   const [selectedGeneration, setSelectedGeneration] = useState<Generation | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [sortBy, setSortBy] = useState<SortBy>("recent");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
   // Delete state
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Upload dialog state
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+
+  // Filtered and sorted generations
+  const sortedGenerations = useMemo(() => {
+    // Filter by type
+    let filtered = generations;
+    if (typeFilter !== "all") {
+      filtered = generations.filter((g) => g.type === typeFilter);
+    }
+
+    // Sort
+    const sorted = [...filtered];
+    switch (sortBy) {
+      case "character":
+        return sorted.sort((a, b) => {
+          // NULL memberId goes last
+          if (!a.memberId && !b.memberId) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          if (!a.memberId) return 1;
+          if (!b.memberId) return -1;
+          // Sort by memberId, then by createdAt within same member
+          if (a.memberId !== b.memberId) return a.memberId.localeCompare(b.memberId);
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      case "action":
+        return sorted.sort((a, b) => {
+          // For videos, use motionVideoId; for images, use conceptImageId
+          const aActionId = a.type === "image" ? a.conceptImageId : a.motionVideoId;
+          const bActionId = b.type === "image" ? b.conceptImageId : b.motionVideoId;
+
+          // NULL actionId goes last
+          if (!aActionId && !bActionId) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          if (!aActionId) return 1;
+          if (!bActionId) return -1;
+          // Sort by actionId, then by createdAt within same action
+          if (aActionId !== bActionId) return aActionId.localeCompare(bActionId);
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+      case "recent":
+      default:
+        return sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+  }, [generations, sortBy, typeFilter]);
 
   // 업스케일 시작 시 즉시 상태 업데이트 핸들러
   const handleUpscaleStart = useCallback((id: string, model: string) => {
@@ -110,6 +232,36 @@ export default function Gallery() {
     );
   }, []);
 
+  // 음악 변경 시 상태 업데이트 핸들러
+  const handleMusicChange = useCallback((id: string, musicId: string | null) => {
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, musicId } : g))
+    );
+    setSelectedGeneration((prev) =>
+      prev?.id === id ? { ...prev, musicId } : prev
+    );
+  }, []);
+
+  // 모션 비디오 변경 시 상태 업데이트 핸들러
+  const handleMotionChange = useCallback((id: string, motionVideoId: string | null, motionName: string | null) => {
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, motionVideoId, motionName } : g))
+    );
+    setSelectedGeneration((prev) =>
+      prev?.id === id ? { ...prev, motionVideoId, motionName } : prev
+    );
+  }, []);
+
+  // 컨셉 이미지 변경 시 상태 업데이트 핸들러
+  const handleConceptImageChange = useCallback((id: string, conceptImageId: string | null, conceptImageName: string | null) => {
+    setGenerations((prev) =>
+      prev.map((g) => (g.id === id ? { ...g, conceptImageId, conceptImageName } : g))
+    );
+    setSelectedGeneration((prev) =>
+      prev?.id === id ? { ...prev, conceptImageId, conceptImageName } : prev
+    );
+  }, []);
+
   // generations 배열 변경 시 selectedGeneration 동기화
   useEffect(() => {
     if (!selectedGeneration) return;
@@ -122,21 +274,31 @@ export default function Gallery() {
     }
   }, [generations, selectedGeneration]);
 
-  // Polling: check status every 5 seconds for pending/processing videos
+  // Polling: check status every 5 seconds for pending/processing generations
   const pollPendingGenerations = useCallback(async () => {
-    const pendingIds = generations
-      .filter((g) => g.status === "pending" || g.status === "processing")
-      .map((g) => g.id);
+    const pendingItems = generations.filter(
+      (g) => g.status === "pending" || g.status === "processing"
+    );
 
-    if (pendingIds.length === 0) return;
+    if (pendingItems.length === 0) return;
 
     // Check status for each pending generation
     const updates = await Promise.all(
-      pendingIds.map(async (id) => {
+      pendingItems.map(async (item) => {
         try {
-          const res = await fetch(`/api/generate?id=${id}`);
+          // Use different endpoint based on type
+          const endpoint = item.type === "image"
+            ? `/api/generate-image?id=${item.id}`
+            : `/api/generate?id=${item.id}`;
+          const res = await fetch(endpoint);
           const data = await res.json();
-          return { id, status: data.status, videoUrl: data.output };
+          return {
+            id: item.id,
+            type: item.type,
+            status: data.status,
+            videoUrl: item.type === "video" ? data.output : null,
+            outputUrl: item.type === "image" ? data.output : null,
+          };
         } catch {
           return null;
         }
@@ -152,6 +314,7 @@ export default function Gallery() {
             ...gen,
             status: update.status,
             videoUrl: update.videoUrl || gen.videoUrl,
+            outputUrl: update.outputUrl || gen.outputUrl,
           };
         }
         return gen;
@@ -294,6 +457,11 @@ export default function Gallery() {
     }
   };
 
+  // Handle upload complete - add new generation to the front of the list
+  const handleUploadComplete = useCallback((generation: Generation) => {
+    setGenerations((prev) => [generation, ...prev]);
+  }, []);
+
   const completedCount = generations.filter((g) => g.status === "completed").length;
   const pendingCount = generations.filter(
     (g) => g.status === "pending" || g.status === "processing"
@@ -302,7 +470,7 @@ export default function Gallery() {
   // Helper to get character name
   const getCharacterName = (memberId: string | null) => {
     if (!memberId) return "Unknown";
-    return CHARACTERS_BY_ID[memberId]?.name || "Unknown";
+    return charactersById[memberId]?.name || "Unknown";
   };
 
   // Helper to get track name
@@ -315,19 +483,52 @@ export default function Gallery() {
     <PageLayout
       showBack
       backTo="/"
+      showHome
       headerRight={
-        <Link
-          to="/"
+        <button
+          onClick={() => setUploadDialogOpen(true)}
           className="text-sm font-medium text-[--color-text-secondary] hover:text-[--color-text] transition-colors"
         >
-          + New
-        </Link>
+          Upload
+        </button>
       }
     >
       <div className="page-padding min-h-[calc(100vh-7.5rem)] flex flex-col">
         {/* Title */}
-        <div className="pt-8 mb-8">
-          <LargeTitle>Gallery</LargeTitle>
+        <div className="pt-8 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <LargeTitle>Gallery</LargeTitle>
+            {/* Sort selector */}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              className="text-sm bg-transparent border border-[--color-border] rounded-lg px-3 py-1.5 text-[--color-text] focus:outline-none focus:ring-1 focus:ring-[--color-text]"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Type filter tabs */}
+          <div className="flex items-center gap-2 mb-4">
+            {TYPE_FILTERS.map((filter) => (
+              <button
+                key={filter.value}
+                onClick={() => setTypeFilter(filter.value)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                  typeFilter === filter.value
+                    ? "bg-black text-white"
+                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                }`}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+
           <div className="flex items-center gap-4">
             <Counter label="COMPLETED" count={completedCount} />
             {pendingCount > 0 && (
@@ -375,7 +576,7 @@ export default function Gallery() {
             </div>
           ) : (
             <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-              {generations.map((gen, index) => (
+              {sortedGenerations.map((gen, index) => (
                 <GenerationGridItem
                   key={gen.id}
                   generation={gen}
@@ -390,18 +591,39 @@ export default function Gallery() {
         </div>
       </div>
 
-      {/* Video Detail Modal */}
-      <VideoDetailModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        generation={selectedGeneration}
-        characterName={getCharacterName(selectedGeneration?.memberId || null)}
-        trackName={getTrackName(selectedGeneration?.musicId || null)}
-        motionName={selectedGeneration?.motionName || "Unknown"}
-        errorMessage={selectedGeneration?.errorMessage || null}
-        onDelete={handleDeleteRequest}
-        onUpscaleStart={handleUpscaleStart}
-      />
+      {/* Video Detail Modal (for video type) */}
+      {selectedGeneration?.type !== "image" && (
+        <VideoDetailModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          generation={selectedGeneration}
+          characterName={getCharacterName(selectedGeneration?.memberId || null)}
+          trackName={getTrackName(selectedGeneration?.musicId || null)}
+          motionName={selectedGeneration?.motionName || "Unknown"}
+          errorMessage={selectedGeneration?.errorMessage || null}
+          onDelete={handleDeleteRequest}
+          onUpscaleStart={handleUpscaleStart}
+          onMusicChange={handleMusicChange}
+          motionVideos={motionVideoOptions}
+          onMotionChange={handleMotionChange}
+        />
+      )}
+
+      {/* Image Detail Modal (for image type) */}
+      {selectedGeneration?.type === "image" && (
+        <ImageDetailModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          generation={selectedGeneration}
+          characterName={getCharacterName(selectedGeneration?.memberId || null)}
+          conceptImageName={selectedGeneration?.conceptImageName || null}
+          errorMessage={selectedGeneration?.errorMessage || null}
+          onDelete={handleDeleteRequest}
+          conceptImages={conceptImageOptions}
+          onMusicChange={handleMusicChange}
+          onConceptImageChange={handleConceptImageChange}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog
@@ -435,6 +657,14 @@ export default function Gallery() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Result Upload Dialog */}
+      <ResultUploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onUploadComplete={handleUploadComplete}
+        characters={loadedCharacters.length > 0 ? loadedCharacters : undefined}
+      />
     </PageLayout>
   );
 }

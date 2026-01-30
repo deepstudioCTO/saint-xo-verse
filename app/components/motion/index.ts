@@ -3,3 +3,8 @@ export type { UploadedVideo } from "./VideoUploadButton";
 export { ValidationDialog } from "./ValidationDialog";
 export { VideoTrimmer } from "./VideoTrimmer";
 export { VideoGridItem } from "./VideoGridItem";
+export { ImageUploadButton } from "./ImageUploadButton";
+export type { UploadedConceptImage } from "./ImageUploadButton";
+export { ConceptImageItem } from "./ConceptImageItem";
+export { ImageGenerateForm } from "./ImageGenerateForm";
+export type { ImageGenerateParams } from "./ImageGenerateForm";

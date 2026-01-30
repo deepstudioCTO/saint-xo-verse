@@ -87,7 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
           image: imageUrl,
           video: videoUrl,
           prompt: "a person performing the motion naturally",
-          mode: "std",
+          mode: "pro",
           character_orientation: "image",
         },
       }),

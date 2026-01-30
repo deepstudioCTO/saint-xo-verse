@@ -2,7 +2,6 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   index("routes/_index.tsx"),
-  route("music", "routes/music.tsx"),
   route("motion", "routes/motion.tsx"),
   route("generate", "routes/generate.tsx"),
   route("gallery", "routes/gallery.tsx"),
@@ -14,4 +13,16 @@ export default [
   route("api/delete-motion", "routes/api.delete-motion.tsx"),
   route("api/delete-generation", "routes/api.delete-generation.tsx"),
   route("api/upscale", "routes/api.upscale.tsx"),
+  route("api/upload-result", "routes/api.upload-result.tsx"),
+  route("api/upload-character-image", "routes/api.upload-character-image.tsx"),
+  route("api/delete-character-image", "routes/api.delete-character-image.tsx"),
+  route("api/update-music", "routes/api.update-music.tsx"),
+  route("api/update-motion", "routes/api.update-motion.tsx"),
+  route("api/update-generation-motion", "routes/api.update-generation-motion.tsx"),
+  route("api/upload-concept-image", "routes/api.upload-concept-image.tsx"),
+  route("api/delete-concept-image", "routes/api.delete-concept-image.tsx"),
+  route("api/generate-image", "routes/api.generate-image.tsx"),
+  route("api/update-concept-image", "routes/api.update-concept-image.tsx"),
+  route("api/update-generation-concept-image", "routes/api.update-generation-concept-image.tsx"),
+  route("api/update-character", "routes/api.update-character.tsx"),
 ] satisfies RouteConfig;

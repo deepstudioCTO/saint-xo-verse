@@ -6,8 +6,9 @@ import { PageLayout } from "~/components/layout";
 import { VideoPlayerWithMusic } from "~/components/common/VideoPlayerWithMusic";
 import { getMusicFilePath, getTrackName } from "~/lib/music-data";
 import { mergeVideoWithMusic, downloadBlob, type MergeProgress } from "~/lib/audio-merge";
-import { CHARACTERS_BY_ID } from "~/lib/data";
-import { getDb, generations, motionVideos } from "~/lib/db.server";
+import { CHARACTERS_BY_ID, createCharactersById, type Character } from "~/lib/data";
+import { getDb, generations, motionVideos, characters } from "~/lib/db.server";
+import { asc } from "drizzle-orm";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Result - Saint XO Verse" },
@@ -25,6 +26,7 @@ interface LoaderData {
   motionVideo: {
     name: string;
   } | null;
+  characters: Character[];
   error?: string;
 }
 
@@ -32,7 +34,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const id = params.id;
 
   if (!id) {
-    return { generation: null, motionVideo: null, error: "ID is required" };
+    return { generation: null, motionVideo: null, characters: [], error: "ID is required" };
   }
 
   const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -45,7 +47,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     .limit(1);
 
   if (!generation) {
-    return { generation: null, motionVideo: null, error: "Generation not found" };
+    return { generation: null, motionVideo: null, characters: [], error: "Generation not found" };
   }
 
   // Query Motion Video name
@@ -59,6 +61,21 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     motionVideo = mv || null;
   }
 
+  // Query all characters
+  const allCharacters = await db
+    .select()
+    .from(characters)
+    .orderBy(asc(characters.displayOrder));
+
+  const characterList: Character[] = allCharacters.map((c) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description,
+    video: c.video,
+    poster: c.poster,
+    displayOrder: c.displayOrder,
+  }));
+
   return {
     generation: {
       id: generation.id,
@@ -69,13 +86,19 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       createdAt: generation.createdAt.toISOString(),
     },
     motionVideo,
+    characters: characterList,
   };
 }
 
 export default function Result() {
-  const { generation, motionVideo, error } = useLoaderData<LoaderData>();
+  const { generation, motionVideo, characters: loadedCharacters, error } = useLoaderData<LoaderData>();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<MergeProgress | null>(null);
+
+  // Create character lookup map from loaded data or fallback to defaults
+  const charactersById = loadedCharacters.length > 0
+    ? createCharactersById(loadedCharacters)
+    : CHARACTERS_BY_ID;
 
   if (error || !generation) {
     return (
@@ -90,7 +113,7 @@ export default function Result() {
     );
   }
 
-  const character = CHARACTERS_BY_ID[generation.memberId || ""] || { name: "Unknown", imageUrl: "" };
+  const character = charactersById[generation.memberId || ""] || { name: "Unknown", imageUrl: "" };
   const trackName = getTrackName(generation.musicId);
   const motionName = motionVideo?.name || "Unknown";
   const musicPath = getMusicFilePath(generation.musicId);
@@ -175,11 +198,10 @@ export default function Result() {
 
   return (
     <PageLayout
-      headerRight={
-        <Link to="/" className="text-subtitle hover:text-[--color-text] transition-normal">
-          NEW
-        </Link>
-      }
+      showBack
+      backTo="/gallery"
+      showHome
+      showGallery
       floatingLeft={
         <div className="flex items-center gap-4">
           <button
