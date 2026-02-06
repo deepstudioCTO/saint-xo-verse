@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import { Button } from "~/components/ui";
 
 interface ImageUploadButtonProps {
   onUploadStart?: () => void;
@@ -74,63 +73,14 @@ export function ImageUploadButton({
         className="hidden"
         onChange={handleFileChange}
       />
-      <Button
-        variant="outline"
-        size="sm"
+      <button
         onClick={handleClick}
         disabled={isUploading}
-        className="gap-2"
+        className="text-sm font-medium text-[--color-text-secondary] hover:text-[--color-text] transition-colors disabled:opacity-50 cursor-pointer"
       >
-        {isUploading ? (
-          <>
-            <LoadingSpinner />
-            Uploading...
-          </>
-        ) : (
-          <>
-            <PlusIcon />
-            Add Image
-          </>
-        )}
-      </Button>
+        {isUploading ? "Uploading..." : "Upload"}
+      </button>
     </>
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <line x1="12" y1="5" x2="12" y2="19" />
-      <line x1="5" y1="12" x2="19" y2="12" />
-    </svg>
-  );
-}
-
-function LoadingSpinner() {
-  return (
-    <svg
-      className="animate-spin"
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
-  );
-}

@@ -487,7 +487,7 @@ export default function Gallery() {
       headerRight={
         <button
           onClick={() => setUploadDialogOpen(true)}
-          className="text-sm font-medium text-[--color-text-secondary] hover:text-[--color-text] transition-colors"
+          className="text-sm font-medium text-[--color-text-secondary] hover:text-[--color-text] transition-colors cursor-pointer"
         >
           Upload
         </button>
@@ -502,7 +502,7 @@ export default function Gallery() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as SortBy)}
-              className="text-sm bg-transparent border border-[--color-border] rounded-lg px-3 py-1.5 text-[--color-text] focus:outline-none focus:ring-1 focus:ring-[--color-text]"
+              className="text-sm bg-transparent border border-[--color-border] rounded-lg px-3 py-1.5 text-[--color-text] focus:outline-none focus:ring-1 focus:ring-[--color-text] cursor-pointer"
             >
               {SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -518,7 +518,7 @@ export default function Gallery() {
               <button
                 key={filter.value}
                 onClick={() => setTypeFilter(filter.value)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer ${
                   typeFilter === filter.value
                     ? "bg-black text-white"
                     : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
@@ -643,14 +643,14 @@ export default function Gallery() {
             <button
               onClick={() => setDeleteTarget(null)}
               disabled={isDeleting}
-              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="px-4 py-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </button>

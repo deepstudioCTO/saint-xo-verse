@@ -59,7 +59,7 @@ const GalleryIcon = () => (
   </svg>
 );
 
-const navButtonClass = "text-[--color-text-secondary] hover:text-[--color-text] transition-normal";
+const navButtonClass = "text-[--color-text-secondary] hover:text-[--color-text] transition-normal cursor-pointer";
 
 export function Header({
   rightElement,

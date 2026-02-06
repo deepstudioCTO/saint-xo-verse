@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams, useNavigate, useLoaderData, useRevalidator, Link } from "react-router";
 import type { Route } from "./+types/_index";
 import { LargeTitle, Counter, StepIndicator } from "~/components/ui";
@@ -6,6 +6,83 @@ import { BackIcon, GalleryIcon, navButtonClass } from "~/components/layout/Heade
 import { CHARACTERS as DEFAULT_CHARACTERS, type Character } from "~/lib/data";
 import { getDb, characterImages, characters } from "~/lib/db.server";
 import { asc } from "drizzle-orm";
+import { VideoCanvas } from "~/components/effects/VideoCanvas";
+
+// Video Modal Component
+function VideoModal({
+  videoType,
+  onClose,
+}: {
+  videoType: "verse" | "bot";
+  onClose: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Close on escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Stop video when closing
+  const handleClose = useCallback(() => {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    onClose();
+  }, [onClose]);
+
+  const videoSrc = videoType === "verse"
+    ? "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/intro-videos/verse.mp4"
+    : "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/intro-videos/bot.mp4";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
+      onClick={handleClose}
+    >
+      {/* Close button */}
+      <button
+        onClick={handleClose}
+        className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
+
+      {/* Video container */}
+      <div
+        className="relative w-full max-w-4xl mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <video
+          ref={videoRef}
+          src={videoSrc}
+          autoPlay
+          controls
+          playsInline
+          className="w-full rounded-lg"
+        />
+      </div>
+    </div>
+  );
+}
 
 export const meta: Route.MetaFunction = () => [
   { title: "Saint XO Verse" },
@@ -95,6 +172,9 @@ export default function Home() {
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Video modal state
+  const [openVideo, setOpenVideo] = useState<"verse" | "bot" | null>(null);
 
   // Get images for current character
   const currentImages = currentCharacter ? imagesByCharacter[currentCharacter.id] || [] : [];
@@ -332,17 +412,12 @@ export default function Home() {
               }}
               onClick={() => setSearchParams({ selected: character.id })}
             >
-              <div className="w-24 h-48 md:w-28 md:h-56 overflow-hidden">
-                <video
+              <div className="w-[5.5vw] min-w-[80px] max-w-[150px] aspect-[1/2] overflow-hidden">
+                <VideoCanvas
                   src={character.video}
                   poster={character.poster}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  disablePictureInPicture
-                  draggable={false}
-                  className="w-full h-full object-cover object-top transition-all duration-500 ease-out select-none pointer-events-none"
+                  preset="saintXo"
+                  className="w-full h-full"
                   style={{
                     filter: grayscale ? "grayscale(100%)" : "grayscale(0%)",
                   }}
@@ -365,9 +440,26 @@ export default function Home() {
             <GalleryIcon />
           </Link>
         </div>
-        {isSelecting && currentCharacter && (
-          <StepIndicator label="CHARACTER" current={selectedIndex + 1} total={characterList.length} />
-        )}
+        <div className="flex items-center gap-3">
+          {isSelecting && currentCharacter && (
+            <StepIndicator label="CHARACTER" current={selectedIndex + 1} total={characterList.length} />
+          )}
+          {/* Verse and Bot video buttons */}
+          <button
+            onClick={() => setOpenVideo("verse")}
+            className={navButtonClass}
+            title="Verse Video"
+          >
+            <span className="text-lg">🌐</span>
+          </button>
+          <button
+            onClick={() => setOpenVideo("bot")}
+            className={navButtonClass}
+            title="Bot Video"
+          >
+            <span className="text-lg">🤖</span>
+          </button>
+        </div>
       </header>
 
       {/* Layer 3: Title */}
@@ -393,7 +485,7 @@ export default function Home() {
                   <LargeTitle>{currentCharacter.name}</LargeTitle>
                   <button
                     onClick={handleStartEditName}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1"
+                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 cursor-pointer"
                     title="Edit name"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -424,7 +516,7 @@ export default function Home() {
                   </p>
                   <button
                     onClick={handleStartEditDescription}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0"
+                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0 cursor-pointer"
                     title="Edit description"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -452,7 +544,7 @@ export default function Home() {
                         [currentCharacter.id]: img.variantId,
                       }));
                     }}
-                    className={`w-12 h-16 md:w-14 md:h-20 rounded overflow-hidden border-2 transition-all ${
+                    className={`w-12 h-16 md:w-14 md:h-20 rounded overflow-hidden border-2 transition-all cursor-pointer ${
                       (selectedImageVariant[currentCharacter.id] || "default") === img.variantId
                         ? "border-white ring-2 ring-white/30"
                         : "border-transparent opacity-60 hover:opacity-100"
@@ -472,7 +564,7 @@ export default function Home() {
                         handleDelete(img.id, img.variantId);
                       }}
                       disabled={deleting === img.id}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-neutral-600 hover:bg-neutral-500 rounded-full flex items-center justify-center text-white transition-all"
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-neutral-600 hover:bg-neutral-500 rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
                     >
                       {deleting === img.id ? (
                         <span className="animate-spin text-xs">...</span>
@@ -493,7 +585,7 @@ export default function Home() {
                   fileInputRef.current?.click();
                 }}
                 disabled={uploading}
-                className="w-6 h-6 rounded-full bg-black hover:bg-neutral-800 flex items-center justify-center text-white transition-all"
+                className="w-6 h-6 rounded-full bg-black hover:bg-neutral-800 flex items-center justify-center text-white transition-all cursor-pointer"
               >
                 {uploading ? (
                   <span className="animate-spin text-xs">...</span>
@@ -557,7 +649,7 @@ export default function Home() {
                 }
               : () => setSearchParams({ selected: characterList[0].id })
           }
-          className="px-4 py-2 text-sm font-medium bg-[--color-text] text-[--color-bg] rounded"
+          className="px-4 py-2 text-sm font-medium bg-[--color-text] text-[--color-bg] rounded cursor-pointer"
         >
           {isSelecting ? "Select" : "Start"} →
         </button>
@@ -570,7 +662,7 @@ export default function Home() {
             onClick={() => selectedIndex > 0 && setSearchParams({ selected: characterList[selectedIndex - 1].id })}
             disabled={selectedIndex === 0}
             className={`flex items-center gap-2 text-sm font-medium transition-all ${
-              selectedIndex === 0 ? "opacity-30 cursor-not-allowed" : "opacity-70 hover:opacity-100"
+              selectedIndex === 0 ? "opacity-30 cursor-not-allowed" : "opacity-70 hover:opacity-100 cursor-pointer"
             }`}
           >
             ← PREV
@@ -579,12 +671,17 @@ export default function Home() {
             onClick={() => selectedIndex < characterList.length - 1 && setSearchParams({ selected: characterList[selectedIndex + 1].id })}
             disabled={selectedIndex === characterList.length - 1}
             className={`flex items-center gap-2 text-sm font-medium transition-all ${
-              selectedIndex === characterList.length - 1 ? "opacity-30 cursor-not-allowed" : "opacity-70 hover:opacity-100"
+              selectedIndex === characterList.length - 1 ? "opacity-30 cursor-not-allowed" : "opacity-70 hover:opacity-100 cursor-pointer"
             }`}
           >
             NEXT →
           </button>
         </div>
+      )}
+
+      {/* Video Modal */}
+      {openVideo && (
+        <VideoModal videoType={openVideo} onClose={() => setOpenVideo(null)} />
       )}
     </div>
   );

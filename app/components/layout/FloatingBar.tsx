@@ -21,7 +21,7 @@ export function FloatingBar({
     px-6 py-3 text-sm font-medium transition-normal
     ${ctaDisabled
       ? "text-[--color-text-tertiary] cursor-not-allowed"
-      : "text-[--color-text] hover:opacity-70"
+      : "text-[--color-text] hover:opacity-70 cursor-pointer"
     }
   `;
 

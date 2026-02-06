@@ -76,7 +76,7 @@ export function ConceptImageItem({
       onMouseLeave={() => setIsHovering(false)}
       className={`
         relative w-full bg-[--color-border-light] overflow-hidden
-        transition-all duration-200 ease-out group aspect-[1/2]
+        transition-all duration-200 ease-out group aspect-[1/2] cursor-pointer
         ${isSelected
           ? "scale-[1.03] shadow-xl shadow-black/25 z-10"
           : "hover:scale-[1.02] hover:shadow-lg hover:z-10"
@@ -140,7 +140,7 @@ export function ConceptImageItem({
       {onNameChange && !isEditing && (
         <button
           onClick={handleEditClick}
-          className={`absolute bottom-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center z-20 transition-opacity hover:bg-black/80 ${
+          className={`absolute bottom-2 right-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center z-20 transition-opacity hover:bg-black/80 cursor-pointer ${
             isHovering ? "opacity-100" : "opacity-0"
           }`}
           title="Rename"
@@ -168,7 +168,7 @@ export function ConceptImageItem({
             e.stopPropagation();
             onDelete(image.id);
           }}
-          className={`absolute bottom-2 left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center z-20 transition-opacity hover:bg-red-600 ${
+          className={`absolute bottom-2 left-2 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center z-20 transition-opacity hover:bg-red-600 cursor-pointer ${
             isHovering ? "opacity-100" : "opacity-0"
           }`}
           title="Delete"

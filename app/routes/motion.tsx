@@ -438,13 +438,13 @@ export default function Motion() {
       <div className="page-padding min-h-[calc(100vh-3.5rem)] flex flex-col pb-32">
         {/* Title + Tabs */}
         <div className="pt-8 mb-6">
-          <LargeTitle>Action Lego item</LargeTitle>
+          <LargeTitle>Skills</LargeTitle>
 
           {/* Tab Selector */}
           <div className="flex items-center gap-4 mt-4">
             <button
               onClick={() => setActiveTab("video")}
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors cursor-pointer ${
                 activeTab === "video"
                   ? "bg-black text-white"
                   : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
@@ -454,7 +454,7 @@ export default function Motion() {
             </button>
             <button
               onClick={() => setActiveTab("image")}
-              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              className={`px-4 py-2 text-sm font-medium rounded-full transition-colors cursor-pointer ${
                 activeTab === "image"
                   ? "bg-black text-white"
                   : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
@@ -578,7 +578,7 @@ export default function Motion() {
                 disabled={!selectedVideoId || isGeneratingVideo}
                 className={`px-8 py-3 rounded-full font-medium text-sm transition-colors ${
                   selectedVideoId && !isGeneratingVideo
-                    ? "bg-black text-white hover:bg-neutral-800"
+                    ? "bg-black text-white hover:bg-neutral-800 cursor-pointer"
                     : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
                 }`}
               >
@@ -609,7 +609,7 @@ export default function Motion() {
                   <span>Reference: {selectedImage.name || "Untitled"}</span>
                   <button
                     onClick={() => setSelectedImageId(null)}
-                    className="ml-1 text-neutral-400 hover:text-neutral-600"
+                    className="ml-1 text-neutral-400 hover:text-neutral-600 cursor-pointer"
                   >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <line x1="18" y1="6" x2="6" y2="18" />
@@ -637,7 +637,7 @@ export default function Motion() {
                 {/* Advanced toggle */}
                 <button
                   onClick={() => setShowAdvanced(!showAdvanced)}
-                  className={`p-3 rounded-full border transition-colors ${
+                  className={`p-3 rounded-full border transition-colors cursor-pointer ${
                     showAdvanced
                       ? "bg-neutral-100 border-neutral-300"
                       : "border-neutral-200 hover:bg-neutral-50"
@@ -665,7 +665,7 @@ export default function Motion() {
                   disabled={!canGenerateImage || isGeneratingImage}
                   className={`px-6 py-3 rounded-full font-medium text-sm whitespace-nowrap transition-colors ${
                     canGenerateImage && !isGeneratingImage
-                      ? "bg-black text-white hover:bg-neutral-800"
+                      ? "bg-black text-white hover:bg-neutral-800 cursor-pointer"
                       : "bg-neutral-200 text-neutral-400 cursor-not-allowed"
                   }`}
                 >
@@ -700,7 +700,7 @@ export default function Motion() {
                             onClick={() =>
                               setReferenceType(referenceType === type.id ? null : type.id)
                             }
-                            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                            className={`px-3 py-1.5 text-xs rounded-full border transition-colors cursor-pointer ${
                               referenceType === type.id
                                 ? "bg-black text-white border-black"
                                 : "bg-white text-neutral-600 border-neutral-300 hover:border-neutral-400"
@@ -794,14 +794,14 @@ export default function Motion() {
             <button
               onClick={() => setDeleteTarget(null)}
               disabled={isDeleting}
-              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={handleDeleteConfirm}
               disabled={isDeleting}
-              className="px-4 py-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors disabled:opacity-50"
+              className="px-4 py-2 text-sm font-medium text-red-500 hover:text-red-400 transition-colors disabled:opacity-50 cursor-pointer"
             >
               {isDeleting ? "Deleting..." : "Delete"}
             </button>

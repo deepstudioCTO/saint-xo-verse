@@ -252,7 +252,7 @@ export function ResultUploadDialog({
                       fileInputRef.current.value = "";
                     }
                   }}
-                  className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors"
+                  className="absolute top-2 right-2 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center hover:bg-black/80 transition-colors cursor-pointer"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -371,14 +371,14 @@ export function ResultUploadDialog({
           <button
             onClick={handleClose}
             disabled={isUploading}
-            className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors disabled:opacity-50 cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={handleUpload}
             disabled={!canUpload}
-            className="px-4 py-2 text-sm font-medium bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 text-sm font-medium bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
             {isUploading ? "Uploading..." : "Upload"}
           </button>

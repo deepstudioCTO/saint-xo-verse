@@ -310,7 +310,7 @@ export function VideoDetailModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute -top-12 right-0 text-white/60 hover:text-white transition-colors"
+          className="absolute -top-12 right-0 text-white/60 hover:text-white transition-colors cursor-pointer"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -333,7 +333,7 @@ export function VideoDetailModal({
           <div className="absolute -top-12 left-0 flex gap-2">
             <button
               onClick={() => setShowUpscaledVideo(false)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full transition-colors cursor-pointer ${
                 !showUpscaledVideo
                   ? "bg-white text-black"
                   : "bg-white/20 text-white hover:bg-white/30"
@@ -343,7 +343,7 @@ export function VideoDetailModal({
             </button>
             <button
               onClick={() => setShowUpscaledVideo(true)}
-              className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full transition-colors cursor-pointer ${
                 showUpscaledVideo
                   ? "bg-white text-black"
                   : "bg-white/20 text-white hover:bg-white/30"
@@ -456,7 +456,7 @@ export function VideoDetailModal({
               {/* None option */}
               <button
                 onClick={() => handleMusicSelect(null)}
-                className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
+                className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                   selectedMusicId === null
                     ? "bg-white/20 ring-2 ring-white"
                     : "bg-white/10 opacity-60 hover:opacity-100"
@@ -483,7 +483,7 @@ export function VideoDetailModal({
                 <button
                   key={track.id}
                   onClick={() => handleMusicSelect(track.id)}
-                  className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all ${
+                  className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all cursor-pointer ${
                     selectedMusicId === track.id
                       ? "ring-2 ring-white"
                       : "opacity-60 hover:opacity-100"
@@ -512,7 +512,7 @@ export function VideoDetailModal({
                   e.stopPropagation();
                   setShowMotionDropdown(!showMotionDropdown);
                 }}
-                className="text-xs text-neutral-600 hover:text-neutral-900 transition-colors flex items-center gap-1"
+                className="text-xs text-neutral-600 hover:text-neutral-900 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 {motionName}
                 <svg
@@ -539,13 +539,13 @@ export function VideoDetailModal({
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   <div className="px-3 py-2 bg-neutral-50 border-b border-neutral-200 flex-shrink-0">
-                    <span className="text-xs font-medium text-neutral-500">Select Motion</span>
+                    <span className="text-xs font-medium text-neutral-500">Select Skill</span>
                   </div>
                   <div className="overflow-y-auto overscroll-contain flex-1">
                     {/* None option */}
                     <button
                       onClick={(e) => handleMotionSelect(e, null)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors ${
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors cursor-pointer ${
                         !generation.motionVideoId ? "bg-neutral-100 font-medium" : ""
                       }`}
                     >
@@ -556,7 +556,7 @@ export function VideoDetailModal({
                       <button
                         key={mv.id}
                         onClick={(e) => handleMotionSelect(e, mv.id)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors truncate ${
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors truncate cursor-pointer ${
                           generation.motionVideoId === mv.id ? "bg-neutral-100 font-medium" : ""
                         }`}
                       >
@@ -578,7 +578,7 @@ export function VideoDetailModal({
             {onDelete && (
               <button
                 onClick={() => onDelete(generation.id)}
-                className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors"
+                className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors cursor-pointer"
                 disabled={isDownloading || isUpscaling}
               >
                 Delete
@@ -593,7 +593,7 @@ export function VideoDetailModal({
                   <button
                     onClick={() => setShowUpscaleMenu(!showUpscaleMenu)}
                     disabled={isDownloading || isUpscaling || upscaleStatus === "completed"}
-                    className={`text-xs font-medium transition-colors disabled:opacity-50 ${
+                    className={`text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer ${
                       upscaleStatus === "completed"
                         ? "text-green-600"
                         : "text-purple-600 hover:text-purple-800"
@@ -612,7 +612,7 @@ export function VideoDetailModal({
                         <button
                           key={model.id}
                           onClick={() => handleUpscale(model.id)}
-                          className="w-full px-3 py-2.5 text-left hover:bg-neutral-50 transition-colors"
+                          className="w-full px-3 py-2.5 text-left hover:bg-neutral-50 transition-colors cursor-pointer"
                         >
                           <div className="text-sm font-medium text-neutral-900">{model.name}</div>
                           <div className="text-xs text-neutral-500">{model.description}</div>
@@ -627,7 +627,7 @@ export function VideoDetailModal({
                   <button
                     onClick={() => handleDownload(showUpscaledVideo)}
                     disabled={isDownloading || isUpscaling}
-                    className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors disabled:opacity-50"
+                    className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors disabled:opacity-50 cursor-pointer"
                   >
                     {isDownloading ? "Processing..." : "Download"}
                   </button>
@@ -635,7 +635,7 @@ export function VideoDetailModal({
 
                 <button
                   onClick={handleShare}
-                  className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+                  className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
                 >
                   Share
                 </button>

@@ -46,7 +46,8 @@ motion-videos/
 ├── uploaded-videos/  # 직접 업로드된 결과 영상 (2026-01-30)
 ├── uploaded-images/  # 직접 업로드된 결과 이미지 (2026-01-30)
 ├── concept-images/   # 컨셉/레퍼런스 이미지 (2026-01-30)
-└── generated-images/ # Nano Banana Pro 생성 이미지 (2026-01-30)
+├── generated-images/ # Nano Banana Pro 생성 이미지 (2026-01-30)
+└── intro-videos/     # Verse/Bot 소개 영상 (2026-02-01)
 ```
 
 ### 버킷 생성 스크립트
@@ -65,6 +66,239 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/upload-member-images.ts
 - Tailwind CSS v4
 - ffmpeg.wasm (브라우저 기반 영상 트리밍 + 음악 합성)
 - Replicate API (영상 생성, 이미지 생성, 업스케일)
+
+## MCP 서버 설정 (2026-02-06)
+
+### 프로젝트별 Slack MCP 연동
+이 프로젝트에서만 Slack MCP 서버가 활성화됨 (전역 설정과 분리)
+
+**설정 파일**: `.claude/settings.local.json`
+```json
+{
+  "mcpServers": {
+    "slack": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-slack"],
+      "env": {
+        "SLACK_BOT_TOKEN": "xoxb-...",
+        "SLACK_TEAM_ID": "T03GNHC0WR4"
+      }
+    }
+  }
+}
+```
+
+### 사용 가능한 Slack 기능
+| 기능 | 설명 |
+|------|------|
+| `slack_list_channels` | 채널 목록 조회 |
+| `slack_get_channel_history` | 채널 메시지 읽기 |
+| `slack_post_message` | 메시지 전송 |
+| `slack_reply_to_thread` | 스레드 답장 |
+| `slack_add_reaction` | 이모지 반응 |
+| `slack_get_users` | 사용자 목록 |
+
+### 주의사항
+- Bot을 사용할 채널에 `/invite @봇이름`으로 초대 필요
+- `thread_ts` 형식: `1234567890.123456` (마침표 뒤 6자리)
+- 비공개 채널은 별도 권한 필요 (`groups:read`, `groups:history`)
+
+### 슬랙 메시지 전송 방법 (curl API)
+MCP 도구 대신 curl로 직접 Slack API 호출:
+
+```bash
+curl -X POST https://slack.com/api/chat.postMessage \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d '{
+    "channel": "채널ID",
+    "text": "<@유저ID> 메시지 내용"
+  }'
+```
+
+**주요 ID:**
+| 항목 | ID |
+|------|-----|
+| 뇌절캠 기획뼈대 채널 | C09N69N75BM |
+| 대표님 | U03GY6ZV3U4 |
+| 팀 ID | T03GNHC0WR4 |
+
+**유저 멘션**: `<@U03GY6ZV3U4>` 형식으로 태그
+
+## 타이포그래피 (2026-02-05)
+
+### 폰트 스택
+- **Orbitron** (Google Fonts) - 영문 메인 폰트
+- **Pretendard** - 한글 폴백 폰트
+
+### 폰트 선택 배경
+- Bécane Paris 웹사이트 참조 (원본: Eurostile Becane)
+- Eurostile은 1962년 기하학적 산세리프, 모서리가 둥근 사각형 형태가 특징
+- Orbitron은 Eurostile과 유사한 무료 대안 (Google Fonts)
+
+### 설정 파일
+- `app/root.tsx` - Google Fonts 링크
+  ```typescript
+  href: "https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Pretendard:wght@400;500;600;700&display=swap"
+  ```
+- `app/app.css` - CSS 변수
+  ```css
+  --font-sans: "Orbitron", "Pretendard", ui-sans-serif, system-ui, sans-serif, ...
+  ```
+
+### Orbitron 특징
+- 웨이트: 400-900 지원
+- 스타일: 기하학적, 미래지향적, 스퀘어한 형태
+- 용도: 제목, UI 텍스트 (본문보다는 헤딩에 적합)
+
+## 비디오 효과 시스템 (2026-02-05)
+
+### 개요
+캐릭터 선택 화면에서 비디오에 글리치 효과 적용
+
+### 렌더러 옵션
+`VideoCanvas` 컴포넌트의 `renderer` prop으로 선택:
+
+| 렌더러 | 설명 | 장점 | 단점 |
+|--------|------|------|------|
+| `webgl` (기본) | 순수 WebGL 셰이더 | 고성능, GPU 가속, 단일 드로우 콜 | - |
+| `canvas` | Canvas 2D API | 세밀한 글리치, WebGL 폴백 | CPU 사용량 높음 |
+| `none` | 효과 없음 | 최고 성능 | - |
+
+### 성능 최적화 (2026-02-05)
+
+기존 Canvas 2D 렌더러의 성능 문제:
+- 모바일: CPU 100%, 프레임 드롭
+- Mac: 심한 발열, 배터리 드레인
+- 원인: 매 프레임 250+ drawImage() 호출, getBoundingClientRect() 레이아웃 스래싱
+
+WebGL 렌더러로 해결:
+- Three.js/postprocessing 제거 → 순수 WebGL API
+- 단일 드로우 콜: 모든 효과를 하나의 fragment shader에서 처리
+- GPU 병렬 처리: 400개 밴드도 성능 영향 없음
+- 조건부 렌더링: 글리치 비활성 시 30fps로 throttle
+- DPR 최대 2로 제한 (모바일 3x 스케일링 방지)
+
+| 지표 | Canvas 2D (이전) | WebGL (현재) |
+|------|------------------|--------------|
+| 드로우 콜/프레임 | 250+ | 1 |
+| CPU 사용률 | 50-100% | <5% |
+| GPU 사용률 | 0% | 10-20% |
+| 모바일 FPS | 5-10 | 60 |
+| 배터리 영향 | 심각 | 최소 |
+
+### 사용법
+```tsx
+import { VideoCanvas } from "~/components/effects/VideoCanvas";
+
+// WebGL 글리치 (기본, 권장)
+<VideoCanvas src={videoUrl} />
+<VideoCanvas src={videoUrl} renderer="webgl" />
+
+// Canvas 2D 글리치 (WebGL 미지원 시 자동 폴백)
+<VideoCanvas src={videoUrl} renderer="canvas" />
+
+// 효과 없음
+<VideoCanvas src={videoUrl} renderer="none" />
+```
+
+### 프리셋
+```tsx
+// 기본 프리셋
+<VideoCanvas src={url} preset="saintXo" />  // 2.5~3.5초 간격
+<VideoCanvas src={url} preset="intense" />  // 1.5~2.5초 간격, 강한 효과
+<VideoCanvas src={url} preset="subtle" />   // 4~6초 간격, 약한 효과
+<VideoCanvas src={url} preset="none" />     // 효과 없음
+```
+
+### 파일 구조
+```
+app/components/effects/
+├── VideoCanvas.tsx         # 메인 컴포넌트 (렌더러 선택)
+├── WebGLGlitchVideo.tsx    # WebGL 렌더러 (기본, 고성능)
+└── CanvasGlitchVideo.tsx   # Canvas 2D 렌더러 (폴백)
+```
+
+### 글리치 효과 구성
+
+#### 1. 메인 글리치 (2.5~3.5초 간격 발생)
+- **밴드 displacement**: 45% 밴드가 좌우로 ±2px 이동
+- **좌우 흔들림**: 전체 이미지 ±2px 수평 흔들림
+- **상하 왜곡**: 전체 이미지 ±0.7% 수직 스케일 변화
+- `bandCount`: 400 (세밀한 밴드)
+- `maxDisplacement`: 2px
+- `glitchDelay`: [2.5, 3.5]초
+- `glitchDuration`: [0.1, 0.2]초
+
+#### 2. 평상시 미세 글리치
+- 3% 밴드가 ±1.5px 미세하게 움직임
+- 300ms마다 패턴 변경
+- 항상 활성화 (메인 글리치가 아닐 때)
+
+#### 3. 스캔라인 효과 (2026-02-05 개선)
+하나의 스캔라인이 아래에서 위로 이동하며 지나가는 영역에 CRT 지지직 효과 적용:
+
+- **두께**: 20px
+- **속도**: 0.12
+- **지터**: ±1.5px (라인별)
+
+**CRT 효과:**
+- **RGB 채널 분리 (Chromatic Aberration)**: R, G, B 채널을 각각 다른 위치에서 샘플링
+  - Red: +1.3x 오프셋
+  - Green: 기준점 (0)
+  - Blue: -0.8x 오프셋 (반대 방향)
+- **가장자리 페이드**: 스캔라인 중심에서 가장자리로 효과 점진적 감소
+- **라인별 노이즈**: 각 수평 라인마다 다른 랜덤 오프셋
+- **픽셀 밝기 노이즈**: 0~6% 랜덤 밝기 변화
+- **간헐적 라인 하이라이트**: 6% 확률로 수평 라인 밝기 증가
+- **세밀한 변화**: 노이즈 패턴이 빠르게 변화하여 CRT 지지직 느낌 강화
+
+### 크기 기반 효과 스케일링 (2026-02-05)
+
+#### 문제
+- 홈 화면 썸네일(~80px): 글리치 효과가 과함
+- 캐릭터 선택 화면(~280px): 적당함
+- 원인: displacement가 고정 픽셀(2px)로 설정되어 작은 영상에서 상대적으로 큼
+
+#### 해결: referenceWidth 기반 자동 스케일링
+캐릭터 선택 화면(280px)을 기준으로, 영상 크기에 따라 displacement를 자동 스케일링
+
+**공식:**
+```
+scaleFactor = actualWidth / referenceWidth
+effectiveDisplacement = maxDisplacement * scaleFactor
+```
+
+**예시:**
+| 영상 너비 | scaleFactor | 효과 |
+|----------|-------------|------|
+| 80px | 80/280 ≈ 0.29 | 효과 ~29%로 감소 |
+| 280px | 280/280 = 1.0 | 원래 효과 (100%) |
+| 600px | 600/280 ≈ 2.14 | 효과 ~214%로 증가 |
+
+#### 사용법
+```tsx
+// 기본값 (referenceWidth=280)
+<VideoCanvas src={videoUrl} />
+
+// 커스텀 기준 너비
+<VideoCanvas src={videoUrl} referenceWidth={400} />
+```
+
+#### 스케일링 적용 대상
+- 메인 글리치 좌우 흔들림 (shakeX)
+- 밴드 displacement
+- 평상시 미세 글리치 displacement
+- 스캔라인 지터
+
+#### 스케일링 미적용 (고정)
+- 상하 왜곡 (scaleY) - 비율 기반이므로 스케일링 불필요
+- 스캔라인 두께 - 시각적 일관성 유지
+
+### 삭제된 렌더러 (2026-02-05)
+- **CSS 렌더러 (`CSSGlitchVideo.tsx`)**: 다중 비디오 디코더 문제로 제거
+- **Three.js 렌더러**: postprocessing 오버헤드로 제거
+- **shaders/ 디렉토리**: Three.js용 셰이더 파일 제거
 
 ## React Router + Cloudflare 설정
 
@@ -152,7 +386,7 @@ export default [
 - **Motion 페이지 UI 구조** (2026-01-30 업데이트):
   ```
   ┌─────────────────────────────────────────────────────┐
-  │ [←] [🏠] [📷]          Action Lego item    [Add Video] │  ← 헤더
+  │ [←] [🏠] [📷]               Skills         [Add Video] │  ← 헤더
   ├─────────────────────────────────────────────────────┤
   │ [Video] [Image]                        12 VIDEOS    │  ← 탭 + 카운터
   ├─────────────────────────────────────────────────────┤
@@ -259,7 +493,7 @@ export default [
   - **컨셉 이미지 매핑 드롭다운**:
     - info bar의 컨셉 이미지명 클릭 → 드롭다운 표시
     - "None" 옵션 + 모든 컨셉 이미지 목록
-    - 이미지의 "레고 아이템"은 모션 비디오가 아닌 **컨셉 이미지**
+    - 이미지의 "스킬"은 모션 비디오가 아닌 **컨셉 이미지**
     - **API 엔드포인트**: `POST /api/update-generation-concept-image`
       ```typescript
       Body: { generationId: string, conceptImageId: string | null }
@@ -332,7 +566,7 @@ export default [
   - ⚠️ 캐릭터 메타데이터는 DB(`characters` 테이블)에서 동적 관리
   - ⚠️ 캐릭터 이미지는 DB(`characterImages` 테이블)에서 동적 관리
 - **Motion 페이지 개선**:
-  - 타이틀: "Motion Video" → "Action Lego item"
+  - 타이틀: "Motion Video" → "Action Lego item" → "Skills"
   - 오른쪽 상단에 "100 Credits" 표시 추가 (유료화 암시)
 - **UI 언어 통일**: 한글/영어 중복 제거, 영어 위주로 통일
 
@@ -404,6 +638,27 @@ export default [
   ```bash
   export $(grep -v '^#' .env | xargs) && npx tsx scripts/seed-characters.ts
   ```
+
+### Verse/Bot 비디오 모달 기능 (2026-02-01)
+- **목적**: 메인 화면에서 Verse 소개 영상과 Bot 소개 영상을 모달로 표시
+- **비디오 파일** (Supabase Storage):
+  - `motion-videos/intro-videos/verse.mp4` (3.9 MB) - Verse 소개 영상
+  - `motion-videos/intro-videos/bot.mp4` (76.2 MB) - Bot 소개 영상
+  - Cloudflare Workers 25MB 제한으로 인해 Supabase Storage에 호스팅
+- **UI 위치**: 메인 화면(`_index.tsx`) 헤더 오른쪽
+- **아이콘 버튼**:
+  - 🌐 (지구 이모지): Verse 비디오
+  - 🤖 (로봇 이모지): Bot 비디오
+  - 기존 `navButtonClass` 스타일 사용 (반투명 원형 버튼)
+- **모달 기능**:
+  - 풀스크린에 가까운 크기 (`max-w-4xl`)
+  - 어두운 오버레이 배경 (`bg-black/90`)
+  - 비디오 자동 재생 + 컨트롤바 표시
+  - 닫기 방법: X 버튼, 외부 클릭, Escape 키
+  - 닫을 때 비디오 정지 및 시간 초기화
+- **컴포넌트**: `_index.tsx` 내 `VideoModal` 컴포넌트
+- **상태 관리**: `openVideo: "verse" | "bot" | null`
+- **업로드 스크립트**: `scripts/upload-intro-videos.ts`
 
 ### 갤러리 음악 선택 기능 (2026-01-30)
 - **변경된 플로우**: 음악 선택 페이지 삭제 → 갤러리 모달에서 음악 선택
@@ -563,6 +818,29 @@ export default [
 import { BackIcon, HomeIcon, GalleryIcon, navButtonClass } from "~/components/layout/Header";
 ```
 
+### 버튼 커서 포인터 스타일 통일 (2026-02-01)
+모든 클릭 가능한 버튼에 `cursor-pointer` 클래스 적용:
+
+**수정된 파일:**
+- `app/components/ui/button.tsx` - Button 컴포넌트 기본 스타일
+- `app/components/layout/Header.tsx` - `navButtonClass` 상수
+- `app/components/layout/FloatingBar.tsx` - CTA 버튼 (disabled가 아닐 때)
+- `app/components/motion/VideoUploadButton.tsx` - 업로드 버튼
+- `app/components/motion/ImageUploadButton.tsx` - 업로드 버튼
+- `app/components/motion/VideoGridItem.tsx` - 메인, 수정, 삭제 버튼
+- `app/components/motion/ConceptImageItem.tsx` - 메인, 수정, 삭제 버튼
+- `app/components/gallery/VideoDetailModal.tsx` - 닫기, 토글, 음악/모션 선택, 액션 버튼들
+- `app/components/gallery/ImageDetailModal.tsx` - 닫기, 음악/컨셉 선택, 액션 버튼들
+- `app/components/gallery/ResultUploadDialog.tsx` - 미리보기 제거, Cancel, Upload 버튼
+- `app/routes/_index.tsx` - 모달 닫기, 편집, 이미지 선택/삭제/추가, 네비게이션 버튼들
+- `app/routes/motion.tsx` - 탭, Generate, 참조 제거, Advanced, 다이얼로그 버튼들
+- `app/routes/gallery.tsx` - Upload, 정렬 셀렉터, 타입 필터, 다이얼로그 버튼들
+
+**적용 패턴:**
+- 활성화 버튼: `cursor-pointer` 추가
+- 비활성화 버튼: `cursor-not-allowed` 유지 (disabled 상태)
+- 조건부: enabled 상태에서만 `cursor-pointer` 적용
+
 ### 파일 구조
 ```
 app/
@@ -581,11 +859,19 @@ app/
 │   │   ├── ImageUploadButton.tsx   # 컨셉 이미지 업로드 버튼
 │   │   ├── ConceptImageItem.tsx    # 컨셉 이미지 그리드 아이템
 │   │   └── ImageGenerateForm.tsx   # 이미지 생성 프롬프트 폼
-│   └── gallery/
-│       ├── GenerationGridItem.tsx  # 상태별 그리드 아이템 (업스케일/이미지 배지 포함)
-│       ├── VideoDetailModal.tsx    # 영상 상세 모달 (음악 동기 재생 + 업스케일 + 음악/모션 선택)
-│       ├── ImageDetailModal.tsx    # 이미지 상세 모달 (프롬프트 표시 + 음악/컨셉이미지 선택 + 다운로드/공유)
-│       └── ResultUploadDialog.tsx  # 결과물 직접 업로드 다이얼로그 (영상+이미지)
+│   ├── gallery/
+│   │   ├── GenerationGridItem.tsx  # 상태별 그리드 아이템 (업스케일/이미지 배지 포함)
+│   │   ├── VideoDetailModal.tsx    # 영상 상세 모달 (음악 동기 재생 + 업스케일 + 음악/모션 선택)
+│   │   ├── ImageDetailModal.tsx    # 이미지 상세 모달 (프롬프트 표시 + 음악/컨셉이미지 선택 + 다운로드/공유)
+│   │   └── ResultUploadDialog.tsx  # 결과물 직접 업로드 다이얼로그 (영상+이미지)
+│   └── effects/
+│       ├── VideoCanvas.tsx         # 비디오 효과 메인 컴포넌트 (렌더러 선택)
+│       ├── CanvasGlitchVideo.tsx   # Canvas 2D 글리치 렌더러
+│       ├── CSSGlitchVideo.tsx      # CSS/DOM 글리치 렌더러
+│       └── shaders/
+│           ├── index.ts            # 셰이더 export
+│           ├── bandGlitch.ts       # Three.js 밴드 글리치 셰이더
+│           └── scanline.ts         # Three.js 스캔라인 셰이더 (미사용)
 ├── lib/
 │   ├── data.ts                 # 공통 데이터 (CHARACTERS 폴백, TRACKS, 룩업 맵, Character 타입)
 │   ├── music-data.ts           # 음악 데이터 중앙화 (MUSIC_FILES, TRACK_NAMES)
@@ -594,8 +880,8 @@ app/
 │   ├── supabase.server.ts      # Storage 헬퍼 (모션/생성/업스케일/캐릭터이미지/결과물 업로드/삭제)
 │   └── db.server.ts            # DB 연결
 └── routes/
-    ├── _index.tsx              # 캐릭터 선택 페이지 (이미지 변형 선택/추가/삭제, 이름/설명 인라인 수정)
-    ├── motion.tsx              # 액션 레고 아이템 선택 (Video/Image 탭)
+    ├── _index.tsx              # 캐릭터 선택 페이지 (이미지 변형 선택/추가/삭제, 이름/설명 인라인 수정, Verse/Bot 비디오 모달)
+    ├── motion.tsx              # 스킬 선택 (Video/Image 탭)
     ├── gallery.tsx             # 갤러리 페이지 (영상+이미지 타입 필터 + 폴링 + 정렬)
     ├── generate.tsx            # 생성 진행 페이지 (레거시, 사용 안함)
     ├── result.$id.tsx          # 결과 페이지 (음악 동기 재생 + 합성 다운로드)
@@ -620,6 +906,7 @@ app/
 scripts/
 ├── create-bucket.ts            # Supabase 버킷 생성
 ├── upload-member-images.ts     # 캐릭터 이미지 업로드 (모든 PNG 파일, 변형 포함)
+├── upload-intro-videos.ts      # Verse/Bot 소개 영상 Supabase 업로드
 ├── seed-character-images.ts    # 기존 캐릭터 이미지 DB 시드
 └── seed-characters.ts          # 캐릭터 메타데이터 DB 시드
 
@@ -633,9 +920,22 @@ drizzle/
 https://saint-xo-request-lab.cto-b0b.workers.dev
 
 ### 배포 명령어
+
+> ⚠️ **중요**: 이 프로젝트는 cto-b0b 계정으로 배포됩니다. 반드시 `.dev.vars`의 환경변수를 로드한 후 배포해야 합니다!
+
 ```bash
-npm run deploy  # 빌드 후 루트에서 wrangler deploy 실행
+# 올바른 배포 명령어 (항상 이 방식 사용)
+export $(grep -v '^#' .dev.vars | xargs) && npm run deploy
+
+# ❌ 잘못된 방식 (인증 에러 발생)
+npm run deploy
 ```
+
+### 프로젝트별 Cloudflare 계정 설정 (2026-02-01)
+이 프로젝트는 `cto-b0b` 계정으로 배포되도록 설정됨:
+- `wrangler.json`에 `account_id: "b0b1337a0142b79b724ee5b96f1f1eec"` 설정
+- `.dev.vars`에 `CLOUDFLARE_API_TOKEN` 설정 (cto-b0b 계정의 API 토큰)
+- 전역 wrangler 로그인과 무관하게 항상 지정된 계정으로 배포
 
 ### 서울 리전 배포 (2026-01-30)
 `wrangler.json`에 placement 설정으로 서울 리전(ICN) 배포:
@@ -670,6 +970,9 @@ npx wrangler secret list  # 설정된 시크릿 목록 확인
 - [ ] SUPABASE_ANON_KEY
 - [ ] SUPABASE_SERVICE_KEY
 - [ ] REPLICATE_TOKEN
+
+**로컬 배포용 (.dev.vars):**
+- [ ] CLOUDFLARE_API_TOKEN - cto-b0b 계정 API 토큰 (프로젝트별 계정 분리용)
 
 > ⚠️ **트러블슈팅**: 배포 후 "Unauthenticated" 에러 발생 시 `npx wrangler secret list`로 모든 시크릿이 설정되어 있는지 확인
 

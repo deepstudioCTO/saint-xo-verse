@@ -172,7 +172,7 @@ export function ImageDetailModal({
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute -top-12 right-0 text-white/60 hover:text-white transition-colors"
+          className="absolute -top-12 right-0 text-white/60 hover:text-white transition-colors cursor-pointer"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -279,7 +279,7 @@ export function ImageDetailModal({
               {/* None option */}
               <button
                 onClick={() => handleMusicSelect(null)}
-                className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-all ${
+                className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                   selectedMusicId === null
                     ? "bg-white/20 ring-2 ring-white"
                     : "bg-white/10 opacity-60 hover:opacity-100"
@@ -306,7 +306,7 @@ export function ImageDetailModal({
                 <button
                   key={track.id}
                   onClick={() => handleMusicSelect(track.id)}
-                  className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all ${
+                  className={`flex-shrink-0 w-12 h-12 rounded-lg overflow-hidden transition-all cursor-pointer ${
                     selectedMusicId === track.id
                       ? "ring-2 ring-white"
                       : "opacity-60 hover:opacity-100"
@@ -335,7 +335,7 @@ export function ImageDetailModal({
                   e.stopPropagation();
                   setShowConceptDropdown(!showConceptDropdown);
                 }}
-                className="text-xs text-neutral-600 hover:text-neutral-900 transition-colors flex items-center gap-1"
+                className="text-xs text-neutral-600 hover:text-neutral-900 transition-colors flex items-center gap-1 cursor-pointer"
               >
                 {displayConceptImageName}
                 <svg
@@ -362,13 +362,13 @@ export function ImageDetailModal({
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   <div className="px-3 py-2 bg-neutral-50 border-b border-neutral-200 flex-shrink-0">
-                    <span className="text-xs font-medium text-neutral-500">Select Lego Item</span>
+                    <span className="text-xs font-medium text-neutral-500">Select Skill</span>
                   </div>
                   <div className="overflow-y-auto overscroll-contain flex-1">
                     {/* None option */}
                     <button
                       onClick={(e) => handleConceptImageSelect(e, null)}
-                      className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors ${
+                      className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors cursor-pointer ${
                         !generation.conceptImageId ? "bg-neutral-100 font-medium" : ""
                       }`}
                     >
@@ -379,7 +379,7 @@ export function ImageDetailModal({
                       <button
                         key={ci.id}
                         onClick={(e) => handleConceptImageSelect(e, ci.id)}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors truncate ${
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-neutral-50 transition-colors truncate cursor-pointer ${
                           generation.conceptImageId === ci.id ? "bg-neutral-100 font-medium" : ""
                         }`}
                       >
@@ -402,7 +402,7 @@ export function ImageDetailModal({
             {onDelete && (
               <button
                 onClick={() => onDelete(generation.id)}
-                className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors"
+                className="text-xs font-medium text-red-500 hover:text-red-400 transition-colors cursor-pointer"
               >
                 Delete
               </button>
@@ -413,14 +413,14 @@ export function ImageDetailModal({
               <>
                 <button
                   onClick={handleDownload}
-                  className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+                  className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
                 >
                   Download
                 </button>
 
                 <button
                   onClick={handleShare}
-                  className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+                  className="text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors cursor-pointer"
                 >
                   Share
                 </button>
