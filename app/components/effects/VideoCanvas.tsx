@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { WebGLGlitchVideo } from "./WebGLGlitchVideo";
-import { CanvasGlitchVideo } from "./CanvasGlitchVideo";
 
-export type GlitchRenderer = "webgl" | "canvas" | "none";
+export type GlitchRenderer = "webgl" | "none";
 
 // 효과 프리셋 (상수로 관리)
 export const EFFECT_PRESETS = {
@@ -13,6 +12,11 @@ export const EFFECT_PRESETS = {
       bandCount: 400,
       maxDisplacement: 2,
     },
+    // 줌 펀치 효과: 글리치 시작 시 "두둥" 확대 후 복귀
+    impact: {
+      scale: 1.025, // 최대 2.5% 확대
+      duration: 0.08, // 80ms 동안 복귀
+    },
   },
   intense: {
     glitch: {
@@ -21,6 +25,10 @@ export const EFFECT_PRESETS = {
       bandCount: 400,
       maxDisplacement: 4,
     },
+    impact: {
+      scale: 1.10, // 최대 10% 확대
+      duration: 0.10, // 100ms 동안 복귀
+    },
   },
   subtle: {
     glitch: {
@@ -28,6 +36,10 @@ export const EFFECT_PRESETS = {
       duration: [0.05, 0.1] as [number, number],
       bandCount: 400,
       maxDisplacement: 1,
+    },
+    impact: {
+      scale: 1.03, // 최대 3% 확대
+      duration: 0.06, // 60ms 동안 복귀
     },
   },
   none: null,
@@ -41,13 +53,16 @@ interface VideoCanvasProps {
   preset?: EffectPreset;
   className?: string;
   style?: React.CSSProperties;
-  // 렌더러 선택: webgl (기본, 고성능), canvas (레거시, CPU 사용), none (효과 없음)
+  // 렌더러 선택: webgl (기본, 고성능), none (효과 없음)
   renderer?: GlitchRenderer;
-  // 개별 오버라이드
+  // 개별 오버라이드 - 글리치
   glitchDelay?: [number, number];
   glitchDuration?: [number, number];
   bandCount?: number;
   maxDisplacement?: number;
+  // 개별 오버라이드 - 줌 펀치 임팩트
+  impactScale?: number;
+  impactDuration?: number;
   // 기준 너비: 이 크기에서 displacement가 100% 적용됨 (작은 영상은 효과 감소, 큰 영상은 증가)
   referenceWidth?: number;
 }
@@ -115,11 +130,13 @@ export function VideoCanvas({
   preset = "saintXo",
   className,
   style,
-  renderer = "webgl", // 기본값을 webgl로 (고성능)
+  renderer = "webgl",
   glitchDelay,
   glitchDuration,
   bandCount,
   maxDisplacement,
+  impactScale,
+  impactDuration,
   referenceWidth = 280, // 캐릭터 선택 화면 기준
 }: VideoCanvasProps) {
   const prefersReducedMotion = useReducedMotion();
@@ -162,27 +179,25 @@ export function VideoCanvas({
     maxDisplacement: maxDisplacement ?? presetConfig.glitch.maxDisplacement,
   };
 
-  // WebGL 렌더러 (기본, 고성능)
-  if (renderer === "webgl" && webglSupported) {
+  const impactConfig = {
+    scale: impactScale ?? presetConfig.impact.scale,
+    duration: impactDuration ?? presetConfig.impact.duration,
+  };
+
+  // WebGL 렌더러 (WebGL 미지원 시 폴백 비디오로)
+  if (!webglSupported) {
     return (
-      <WebGLGlitchVideo
+      <FallbackVideo
         src={src}
         poster={poster}
         className={className}
         style={style}
-        glitchDelay={glitchConfig.delay}
-        glitchDuration={glitchConfig.duration}
-        bandCount={glitchConfig.bandCount}
-        maxDisplacement={glitchConfig.maxDisplacement}
-        referenceWidth={referenceWidth}
       />
     );
   }
 
-  // Canvas 2D 렌더러 (폴백 또는 명시적 선택)
-  // WebGL 미지원 시에도 이 렌더러 사용
   return (
-    <CanvasGlitchVideo
+    <WebGLGlitchVideo
       src={src}
       poster={poster}
       className={className}
@@ -191,6 +206,8 @@ export function VideoCanvas({
       glitchDuration={glitchConfig.duration}
       bandCount={glitchConfig.bandCount}
       maxDisplacement={glitchConfig.maxDisplacement}
+      impactScale={impactConfig.scale}
+      impactDuration={impactConfig.duration}
       referenceWidth={referenceWidth}
     />
   );

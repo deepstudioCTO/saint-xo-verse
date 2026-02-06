@@ -21,6 +21,9 @@ interface WebGLGlitchVideoProps {
   glitchDuration?: [number, number];
   bandCount?: number;
   maxDisplacement?: number; // 픽셀 단위
+  // 줌 펀치 임팩트 설정
+  impactScale?: number; // 최대 확대 비율 (1.06 = 6% 확대)
+  impactDuration?: number; // 확대 애니메이션 지속 시간 (초)
   referenceWidth?: number; // 기준 너비 (이 크기에서 maxDisplacement가 100% 적용)
   disabled?: boolean;
 }
@@ -50,6 +53,7 @@ uniform float u_maxDisplacement;
 uniform vec2 u_resolution;
 uniform float u_dpr;
 uniform float u_referenceWidth;
+uniform float u_impactScale; // 현재 스케일 값 (1.0 ~ impactScale)
 
 varying vec2 v_texCoord;
 
@@ -63,7 +67,13 @@ float rand2(vec2 co) {
 }
 
 void main() {
+  // 줌 펀치 효과: 중심 기준 스케일 적용
   vec2 uv = v_texCoord;
+  if (u_impactScale > 1.0) {
+    // 중심(0.5, 0.5)을 기준으로 스케일 변환
+    uv = (uv - 0.5) / u_impactScale + 0.5;
+  }
+
   float time = u_time;
 
   // 픽셀 단위를 UV 단위로 변환하는 비율
@@ -93,14 +103,14 @@ void main() {
       uv.x += displacement;
     }
   }
-  // === 2. 평상시 미세 글리치 (3% 밴드, ±1.5px, 스케일 적용) ===
+  // === 2. 평상시 미세 글리치 (1.5% 밴드, ±1px, 스케일 적용) ===
   else {
     float band = floor(v_texCoord.y * u_bandCount);
     float idleSeed = floor(time / 300.0); // 300ms마다 패턴 변경
     float bandRand = rand(band + idleSeed);
 
-    if (bandRand > 0.97) {
-      float displacement = (rand(band * 2.0 + idleSeed) - 0.5) * 3.0 * pxToUv * scaleFactor;
+    if (bandRand > 0.985) {
+      float displacement = (rand(band * 2.0 + idleSeed) - 0.5) * 2.0 * pxToUv * scaleFactor;
       uv.x += displacement;
     }
   }
@@ -221,6 +231,8 @@ export function WebGLGlitchVideo({
   glitchDuration = [0.1, 0.2],
   bandCount = 400,
   maxDisplacement = 2,
+  impactScale = 1.06,
+  impactDuration = 0.08,
   referenceWidth = 280,
   disabled = false,
 }: WebGLGlitchVideoProps) {
@@ -231,6 +243,7 @@ export function WebGLGlitchVideo({
   const glitchTimeoutRef = useRef<number | null>(null);
   const glitchStateRef = useRef({
     isGlitching: false,
+    startTime: 0, // 글리치 시작 시간 (줌 펀치 계산용)
     endTime: 0,
     seed: Math.random() * 1000,
   });
@@ -249,6 +262,7 @@ export function WebGLGlitchVideo({
     u_resolution: WebGLUniformLocation | null;
     u_dpr: WebGLUniformLocation | null;
     u_referenceWidth: WebGLUniformLocation | null;
+    u_impactScale: WebGLUniformLocation | null;
   } | null>(null);
 
   const [isWebGLReady, setIsWebGLReady] = useState(false);
@@ -260,10 +274,12 @@ export function WebGLGlitchVideo({
   // 글리치 시작
   const startGlitch = useCallback(() => {
     if (disabled) return;
+    const now = performance.now();
     const duration = randomInRange(glitchDuration[0], glitchDuration[1]) * 1000;
     glitchStateRef.current = {
       isGlitching: true,
-      endTime: performance.now() + duration,
+      startTime: now,
+      endTime: now + duration,
       seed: Math.random() * 1000,
     };
   }, [disabled, glitchDuration, randomInRange]);
@@ -345,6 +361,7 @@ export function WebGLGlitchVideo({
       u_resolution: gl.getUniformLocation(program, "u_resolution"),
       u_dpr: gl.getUniformLocation(program, "u_dpr"),
       u_referenceWidth: gl.getUniformLocation(program, "u_referenceWidth"),
+      u_impactScale: gl.getUniformLocation(program, "u_impactScale"),
     };
 
     // 버퍼 생성 - 풀스크린 쿼드
@@ -416,19 +433,35 @@ export function WebGLGlitchVideo({
     let lastFrameTime = 0;
     const targetFrameTime = 1000 / 60; // 60fps
 
+    const impactDurationMs = impactDuration * 1000;
+
     const render = (timestamp: number) => {
       // 프레임 레이트 제한 (글리치 비활성 시 30fps로 throttle)
       const glitchState = glitchStateRef.current;
       const now = performance.now();
       const shouldGlitch = glitchState.isGlitching && now < glitchState.endTime;
 
+      // 줌 펀치 스케일 계산: 시작 시 최대값, impactDuration 동안 1.0으로 복귀 (easeOutQuad)
+      let currentImpactScale = 1.0;
+      if (glitchState.isGlitching && glitchState.startTime > 0) {
+        const elapsed = now - glitchState.startTime;
+        if (elapsed < impactDurationMs) {
+          // easeOutQuad: 1 - (1 - t)^2 → 빠르게 감속
+          const t = elapsed / impactDurationMs;
+          const eased = 1 - (1 - t) * (1 - t);
+          // impactScale에서 1.0으로 감소
+          currentImpactScale = impactScale - (impactScale - 1.0) * eased;
+        }
+      }
+
       // 글리치 종료 체크
       if (glitchState.isGlitching && now >= glitchState.endTime) {
         glitchStateRef.current.isGlitching = false;
       }
 
-      // 프레임 스킵 로직 (글리치 비활성 시 30fps)
-      const frameInterval = shouldGlitch ? targetFrameTime : targetFrameTime * 2;
+      // 프레임 스킵 로직 (글리치/임팩트 비활성 시 30fps)
+      const isAnimating = shouldGlitch || currentImpactScale > 1.0;
+      const frameInterval = isAnimating ? targetFrameTime : targetFrameTime * 2;
       if (timestamp - lastFrameTime < frameInterval) {
         animationRef.current = requestAnimationFrame(render);
         return;
@@ -467,6 +500,7 @@ export function WebGLGlitchVideo({
       gl.uniform2f(uniforms.u_resolution, canvas.width, canvas.height);
       gl.uniform1f(uniforms.u_dpr, dpr);
       gl.uniform1f(uniforms.u_referenceWidth, referenceWidth);
+      gl.uniform1f(uniforms.u_impactScale, currentImpactScale);
 
       // 그리기
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -496,7 +530,7 @@ export function WebGLGlitchVideo({
       video.removeEventListener("loadeddata", startRender);
       video.removeEventListener("play", startRender);
     };
-  }, [isWebGLReady, bandCount, maxDisplacement, referenceWidth]);
+  }, [isWebGLReady, bandCount, maxDisplacement, impactScale, impactDuration, referenceWidth]);
 
   return (
     <div
