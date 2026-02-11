@@ -8,7 +8,7 @@ import { getDb, motionVideos } from "~/lib/db.server";
 import { getPublicUrl } from "~/lib/supabase.server";
 
 export const meta: Route.MetaFunction = () => [
-  { title: "Generating - Saint XO Verse" },
+  { title: "Generating - Saint Verse" },
 ];
 
 interface LoaderData {

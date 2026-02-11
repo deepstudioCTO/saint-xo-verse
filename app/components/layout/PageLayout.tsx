@@ -11,6 +11,7 @@ interface PageLayoutProps {
   onBackClick?: () => void;
   showHome?: boolean;
   showGallery?: boolean;
+  galleryTo?: string;
 
   // FloatingBar props
   floatingLeft?: React.ReactNode;
@@ -34,6 +35,7 @@ export function PageLayout({
   onBackClick,
   showHome,
   showGallery,
+  galleryTo,
   floatingLeft,
   floatingRight,
   ctaText,
@@ -55,6 +57,7 @@ export function PageLayout({
           onBackClick={onBackClick}
           showHome={showHome}
           showGallery={showGallery}
+          galleryTo={galleryTo}
         />
       )}
 

@@ -3,6 +3,7 @@ import { VideoPlayerWithMusic } from "~/components/common/VideoPlayerWithMusic";
 import { getMusicFilePath } from "~/lib/music-data";
 import { mergeVideoWithMusic, downloadBlob, type MergeProgress } from "~/lib/audio-merge";
 import { TRACKS } from "~/lib/data";
+import { pauseBgMusic, resumeBgMusic } from "~/hooks/useAudioPlayer";
 
 type UpscaleModel = "real-esrgan" | "topaz";
 
@@ -93,6 +94,14 @@ export function VideoDetailModal({
       setUpscaleError(null);
       setShowUpscaleMenu(false);
       setPlaybackKey(0);
+    }
+  }, [open]);
+
+  // 배경음악 양보: 모달 열릴 때 pause, 닫힐 때 resume
+  useEffect(() => {
+    if (open) {
+      pauseBgMusic();
+      return () => resumeBgMusic();
     }
   }, [open]);
 

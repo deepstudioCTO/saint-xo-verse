@@ -1,91 +1,30 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate, useLoaderData, useRevalidator, Link } from "react-router";
+import { motion, AnimatePresence } from "motion/react";
+import { useGesture } from "@use-gesture/react";
 import type { Route } from "./+types/_index";
-import { LargeTitle, Counter, StepIndicator } from "~/components/ui";
-import { BackIcon, GalleryIcon, navButtonClass } from "~/components/layout/Header";
-import { CHARACTERS as DEFAULT_CHARACTERS, type Character } from "~/lib/data";
-import { getDb, characterImages, characters } from "~/lib/db.server";
-import { asc } from "drizzle-orm";
+import { LargeTitle } from "~/components/ui";
+import { navButtonClass } from "~/components/layout/Header";
+import {
+  VERSES as DEFAULT_VERSES,
+  VERSE_CHARACTERS as DEFAULT_VERSE_CHARACTERS,
+  type Verse,
+  type VerseCharacter,
+} from "~/lib/data";
+import { getDb, characterImages, verses, verseCharacters, motionVideos, conceptImages, generations } from "~/lib/db.server";
+import { getPublicUrl } from "~/lib/supabase.server";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { VideoCanvas } from "~/components/effects/VideoCanvas";
+import { SkillPanel } from "~/components/skill/SkillPanel";
+import { HomeFloatingBar, type ActivePanel } from "~/components/layout/HomeFloatingBar";
+import { GalleryCompactPanel, GalleryExpandedPanel, GalleryModals } from "~/components/gallery";
+import { useGalleryState } from "~/hooks/useGalleryState";
+import { InputImagePanel } from "~/components/common/InputImagePanel";
 
 // Video Modal Component
-function VideoModal({
-  videoType,
-  onClose,
-}: {
-  videoType: "verse" | "bot";
-  onClose: () => void;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Close on escape key
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  // Stop video when closing
-  const handleClose = useCallback(() => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
-    onClose();
-  }, [onClose]);
-
-  const videoSrc = videoType === "verse"
-    ? "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/intro-videos/verse.mp4"
-    : "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/intro-videos/bot.mp4";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
-      onClick={handleClose}
-    >
-      {/* Close button */}
-      <button
-        onClick={handleClose}
-        className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors cursor-pointer"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        >
-          <line x1="18" y1="6" x2="6" y2="18" />
-          <line x1="6" y1="6" x2="18" y2="18" />
-        </svg>
-      </button>
-
-      {/* Video container */}
-      <div
-        className="relative w-full max-w-4xl mx-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <video
-          ref={videoRef}
-          src={videoSrc}
-          autoPlay
-          controls
-          playsInline
-          className="w-full rounded-lg"
-        />
-      </div>
-    </div>
-  );
-}
 
 export const meta: Route.MetaFunction = () => [
-  { title: "Saint XO Verse" },
+  { title: "Saint Verse" },
   { name: "description", content: "Fan-made short-form video creation platform" },
 ];
 
@@ -98,26 +37,46 @@ interface CharacterImage {
   publicUrl: string;
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const db = getDb(context.cloudflare as { env: Record<string, string> });
+  const url = new URL(request.url);
+  const verseParam = url.searchParams.get("verse") || "00";
 
-  // Load characters from DB (sorted by displayOrder)
-  const dbCharacters = await db
+  // Load all verses
+  const dbVerses = await db
     .select()
-    .from(characters)
-    .orderBy(asc(characters.displayOrder));
+    .from(verses)
+    .orderBy(asc(verses.displayOrder));
 
-  // Use DB characters if available, otherwise fallback to defaults
-  const characterList: Character[] = dbCharacters.length > 0
-    ? dbCharacters.map((c) => ({
-        id: c.id,
-        name: c.name,
-        description: c.description,
-        video: c.video,
-        poster: c.poster,
-        displayOrder: c.displayOrder,
+  const verseList: Verse[] = dbVerses.length > 0
+    ? dbVerses.map((v) => ({
+        id: v.id,
+        name: v.name,
+        displayName: v.displayName,
+        description: v.description,
+        displayOrder: v.displayOrder,
       }))
-    : DEFAULT_CHARACTERS;
+    : DEFAULT_VERSES;
+
+  // Load ALL verse characters (for preloading other verse videos)
+  const dbAllVerseCharacters = await db
+    .select()
+    .from(verseCharacters)
+    .orderBy(asc(verseCharacters.displayOrder));
+
+  const allCharacters: VerseCharacter[] = dbAllVerseCharacters.length > 0
+    ? dbAllVerseCharacters.map((vc) => ({
+        id: vc.id,
+        verseId: vc.verseId,
+        characterId: vc.characterId,
+        name: vc.name,
+        description: vc.description,
+        video: vc.video,
+        poster: vc.poster,
+        defaultInput: vc.defaultInput,
+        displayOrder: vc.displayOrder,
+      }))
+    : DEFAULT_VERSE_CHARACTERS;
 
   // Load all character images from DB (sorted by createdAt so new images appear at end)
   const images = await db
@@ -134,71 +93,244 @@ export async function loader({ context }: Route.LoaderArgs) {
     imagesByCharacter[img.characterId].push(img);
   }
 
-  return { characters: characterList, imagesByCharacter };
+  // Load motion videos, concept images, and story count
+  const cf = context.cloudflare as { env: Record<string, string> };
+  const [dbVideos, dbConceptImages, storiesResult] = await Promise.all([
+    db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
+    db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
+    db.select({ count: sql<number>`count(*)` }).from(generations).where(eq(generations.status, "completed")),
+  ]);
+
+  const skillVideos = dbVideos.map((v) => ({
+    id: v.id,
+    name: v.name,
+    videoUrl: getPublicUrl(cf, v.storagePath),
+    thumbnailUrl: v.thumbnailPath ? getPublicUrl(cf, v.thumbnailPath) : null,
+    duration: v.duration,
+  }));
+
+  const skillImages = dbConceptImages.map((img) => ({
+    id: img.id,
+    name: img.name,
+    publicUrl: img.publicUrl,
+  }));
+
+  const skillsCount = dbVideos.length;
+  const storiesCount = Number(storiesResult[0]?.count || 0);
+
+  return {
+    verses: verseList,
+    currentVerseId: verseParam,
+    allCharacters,
+    imagesByCharacter,
+    skillsCount,
+    storiesCount,
+    skillVideos,
+    skillImages,
+  };
 }
 
 export default function Home() {
-  const { characters: dbCharacters, imagesByCharacter } = useLoaderData<typeof loader>();
+  const {
+    verses: verseList,
+    currentVerseId,
+    allCharacters,
+    imagesByCharacter,
+    skillsCount,
+    storiesCount,
+    skillVideos,
+    skillImages,
+  } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const descInputRef = useRef<HTMLTextAreaElement>(null);
+  const verseNameInputRef = useRef<HTMLInputElement>(null);
+  const verseDescInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Local state for characters (for optimistic updates)
-  const [characterList, setCharacterList] = useState<Character[]>(dbCharacters);
+  // Slide direction for verse transitions: 1=down, -1=up
+  const [slideDirection, setSlideDirection] = useState(0);
 
-  // Sync with loader data when it changes
+  // Current verse characters (with optimistic update support)
+  const dbCharacters = useMemo(
+    () => allCharacters.filter((c) => c.verseId === currentVerseId),
+    [allCharacters, currentVerseId]
+  );
+  const [characterList, setCharacterList] = useState<VerseCharacter[]>(dbCharacters);
+
   useEffect(() => {
     setCharacterList(dbCharacters);
-  }, [dbCharacters]);
+  }, [currentVerseId, allCharacters]);
 
   const selectedId = searchParams.get("selected");
-  const urlVariant = searchParams.get("variant");
-  const selectedIndex = characterList.findIndex((c) => c.id === selectedId);
+  const selectedIndex = characterList.findIndex((c) => c.characterId === selectedId);
   const isSelecting = selectedIndex >= 0;
   const currentCharacter = isSelecting ? characterList[selectedIndex] : null;
 
-  // Track selected image variant per character
-  const [selectedImageVariant, setSelectedImageVariant] = useState<Record<string, string>>({});
-  const [hoveredImageId, setHoveredImageId] = useState<string | null>(null);
+  // Verse list state (for optimistic updates)
+  const [verseListState, setVerseListState] = useState<Verse[]>(verseList);
+  useEffect(() => {
+    setVerseListState(verseList);
+  }, [verseList]);
+
+  // Current verse (use stateful list for optimistic updates)
+  const currentVerse = verseListState.find((v) => v.id === currentVerseId) || verseListState[0];
+  const currentVerseIndex = verseListState.findIndex((v) => v.id === currentVerseId);
+
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [inputPanelOpen, setInputPanelOpen] = useState(false);
+  const savingRef = useRef(false);
 
-  // Inline editing state
+  // Inline editing state (character)
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editName, setEditName] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Video modal state
-  const [openVideo, setOpenVideo] = useState<"verse" | "bot" | null>(null);
+  // Inline editing state (verse)
+  const [isEditingVerseName, setIsEditingVerseName] = useState(false);
+  const [isEditingVerseDesc, setIsEditingVerseDesc] = useState(false);
+  const [editVerseName, setEditVerseName] = useState("");
+  const [editVerseDesc, setEditVerseDesc] = useState("");
+
+  // Hover state for character dimming
+  const [hoveredCharacterId, setHoveredCharacterId] = useState<string | null>(null);
 
   // Get images for current character
-  const currentImages = currentCharacter ? imagesByCharacter[currentCharacter.id] || [] : [];
+  const currentImages = currentCharacter ? imagesByCharacter[currentCharacter.characterId] || [] : [];
 
-  // Restore variant from URL when coming back from music page
+  // Selected image URL (shared by SkillPanel and HomeFloatingBar)
+  const selectedImgUrl = useMemo(() => {
+    if (!currentCharacter) return "";
+    return currentCharacter.defaultInput ?? currentCharacter.poster;
+  }, [currentCharacter]);
+
+  // Unified panel state — only one panel open at a time
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const skillPanelOpen = activePanel === "skill";
+  const galleryCompactOpen = activePanel === "gallery-compact";
+  const galleryExpandedOpen = activePanel === "gallery-expanded";
+  const galleryState = useGalleryState(galleryCompactOpen || galleryExpandedOpen);
+  const [skillTab, setSkillTab] = useState<"video" | "image">("video");
+  const [selectedSkillVideoId, setSelectedSkillVideoId] = useState<string | null>(null);
+  const [selectedSkillImageId, setSelectedSkillImageId] = useState<string | null>(null);
+
+  // Resolved selected objects for HomeFloatingBar
+  const selectedSkillVideo = useMemo(
+    () => (selectedSkillVideoId ? skillVideos.find((v) => v.id === selectedSkillVideoId) ?? null : null),
+    [selectedSkillVideoId, skillVideos]
+  );
+  const selectedSkillImage = useMemo(
+    () => (selectedSkillImageId ? skillImages.find((img) => img.id === selectedSkillImageId) ?? null : null),
+    [selectedSkillImageId, skillImages]
+  );
+
+  // Close panels and reset skill selections when character changes or deselects
   useEffect(() => {
-    if (selectedId && urlVariant && urlVariant !== "default") {
-      setSelectedImageVariant((prev) => ({
-        ...prev,
-        [selectedId]: urlVariant,
-      }));
-    }
-  }, [selectedId, urlVariant]);
+    setActivePanel(null);
+    setInputPanelOpen(false);
+    setSelectedSkillVideoId(null);
+    setSelectedSkillImageId(null);
+  }, [selectedId]);
+
+  // Verse navigation — just update the URL param, no loader rerun needed
+  const handleVerseChange = useCallback((direction: "up" | "down") => {
+    const newIndex = direction === "up"
+      ? currentVerseIndex - 1
+      : currentVerseIndex + 1;
+    if (newIndex < 0 || newIndex >= verseListState.length) return;
+
+    setSlideDirection(direction === "down" ? 1 : -1);
+    setSearchParams({ verse: verseListState[newIndex].id }, { replace: true });
+  }, [currentVerseIndex, verseListState, setSearchParams]);
+
+  // Navigate to prev/next character
+  const navigateCharacter = useCallback((direction: "prev" | "next") => {
+    const idx = characterList.findIndex((c) => c.characterId === selectedId);
+    if (idx < 0) return;
+    const newIdx = direction === "prev" ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= characterList.length) return;
+    setSearchParams({ selected: characterList[newIdx].characterId, verse: currentVerseId });
+  }, [characterList, selectedId, currentVerseId, setSearchParams]);
+
+  // Keyboard arrow keys for verse + character navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isSelecting) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          navigateCharacter("prev");
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          navigateCharacter("next");
+        }
+      }
+      if (verseListState.length > 1) {
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          handleVerseChange("up");
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          handleVerseChange("down");
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSelecting, verseListState, handleVerseChange, navigateCharacter]);
+
+  // Close compact panels on Escape
+  useEffect(() => {
+    if (!activePanel || activePanel === "gallery-expanded") return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setActivePanel(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [activePanel]);
+
+  // Swipe (touch/mouse drag) + trackpad scroll for character navigation
+  const charNavRef = useRef<HTMLDivElement>(null);
+  const gestureActive = useRef(false);
+  useGesture(
+    {
+      onDrag: ({ active, movement: [mx], direction: [dx], cancel }) => {
+        if (!isSelecting) return;
+        if (active && Math.abs(mx) > 50) {
+          cancel();
+          navigateCharacter(dx > 0 ? "prev" : "next");
+        }
+      },
+      onWheel: ({ event, direction: [dx], distance: [distX, distY] }) => {
+        if (!isSelecting || distX < distY) return;
+        event.preventDefault();
+        if (gestureActive.current) return;
+        if (distX > 60) {
+          gestureActive.current = true;
+          navigateCharacter(dx > 0 ? "next" : "prev");
+          setTimeout(() => { gestureActive.current = false; }, 400);
+        }
+      },
+    },
+    {
+      target: charNavRef,
+      drag: { axis: "x", filterTaps: true },
+      wheel: { eventOptions: { passive: false } },
+    },
+  );
 
   // Handle image upload
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !currentCharacter) return;
+  const handleUpload = async (file: File) => {
+    if (!currentCharacter) return;
 
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append("image", file);
-      formData.append("characterId", currentCharacter.id);
+      formData.append("characterId", currentCharacter.characterId);
 
       const response = await fetch("/api/upload-character-image", {
         method: "POST",
@@ -216,9 +348,6 @@ export default function Home() {
       alert(error instanceof Error ? error.message : "Upload failed");
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -238,7 +367,7 @@ export default function Home() {
     setTimeout(() => descInputRef.current?.focus(), 0);
   };
 
-  // Save name
+  // Save name (to verseCharacters table)
   const handleSaveName = async () => {
     if (!currentCharacter || isSaving) return;
     const trimmedName = editName.trim();
@@ -249,10 +378,14 @@ export default function Home() {
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/update-character", {
+      const response = await fetch("/api/update-verse-character", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: currentCharacter.id, name: trimmedName }),
+        body: JSON.stringify({
+          verseId: currentVerseId,
+          characterId: currentCharacter.characterId,
+          name: trimmedName,
+        }),
       });
 
       if (!response.ok) {
@@ -262,7 +395,11 @@ export default function Home() {
 
       // Optimistic update
       setCharacterList((prev) =>
-        prev.map((c) => (c.id === currentCharacter.id ? { ...c, name: trimmedName } : c))
+        prev.map((c) =>
+          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
+            ? { ...c, name: trimmedName }
+            : c
+        )
       );
       setIsEditingName(false);
     } catch (error) {
@@ -273,7 +410,7 @@ export default function Home() {
     }
   };
 
-  // Save description
+  // Save description (to verseCharacters table)
   const handleSaveDescription = async () => {
     if (!currentCharacter || isSaving) return;
     const trimmedDesc = editDescription.trim();
@@ -284,10 +421,14 @@ export default function Home() {
 
     setIsSaving(true);
     try {
-      const response = await fetch("/api/update-character", {
+      const response = await fetch("/api/update-verse-character", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: currentCharacter.id, description: trimmedDesc }),
+        body: JSON.stringify({
+          verseId: currentVerseId,
+          characterId: currentCharacter.characterId,
+          description: trimmedDesc,
+        }),
       });
 
       if (!response.ok) {
@@ -297,7 +438,11 @@ export default function Home() {
 
       // Optimistic update
       setCharacterList((prev) =>
-        prev.map((c) => (c.id === currentCharacter.id ? { ...c, description: trimmedDesc } : c))
+        prev.map((c) =>
+          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
+            ? { ...c, description: trimmedDesc }
+            : c
+        )
       );
       setIsEditingDescription(false);
     } catch (error) {
@@ -328,19 +473,157 @@ export default function Home() {
     }
   };
 
-  // Handle image delete
-  const handleDelete = async (imageId: string, variantId: string) => {
-    if (!currentCharacter) return;
+  // --- Verse name/description editing ---
+  const handleStartEditVerseName = () => {
+    if (!currentVerse) return;
+    setEditVerseName(currentVerse.displayName);
+    setIsEditingVerseName(true);
+    setTimeout(() => verseNameInputRef.current?.focus(), 0);
+  };
 
-    // Don't allow deleting if it's the currently selected variant
-    const currentSelected = selectedImageVariant[currentCharacter.id] || "default";
-    if (variantId === currentSelected) {
-      // Reset to default first
-      setSelectedImageVariant((prev) => ({
-        ...prev,
-        [currentCharacter.id]: "default",
-      }));
+  const handleStartEditVerseDesc = () => {
+    if (!currentVerse) return;
+    setEditVerseDesc(currentVerse.description || "");
+    setIsEditingVerseDesc(true);
+    setTimeout(() => verseDescInputRef.current?.focus(), 0);
+  };
+
+  const handleSaveVerseName = async () => {
+    if (!currentVerse || isSaving) return;
+    const trimmed = editVerseName.trim();
+    if (trimmed.length === 0 || trimmed === currentVerse.displayName) {
+      setIsEditingVerseName(false);
+      return;
     }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/update-verse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verseId: currentVerse.id, name: trimmed }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Update failed");
+      }
+      setVerseListState((prev) =>
+        prev.map((v) =>
+          v.id === currentVerse.id
+            ? { ...v, name: trimmed.toLowerCase(), displayName: trimmed }
+            : v
+        )
+      );
+      setIsEditingVerseName(false);
+    } catch (error) {
+      console.error("Verse name update error:", error);
+      alert(error instanceof Error ? error.message : "Update failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveVerseDesc = async () => {
+    if (!currentVerse || isSaving) return;
+    const trimmed = editVerseDesc.trim();
+    if (trimmed === (currentVerse.description || "")) {
+      setIsEditingVerseDesc(false);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const response = await fetch("/api/update-verse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          verseId: currentVerse.id,
+          description: trimmed || null,
+        }),
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Update failed");
+      }
+      setVerseListState((prev) =>
+        prev.map((v) =>
+          v.id === currentVerse.id
+            ? { ...v, description: trimmed || null }
+            : v
+        )
+      );
+      setIsEditingVerseDesc(false);
+    } catch (error) {
+      console.error("Verse description update error:", error);
+      alert(error instanceof Error ? error.message : "Update failed");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleVerseNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSaveVerseName();
+    } else if (e.key === "Escape") {
+      setIsEditingVerseName(false);
+    }
+  };
+
+  const handleVerseDescKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveVerseDesc();
+    } else if (e.key === "Escape") {
+      setIsEditingVerseDesc(false);
+    }
+  };
+
+  // Reset verse editing on verse change
+  useEffect(() => {
+    setIsEditingVerseName(false);
+    setIsEditingVerseDesc(false);
+  }, [currentVerseId]);
+
+  // Save defaultInput (optimistic update + API persist)
+  const handleSaveDefaultInput = useCallback(async (url: string | null) => {
+    if (!currentCharacter || savingRef.current) return;
+    savingRef.current = true;
+
+    setCharacterList((prev) =>
+      prev.map((c) =>
+        c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
+          ? { ...c, defaultInput: url }
+          : c
+      )
+    );
+
+    try {
+      const response = await fetch("/api/update-verse-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          verseId: currentVerseId,
+          characterId: currentCharacter.characterId,
+          defaultInput: url,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Update failed");
+      }
+    } catch (error) {
+      console.error("DefaultInput update error:", error);
+      revalidator.revalidate();
+    } finally {
+      savingRef.current = false;
+    }
+  }, [currentCharacter, currentVerseId, revalidator]);
+
+  // Handle image delete
+  const handleDelete = async (imageId: string) => {
+    if (!currentCharacter) return;
 
     setDeleting(imageId);
     try {
@@ -355,6 +638,12 @@ export default function Home() {
         throw new Error(data.error || "Delete failed");
       }
 
+      // If deleted image was the defaultInput, reset it
+      const deletedImage = currentImages.find((img) => img.id === imageId);
+      if (deletedImage && currentCharacter.defaultInput === deletedImage.publicUrl) {
+        await handleSaveDefaultInput(null);
+      }
+
       revalidator.revalidate();
     } catch (error) {
       console.error("Delete error:", error);
@@ -366,106 +655,110 @@ export default function Home() {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-[--color-bg]">
-      {/* Layer 1: Characters (full screen background) */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        {characterList.map((character, index) => {
-          const isSelected = index === selectedIndex;
-          const diff = index - selectedIndex;
-          const absDiff = Math.abs(diff);
-          const centerIndex = (characterList.length - 1) / 2;
+      {/* Layer 1: Current verse characters (AnimatePresence slide transition) */}
+      <AnimatePresence mode="wait" initial={false} custom={slideDirection}>
+        <motion.div
+          key={currentVerseId}
+          custom={slideDirection}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.3, ease: "easeInOut" }}
+          ref={charNavRef}
+          className="absolute inset-0 flex items-center justify-center overflow-hidden touch-none"
+        >
+          {characterList.map((character, index) => {
+            const isSelected = index === selectedIndex;
+            const diff = index - selectedIndex;
+            const absDiff = Math.abs(diff);
+            const centerIndex = (characterList.length - 1) / 2;
 
-          // Position calculation
-          const homeX = (index - centerIndex) * 165;
-          const selectX = diff * 22;
-          const x = isSelecting ? selectX : homeX;
+            const homeX = (index - centerIndex) * 165;
+            const selectX = diff * 22;
+            const x = isSelecting ? selectX : homeX;
 
-          // Scale, opacity
-          const baseScale = 3.5;
-          let scale = 1;
-          let opacity = 1;
-          let grayscale = true;
+            const baseScale = 3.5;
+            let scale = 1;
+            let opacity = 1;
 
-          if (isSelecting) {
-            if (isSelected) {
-              scale = baseScale;
-              opacity = 1;
-              grayscale = false;
-            } else if (absDiff === 1) {
-              scale = baseScale * 0.5;
-              opacity = 0.2;
+            if (isSelecting) {
+              if (isSelected) {
+                scale = baseScale;
+                opacity = 1;
+              } else if (absDiff === 1) {
+                scale = baseScale * 0.5;
+                opacity = 0.2;
+              } else {
+                scale = baseScale * 0.3;
+                opacity = 0.08;
+              }
             } else {
-              scale = baseScale * 0.3;
-              opacity = 0.08;
+              // Home view: dim non-hovered characters
+              if (hoveredCharacterId && character.characterId !== hoveredCharacterId) {
+                opacity = 0.3;
+              }
             }
-          }
 
-          return (
-            <div
-              key={character.id}
-              className="absolute cursor-pointer transition-all duration-500 ease-out"
-              style={{
-                transform: isSelecting
-                  ? `translateX(${x}vw) scale(${scale})`
-                  : `translateX(${x}px) scale(${scale})`,
-                opacity,
-                zIndex: isSelected ? 10 : 5 - absDiff,
-              }}
-              onClick={() => setSearchParams({ selected: character.id })}
-            >
-              <div className="w-[5.5vw] min-w-[80px] max-w-[150px] aspect-[1/2] overflow-hidden">
-                <VideoCanvas
-                  src={character.video}
-                  poster={character.poster}
-                  preset="saintXo"
-                  className="w-full h-full"
+            return (
+              <div
+                key={`${character.verseId}-${character.characterId}`}
+                className="absolute cursor-pointer transition-all duration-500 ease-out"
+                style={{
+                  transform: isSelecting
+                    ? `translateX(${x}vw) scale(${scale})`
+                    : `translateX(${x}px) scale(${scale})`,
+                  opacity,
+                  zIndex: isSelected ? 10 : 5 - absDiff,
+                }}
+                onClick={() => {
+                  if (isSelecting && character.characterId === selectedId) {
+                    return;
+                  }
+                  setSearchParams({ selected: character.characterId, verse: currentVerseId });
+                }}
+                onMouseEnter={() => !isSelecting && setHoveredCharacterId(character.characterId)}
+                onMouseLeave={() => !isSelecting && setHoveredCharacterId(null)}
+              >
+                <div
+                  className="w-[5.5vw] min-w-[80px] max-w-[150px] aspect-[1/2] overflow-hidden"
                   style={{
-                    filter: grayscale ? "grayscale(100%)" : "grayscale(0%)",
+                    backgroundImage: character.poster ? `url(${character.poster})` : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center top",
                   }}
-                />
+                >
+                  <VideoCanvas
+                    src={character.video}
+                    poster={character.poster}
+                    preset="saintXo"
+                    className="w-full h-full"
+                  />
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Layer 2: Header */}
-      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4">
+      <header className="absolute top-0 left-0 right-0 z-[45] flex items-center justify-between px-6 py-4">
         <div className="flex items-center gap-3">
-          {isSelecting && (
-            <button onClick={() => setSearchParams({})} className={navButtonClass}>
-              <BackIcon />
-            </button>
-          )}
-          <Link to="/gallery" className={navButtonClass}>
-            <GalleryIcon />
-          </Link>
-        </div>
-        <div className="flex items-center gap-3">
-          {isSelecting && currentCharacter && (
-            <StepIndicator label="CHARACTER" current={selectedIndex + 1} total={characterList.length} />
-          )}
-          {/* Verse and Bot video buttons */}
-          <button
-            onClick={() => setOpenVideo("verse")}
-            className={navButtonClass}
-            title="Verse Video"
-          >
-            <span className="text-lg">🌐</span>
-          </button>
-          <button
-            onClick={() => setOpenVideo("bot")}
-            className={navButtonClass}
-            title="Bot Video"
-          >
-            <span className="text-lg">🤖</span>
-          </button>
+          <div className="flex flex-col">
+            <Link to="/" className="text-lg font-black italic tracking-wider text-black cursor-pointer hover:opacity-70 transition-opacity" style={{ fontWeight: 900 }}>SAINT VERSE</Link>
+            <div className="flex items-center gap-3 text-[10px] tracking-wider mt-1.5">
+              <button onClick={() => setActivePanel(prev => prev === "skill" ? null : "skill")} disabled={!isSelecting} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"><span className="font-semibold text-black">SKILLS</span><span className="text-gray-400">{String(skillsCount).padStart(2, "0")}</span></button>
+              <button onClick={() => setActivePanel(prev => prev === "gallery-compact" || prev === "gallery-expanded" ? null : "gallery-compact")} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"><span className="font-semibold text-black">GALLERY</span><span className="text-gray-400">{String(storiesCount).padStart(2, "0")}</span></button>
+            </div>
+          </div>
         </div>
       </header>
 
       {/* Layer 3: Title */}
-      <div className="absolute top-20 left-0 right-0 z-20 px-6">
+      <div className="absolute top-28 left-0 right-0 z-20 px-6">
         {isSelecting && currentCharacter ? (
           <>
+            {/* Character Step Indicator */}
+            <p className="text-[10px] tracking-wider text-black mb-1">CHARACTER {String(selectedIndex + 1).padStart(2, "0")} / {String(characterList.length).padStart(2, "0")}</p>
             {/* Character Name with inline edit */}
             <div className="group flex items-center gap-2">
               {isEditingName ? (
@@ -527,162 +820,212 @@ export default function Home() {
                 </>
               )}
             </div>
-            {/* Image Variant Selection */}
-            <div className="flex items-center gap-2 mt-4">
-              {currentImages.map((img) => (
-                <div
-                  key={img.id}
-                  className="relative"
-                  onMouseEnter={() => setHoveredImageId(img.id)}
-                  onMouseLeave={() => setHoveredImageId(null)}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedImageVariant((prev) => ({
-                        ...prev,
-                        [currentCharacter.id]: img.variantId,
-                      }));
-                    }}
-                    className={`w-12 h-16 md:w-14 md:h-20 rounded overflow-hidden border-2 transition-all cursor-pointer ${
-                      (selectedImageVariant[currentCharacter.id] || "default") === img.variantId
-                        ? "border-white ring-2 ring-white/30"
-                        : "border-transparent opacity-60 hover:opacity-100"
-                    }`}
-                  >
-                    <img
-                      src={img.publicUrl}
-                      alt={`${currentCharacter.name} ${img.variantId}`}
-                      className="w-full h-full object-cover object-top"
-                    />
-                  </button>
-                  {/* Delete button on hover (not for last image) */}
-                  {hoveredImageId === img.id && currentImages.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(img.id, img.variantId);
-                      }}
-                      disabled={deleting === img.id}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-neutral-600 hover:bg-neutral-500 rounded-full flex items-center justify-center text-white transition-all cursor-pointer"
-                    >
-                      {deleting === img.id ? (
-                        <span className="animate-spin text-xs">...</span>
-                      ) : (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                          <line x1="18" y1="6" x2="6" y2="18" />
-                          <line x1="6" y1="6" x2="18" y2="18" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
-                </div>
-              ))}
-              {/* Add button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  fileInputRef.current?.click();
-                }}
-                disabled={uploading}
-                className="w-6 h-6 rounded-full bg-black hover:bg-neutral-800 flex items-center justify-center text-white transition-all cursor-pointer"
-              >
-                {uploading ? (
-                  <span className="animate-spin text-xs">...</span>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                    <line x1="12" y1="5" x2="12" y2="19" />
-                    <line x1="5" y1="12" x2="19" y2="12" />
-                  </svg>
-                )}
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/png,image/jpeg"
-                onChange={handleUpload}
-                className="hidden"
-              />
-            </div>
-            <div className="flex items-center gap-3 mt-4 max-w-xs">
-              <span className="text-xs text-[--color-text-tertiary] w-16">
-                {String(selectedIndex + 1).padStart(2, "0")} / {String(characterList.length).padStart(2, "0")}
-              </span>
-              <input
-                type="range"
-                min="0"
-                max={characterList.length - 1}
-                value={selectedIndex}
-                onChange={(e) => setSearchParams({ selected: characterList[parseInt(e.target.value)].id })}
-                className="flex-1 h-1 bg-[--color-border] rounded-full appearance-none cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none
-                  [&::-webkit-slider-thumb]:w-3
-                  [&::-webkit-slider-thumb]:h-3
-                  [&::-webkit-slider-thumb]:bg-[--color-text]
-                  [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:cursor-pointer
-                "
-              />
-            </div>
           </>
         ) : (
-          <>
-            <LargeTitle>Saint XO Verse</LargeTitle>
-            <Counter label="CHARACTERS" count={characterList.length} />
-          </>
+          <AnimatePresence mode="wait" custom={slideDirection}>
+            <motion.div
+              key={currentVerseId}
+              custom={slideDirection}
+              initial={{ opacity: 0, y: slideDirection * 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -slideDirection * 10 }}
+              transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
+            >
+              <span className="text-[10px] font-medium tracking-wider text-black mb-1">VERSE&ensp;{String(currentVerseIndex + 1).padStart(2, "0")}/{String(verseListState.length).padStart(2, "0")}</span>
+              {/* Verse Name with inline edit */}
+              <div className="group flex items-center gap-2">
+                {isEditingVerseName ? (
+                  <input
+                    ref={verseNameInputRef}
+                    type="text"
+                    value={editVerseName}
+                    onChange={(e) => setEditVerseName(e.target.value)}
+                    onKeyDown={handleVerseNameKeyDown}
+                    onBlur={handleSaveVerseName}
+                    disabled={isSaving}
+                    className="text-3xl md:text-4xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white outline-none text-[--color-text] w-full max-w-md"
+                    style={{ fontFamily: "inherit" }}
+                  />
+                ) : (
+                  <>
+                    <LargeTitle>{currentVerse ? `${currentVerse.name.toUpperCase()} VERSE` : "SAINT VERSE"}</LargeTitle>
+                    <button
+                      onClick={handleStartEditVerseName}
+                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 cursor-pointer"
+                      title="Edit verse name"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
+              {/* Verse Description with inline edit */}
+              <div className="group flex items-start gap-2 mt-2">
+                {isEditingVerseDesc ? (
+                  <textarea
+                    ref={verseDescInputRef}
+                    value={editVerseDesc}
+                    onChange={(e) => setEditVerseDesc(e.target.value)}
+                    onKeyDown={handleVerseDescKeyDown}
+                    onBlur={handleSaveVerseDesc}
+                    disabled={isSaving}
+                    rows={2}
+                    className="text-sm bg-transparent border border-white/30 focus:border-white/50 rounded-lg outline-none text-[--color-text-secondary] w-full max-w-md p-2 resize-none leading-relaxed"
+                    placeholder="Add verse description..."
+                  />
+                ) : (
+                  <>
+                    {currentVerse?.description ? (
+                      <p className="text-sm text-[--color-text-secondary] max-w-md leading-relaxed">
+                        {currentVerse.description}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-[--color-text-secondary]/40 max-w-md leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">
+                        Add description...
+                      </p>
+                    )}
+                    <button
+                      onClick={handleStartEditVerseDesc}
+                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0 cursor-pointer"
+                      title="Edit verse description"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                        <path d="m15 5 4 4" />
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
+              <span className="flex items-center gap-24 text-[10px] tracking-wider text-black mt-8"><span className="font-medium">CHARACTERS</span><span className="font-bold">{String(characterList.length).padStart(2, "0")}</span></span>
+            </motion.div>
+          </AnimatePresence>
         )}
       </div>
 
-      {/* Layer 4: Bottom Bar */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 flex items-center justify-between px-6 py-4 bg-[--color-bg]">
-        <span className="text-sm text-[--color-text-secondary]">
-          {isSelecting && currentCharacter ? currentCharacter.name : `${characterList.length} CHARACTERS`}
-        </span>
-        <button
-          onClick={
-            isSelecting
-              ? () => {
-                  const selectedVariant = selectedImageVariant[currentCharacter?.id || ""] || "default";
-                  const selectedImage = currentImages.find((img) => img.variantId === selectedVariant) || currentImages[0];
-                  const imageUrl = selectedImage?.publicUrl || "";
-                  navigate(`/motion?character=${currentCharacter?.id}&variant=${selectedVariant}&imageUrl=${encodeURIComponent(imageUrl)}`);
-                }
-              : () => setSearchParams({ selected: characterList[0].id })
-          }
-          className="px-4 py-2 text-sm font-medium bg-[--color-text] text-[--color-bg] rounded cursor-pointer"
-        >
-          {isSelecting ? "Select" : "Start"} →
-        </button>
-      </div>
+      {/* Image Input Selection — subtle bar toggle + expandable panel */}
+      <AnimatePresence>
+        {isSelecting && currentCharacter && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="absolute top-[300px] left-6 z-20"
+          >
+            <InputImagePanel
+              open={inputPanelOpen}
+              onToggle={setInputPanelOpen}
+              character={currentCharacter}
+              images={currentImages}
+              verseId={currentVerseId}
+              onSaveDefaultInput={handleSaveDefaultInput}
+              onDeleteImage={handleDelete}
+              onUploadImage={handleUpload}
+              uploading={uploading}
+              deleting={deleting}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Layer 5: Navigation (only when selecting) */}
-      {isSelecting && (
-        <div className="absolute bottom-20 left-0 right-0 z-20 flex items-center justify-between px-6">
+      {/* Floating Bar */}
+      {/* Click-outside backdrop for compact panels (music/skill/gallery-compact) */}
+      {activePanel && activePanel !== "gallery-expanded" && (
+        <div className="fixed inset-0 z-[25]" onClick={() => setActivePanel(null)} />
+      )}
+
+      <HomeFloatingBar
+        characterId={currentCharacter?.characterId ?? null}
+        characterImageUrl={selectedImgUrl}
+        verseId={currentVerseId}
+        activePanel={activePanel}
+        onPanelChange={setActivePanel}
+        selectedVideo={selectedSkillVideo}
+        selectedImage={selectedSkillImage}
+      >
+        {isSelecting && currentCharacter && (
+          <SkillPanel
+            open={skillPanelOpen}
+            videos={skillVideos}
+            images={skillImages}
+            tab={skillTab}
+            selectedVideoId={selectedSkillVideoId}
+            selectedImageId={selectedSkillImageId}
+            onTabChange={(t) => {
+              setSkillTab(t);
+              if (t === "video") setSelectedSkillImageId(null);
+              else setSelectedSkillVideoId(null);
+            }}
+            onSelectVideo={setSelectedSkillVideoId}
+            onSelectImage={setSelectedSkillImageId}
+          />
+        )}
+        <GalleryCompactPanel
+          open={galleryCompactOpen}
+          onExpand={() => setActivePanel("gallery-expanded")}
+          galleryState={galleryState}
+        />
+      </HomeFloatingBar>
+
+      {/* Verse Navigation (right side, only when not selecting) */}
+      {!isSelecting && verseListState.length > 1 && (
+        <div className="absolute right-6 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3">
           <button
-            onClick={() => selectedIndex > 0 && setSearchParams({ selected: characterList[selectedIndex - 1].id })}
-            disabled={selectedIndex === 0}
-            className={`flex items-center gap-2 text-sm font-medium transition-all ${
-              selectedIndex === 0 ? "opacity-30 cursor-not-allowed" : "opacity-70 hover:opacity-100 cursor-pointer"
+            onClick={() => handleVerseChange("up")}
+            disabled={currentVerseIndex === 0}
+            className={`${navButtonClass} ${
+              currentVerseIndex === 0 ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
             }`}
+            title="Previous Verse"
           >
-            ← PREV
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
           </button>
+
+          {/* Verse indicator dots */}
+          <div className="flex flex-col items-center gap-1.5 py-1">
+            {verseListState.map((v, i) => (
+              <div
+                key={v.id}
+                className={`w-1.5 h-1.5 rounded-full transition-all ${
+                  i === currentVerseIndex ? "bg-white scale-125" : "bg-white/30"
+                }`}
+              />
+            ))}
+          </div>
+
           <button
-            onClick={() => selectedIndex < characterList.length - 1 && setSearchParams({ selected: characterList[selectedIndex + 1].id })}
-            disabled={selectedIndex === characterList.length - 1}
-            className={`flex items-center gap-2 text-sm font-medium transition-all ${
-              selectedIndex === characterList.length - 1 ? "opacity-30 cursor-not-allowed" : "opacity-70 hover:opacity-100 cursor-pointer"
+            onClick={() => handleVerseChange("down")}
+            disabled={currentVerseIndex === verseListState.length - 1}
+            className={`${navButtonClass} ${
+              currentVerseIndex === verseListState.length - 1 ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
             }`}
+            title="Next Verse"
           >
-            NEXT →
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         </div>
       )}
 
-      {/* Video Modal */}
-      {openVideo && (
-        <VideoModal videoType={openVideo} onClose={() => setOpenVideo(null)} />
-      )}
+      {/* Gallery Expanded Panel */}
+      <GalleryExpandedPanel
+        open={galleryExpandedOpen}
+        onClose={() => setActivePanel(null)}
+        onCollapse={() => setActivePanel("gallery-compact")}
+        galleryState={galleryState}
+        verseId={currentVerseId}
+      />
+
+      {/* Gallery Modals — root level so z-50 escapes all stacking contexts */}
+      <GalleryModals galleryState={galleryState} />
+
     </div>
   );
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "verse_characters" ADD COLUMN "default_input" text;

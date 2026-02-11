@@ -18,3 +18,4 @@ export { SubTitle } from "./SubTitle";
 export { Counter } from "./Counter";
 export { NavButton } from "./NavButton";
 export { DotIndicator } from "./DotIndicator";
+export { GlassButton } from "./GlassButton";

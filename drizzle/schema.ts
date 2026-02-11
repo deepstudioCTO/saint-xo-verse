@@ -17,6 +17,7 @@ export const generations = pgTable("generations", {
   musicId: text("music_id"), // 선택한 음악 ID
   motionVideoId: uuid("motion_video_id"), // 선택한 모션 비디오 ID
   conceptImageId: uuid("concept_image_id"), // 참조용 컨셉 이미지 ID (이미지 생성용)
+  verseId: text("verse_id"), // verse ID (nullable for backward compat)
   prompt: text("prompt"), // 이미지 생성 프롬프트
   resolution: text("resolution"), // '1K' | '2K' | '4K'
   imageUrl: text("image_url").notNull(),
@@ -75,6 +76,36 @@ export const characters = pgTable("characters", {
   description: text("description").notNull(), // 설명
   video: text("video").notNull(), // 영상 경로
   poster: text("poster").notNull(), // 포스터 경로
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => sql`now()`),
+});
+
+export const verses = pgTable("verses", {
+  id: text("id").primaryKey(), // "00", "01" 등
+  name: text("name").notNull(), // "showcase", "ojos"
+  displayName: text("display_name").notNull(), // "Showcase", "Ojos"
+  description: text("description"), // verse 설명 (nullable)
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => sql`now()`),
+});
+
+export const verseCharacters = pgTable("verse_characters", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  verseId: text("verse_id").notNull(), // "00", "01"
+  characterId: text("character_id").notNull(), // "sumin", "rumi"
+  name: text("name").notNull(), // verse별 페르소나 이름
+  description: text("description").notNull(), // verse별 설명
+  video: text("video").notNull(), // verse별 영상 경로
+  poster: text("poster").notNull(), // verse별 포스터 경로
+  defaultInput: text("default_input"), // poster 대체 URL (nullable, null이면 poster 사용)
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")

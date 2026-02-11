@@ -17,6 +17,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const duration = parseFloat(formData.get("duration") as string);
     const memberId = formData.get("memberId") as string | null;
     const musicId = formData.get("musicId") as string | null;
+    const verseId = formData.get("verseId") as string | null;
     let characterImageUrl = formData.get("imageUrl") as string | null;
 
     if (!memberId) {
@@ -67,6 +68,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
           status: "completed",
           memberId,
           musicId: musicId || null,
+          verseId,
           imageUrl: characterImageUrl,
           predictionId: null,
           motionVideoId: null,
@@ -98,11 +100,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
           memberId: updated.memberId,
           musicId: updated.musicId,
           motionVideoId: null,
+          conceptImageId: null,
+          verseId: updated.verseId,
           videoUrl: updated.videoUrl,
           outputUrl: null,
           status: updated.status,
           createdAt: updated.createdAt.toISOString(),
           motionName: null,
+          conceptImageName: null,
           errorMessage: null,
           prompt: null,
           upscaleStatus: null,
@@ -131,6 +136,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
           status: "completed",
           memberId,
           musicId: musicId || null,
+          verseId,
           imageUrl: characterImageUrl,
           predictionId: null,
           motionVideoId: null,
@@ -161,11 +167,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
           memberId: updated.memberId,
           musicId: updated.musicId,
           motionVideoId: null,
+          conceptImageId: null,
+          verseId: updated.verseId,
           videoUrl: null,
           outputUrl: updated.outputUrl,
           status: updated.status,
           createdAt: updated.createdAt.toISOString(),
           motionName: null,
+          conceptImageName: null,
           errorMessage: null,
           prompt: null,
           upscaleStatus: null,

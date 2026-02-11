@@ -24,6 +24,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const memberId = formData.get("memberId") as string | null;
     const musicId = formData.get("musicId") as string | null;
     const motionVideoId = formData.get("motionVideoId") as string | null;
+    const verseId = formData.get("verseId") as string | null;
 
     const imageFile = formData.get("image") as File | null;
     const videoFile = formData.get("video") as File | null;
@@ -86,7 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         input: {
           image: imageUrl,
           video: videoUrl,
-          prompt: "a person performing the motion naturally",
+          prompt: (formData.get("prompt") as string) || "a person performing the motion naturally",
           mode: "pro",
           character_orientation: "image",
         },
@@ -113,6 +114,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         memberId,
         musicId,
         motionVideoId,
+        verseId,
         imageUrl,
         motionVideoUrl: videoUrl,
         status: "pending",

@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { Link, useLoaderData } from "react-router";
-import { eq } from "drizzle-orm";
+import { and, eq, asc } from "drizzle-orm";
 import type { Route } from "./+types/result.$id";
 import { PageLayout } from "~/components/layout";
 import { VideoPlayerWithMusic } from "~/components/common/VideoPlayerWithMusic";
 import { getMusicFilePath, getTrackName } from "~/lib/music-data";
 import { mergeVideoWithMusic, downloadBlob, type MergeProgress } from "~/lib/audio-merge";
 import { CHARACTERS_BY_ID, createCharactersById, type Character } from "~/lib/data";
-import { getDb, generations, motionVideos, characters } from "~/lib/db.server";
-import { asc } from "drizzle-orm";
+import { getDb, generations, motionVideos, characters, verseCharacters } from "~/lib/db.server";
 
 export const meta: Route.MetaFunction = () => [
-  { title: "Result - Saint XO Verse" },
+  { title: "Result - Saint Verse" },
 ];
 
 interface LoaderData {
@@ -19,6 +18,7 @@ interface LoaderData {
     id: string;
     memberId: string | null;
     musicId: string | null;
+    verseId: string | null;
     videoUrl: string | null;
     status: string;
     createdAt: string;
@@ -27,6 +27,7 @@ interface LoaderData {
     name: string;
   } | null;
   characters: Character[];
+  verseCharacterName: string | null;
   error?: string;
 }
 
@@ -34,7 +35,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const id = params.id;
 
   if (!id) {
-    return { generation: null, motionVideo: null, characters: [], error: "ID is required" };
+    return { generation: null, motionVideo: null, characters: [], verseCharacterName: null, error: "ID is required" };
   }
 
   const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -47,7 +48,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     .limit(1);
 
   if (!generation) {
-    return { generation: null, motionVideo: null, characters: [], error: "Generation not found" };
+    return { generation: null, motionVideo: null, characters: [], verseCharacterName: null, error: "Generation not found" };
   }
 
   // Query Motion Video name
@@ -76,22 +77,40 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     displayOrder: c.displayOrder,
   }));
 
+  // Look up verse-specific character name
+  let verseCharacterName: string | null = null;
+  if (generation.verseId && generation.memberId) {
+    const [vc] = await db
+      .select({ name: verseCharacters.name })
+      .from(verseCharacters)
+      .where(
+        and(
+          eq(verseCharacters.verseId, generation.verseId),
+          eq(verseCharacters.characterId, generation.memberId)
+        )
+      )
+      .limit(1);
+    verseCharacterName = vc?.name || null;
+  }
+
   return {
     generation: {
       id: generation.id,
       memberId: generation.memberId,
       musicId: generation.musicId,
+      verseId: generation.verseId,
       videoUrl: generation.videoUrl,
       status: generation.status,
       createdAt: generation.createdAt.toISOString(),
     },
     motionVideo,
     characters: characterList,
+    verseCharacterName,
   };
 }
 
 export default function Result() {
-  const { generation, motionVideo, characters: loadedCharacters, error } = useLoaderData<LoaderData>();
+  const { generation, motionVideo, characters: loadedCharacters, verseCharacterName, error } = useLoaderData<LoaderData>();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<MergeProgress | null>(null);
 
@@ -113,7 +132,8 @@ export default function Result() {
     );
   }
 
-  const character = charactersById[generation.memberId || ""] || { name: "Unknown", imageUrl: "" };
+  const baseCharacter = charactersById[generation.memberId || ""] || { name: "Unknown", imageUrl: "" };
+  const character = { ...baseCharacter, name: verseCharacterName || baseCharacter.name };
   const trackName = getTrackName(generation.musicId);
   const motionName = motionVideo?.name || "Unknown";
   const musicPath = getMusicFilePath(generation.musicId);

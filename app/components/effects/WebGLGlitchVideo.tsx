@@ -266,6 +266,7 @@ export function WebGLGlitchVideo({
   } | null>(null);
 
   const [isWebGLReady, setIsWebGLReady] = useState(false);
+  const videoTextureReady = useRef(false);
 
   const randomInRange = useCallback((min: number, max: number) => {
     return min + Math.random() * (max - min);
@@ -485,6 +486,10 @@ export function WebGLGlitchVideo({
       if (video.readyState >= 2 && !video.paused) {
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+        if (!videoTextureReady.current) {
+          videoTextureReady.current = true;
+          canvas.style.opacity = "1";
+        }
       }
 
       // 셰이더 사용
@@ -564,7 +569,7 @@ export function WebGLGlitchVideo({
         }}
       />
 
-      {/* WebGL 캔버스 */}
+      {/* WebGL 캔버스 - 비디오 텍스처 준비 전까지 숨김 (poster 배경이 보이도록) */}
       <canvas
         ref={canvasRef}
         style={{
@@ -574,6 +579,7 @@ export function WebGLGlitchVideo({
           position: "absolute",
           top: 0,
           left: 0,
+          opacity: 0,
         }}
       />
     </div>

@@ -77,7 +77,7 @@ export function GenerationGridItem({
       onMouseLeave={handleMouseLeave}
       disabled={!isClickable}
       className={`
-        relative w-full bg-[--color-border-light] overflow-hidden
+        relative w-full bg-[--color-border-light] overflow-hidden glass-round
         transition-all duration-200 ease-out group aspect-[1/2]
         ${isHighlighted
           ? "scale-[1.03] shadow-xl shadow-black/25 z-10 ring-2 ring-white/50"
@@ -90,7 +90,7 @@ export function GenerationGridItem({
     >
       {/* Pending/Processing State */}
       {isPending && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md z-20">
           <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin mb-2" />
           <span className="text-xs text-white/80">
             {generation.status === "processing" ? "Generating..." : "Waiting..."}
@@ -100,7 +100,7 @@ export function GenerationGridItem({
 
       {/* Failed State */}
       {isFailed && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/60 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-900/40 backdrop-blur-md z-20">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -165,15 +165,15 @@ export function GenerationGridItem({
       )}
 
       {/* Index Label */}
-      <span className={`absolute top-2 left-2 text-[10px] font-medium px-1.5 py-0.5 rounded z-30 transition-all ${
-        isActive ? "text-white bg-black/60" : "text-white/70 bg-black/30"
+      <span className={`absolute top-2 left-2 text-[10px] font-medium px-1.5 py-0.5 rounded z-30 transition-all backdrop-blur-md ${
+        isActive ? "text-white bg-black/50" : "text-white/70 bg-black/20"
       }`}>
         {String(index + 1).padStart(2, "0")}
       </span>
 
       {/* Character name badge */}
-      <span className={`absolute bottom-2 left-2 text-[10px] font-medium px-1.5 py-0.5 rounded z-30 transition-all ${
-        isActive ? "text-white bg-black/60" : "text-white/70 bg-black/30"
+      <span className={`absolute bottom-2 left-2 text-[10px] font-medium px-1.5 py-0.5 rounded z-30 transition-all backdrop-blur-md ${
+        isActive ? "text-white bg-black/50" : "text-white/70 bg-black/20"
       }`}>
         {characterName}
       </span>
@@ -191,20 +191,20 @@ export function GenerationGridItem({
 
       {/* Upscale badge (video only) */}
       {isCompleted && !isImage && isUpscaling && (
-        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 px-1.5 py-0.5 bg-purple-600/90 rounded text-[9px] font-medium text-white">
+        <div className="absolute top-2 right-2 z-30 flex items-center gap-1 px-1.5 py-0.5 bg-purple-600/70 backdrop-blur-md rounded text-[9px] font-medium text-white">
           <div className="w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
           <span>Upscaling</span>
         </div>
       )}
       {isCompleted && !isImage && isUpscaled && !isUpscaling && (
-        <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-green-600/90 rounded text-[9px] font-bold text-white">
+        <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-green-600/70 backdrop-blur-md rounded text-[9px] font-bold text-white">
           HD
         </div>
       )}
 
       {/* Image type badge */}
       {isCompleted && isImage && (
-        <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-blue-600/90 rounded text-[9px] font-bold text-white">
+        <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-blue-600/70 backdrop-blur-md rounded text-[9px] font-bold text-white">
           IMG
         </div>
       )}

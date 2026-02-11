@@ -4,6 +4,7 @@ import { desc } from "drizzle-orm";
 import type { Route } from "./+types/gallery";
 import { PageLayout } from "~/components/layout";
 import { LargeTitle, Counter } from "~/components/ui";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "~/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -13,12 +14,12 @@ import {
   DialogFooter,
 } from "~/components/ui/dialog";
 import { GenerationGridItem, VideoDetailModal, ImageDetailModal, ResultUploadDialog } from "~/components/gallery";
-import { CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById, type Character } from "~/lib/data";
-import { getDb, generations, motionVideos, conceptImages, characters } from "~/lib/db.server";
+import { CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById, type Character, type VerseCharacter } from "~/lib/data";
+import { getDb, generations, motionVideos, conceptImages, characters, verseCharacters } from "~/lib/db.server";
 import { asc } from "drizzle-orm";
 
 export const meta: Route.MetaFunction = () => [
-  { title: "Gallery - Saint XO Verse" },
+  { title: "Gallery - Saint Verse" },
 ];
 
 interface Generation {
@@ -28,6 +29,7 @@ interface Generation {
   musicId: string | null;
   motionVideoId: string | null;
   conceptImageId: string | null;
+  verseId: string | null;
   videoUrl: string | null;
   outputUrl: string | null;
   status: string;
@@ -57,6 +59,7 @@ interface LoaderData {
   motionVideos: MotionVideoOption[];
   conceptImages: ConceptImageOption[];
   characters: Character[];
+  verseCharacterMap: Record<string, Record<string, { name: string }>>;
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -105,6 +108,7 @@ export async function loader({ context }: Route.LoaderArgs) {
       musicId: gen.musicId,
       motionVideoId: gen.motionVideoId,
       conceptImageId: gen.conceptImageId,
+      verseId: gen.verseId,
       videoUrl: gen.videoUrl,
       outputUrl: gen.outputUrl,
       status: gen.status,
@@ -129,21 +133,40 @@ export async function loader({ context }: Route.LoaderArgs) {
     displayOrder: c.displayOrder,
   }));
 
+  // Query all verse characters for name lookup
+  const allVerseCharacters = await db
+    .select({
+      verseId: verseCharacters.verseId,
+      characterId: verseCharacters.characterId,
+      name: verseCharacters.name,
+    })
+    .from(verseCharacters);
+
+  // Build nested map: { verseId: { characterId: { name } } }
+  const verseCharacterMap: Record<string, Record<string, { name: string }>> = {};
+  for (const vc of allVerseCharacters) {
+    if (!verseCharacterMap[vc.verseId]) {
+      verseCharacterMap[vc.verseId] = {};
+    }
+    verseCharacterMap[vc.verseId][vc.characterId] = { name: vc.name };
+  }
+
   return {
     generations: generationsWithNames,
     motionVideos: allMotionVideos,
     conceptImages: allConceptImages,
     characters: characterList,
+    verseCharacterMap,
   };
 }
 
-type SortBy = "recent" | "character" | "action";
+type SortBy = "recent" | "character" | "skill";
 type TypeFilter = "all" | "video" | "image";
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: "recent", label: "Recent" },
   { value: "character", label: "Character" },
-  { value: "action", label: "Action" },
+  { value: "skill", label: "Skill" },
 ];
 
 const TYPE_FILTERS: { value: TypeFilter; label: string }[] = [
@@ -153,7 +176,7 @@ const TYPE_FILTERS: { value: TypeFilter; label: string }[] = [
 ];
 
 export default function Gallery() {
-  const { generations: initialGenerations, motionVideos: motionVideoOptions, conceptImages: conceptImageOptions, characters: loadedCharacters } = useLoaderData<LoaderData>();
+  const { generations: initialGenerations, motionVideos: motionVideoOptions, conceptImages: conceptImageOptions, characters: loadedCharacters, verseCharacterMap } = useLoaderData<LoaderData>();
 
   // Create character lookup map from loaded data or fallback to defaults
   const charactersById = loadedCharacters.length > 0
@@ -161,6 +184,7 @@ export default function Gallery() {
     : CHARACTERS_BY_ID;
   const [searchParams, setSearchParams] = useSearchParams();
   const highlightId = searchParams.get("highlight");
+  const verseId = searchParams.get("verse") || "00";
 
   const [generations, setGenerations] = useState<Generation[]>(initialGenerations);
   const [selectedGeneration, setSelectedGeneration] = useState<Generation | null>(null);
@@ -196,18 +220,18 @@ export default function Gallery() {
           if (a.memberId !== b.memberId) return a.memberId.localeCompare(b.memberId);
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
-      case "action":
+      case "skill":
         return sorted.sort((a, b) => {
           // For videos, use motionVideoId; for images, use conceptImageId
-          const aActionId = a.type === "image" ? a.conceptImageId : a.motionVideoId;
-          const bActionId = b.type === "image" ? b.conceptImageId : b.motionVideoId;
+          const aSkillId = a.type === "image" ? a.conceptImageId : a.motionVideoId;
+          const bSkillId = b.type === "image" ? b.conceptImageId : b.motionVideoId;
 
-          // NULL actionId goes last
-          if (!aActionId && !bActionId) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-          if (!aActionId) return 1;
-          if (!bActionId) return -1;
-          // Sort by actionId, then by createdAt within same action
-          if (aActionId !== bActionId) return aActionId.localeCompare(bActionId);
+          // NULL skillId goes last
+          if (!aSkillId && !bSkillId) return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+          if (!aSkillId) return 1;
+          if (!bSkillId) return -1;
+          // Sort by skillId, then by createdAt within same skill
+          if (aSkillId !== bSkillId) return aSkillId.localeCompare(bSkillId);
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
         });
       case "recent":
@@ -467,9 +491,13 @@ export default function Gallery() {
     (g) => g.status === "pending" || g.status === "processing"
   ).length;
 
-  // Helper to get character name
-  const getCharacterName = (memberId: string | null) => {
+  // Helper to get character name (prefer verse-specific name)
+  const getCharacterName = (memberId: string | null, genVerseId?: string | null) => {
     if (!memberId) return "Unknown";
+    // Try verse-specific name first
+    if (genVerseId && verseCharacterMap[genVerseId]?.[memberId]) {
+      return verseCharacterMap[genVerseId][memberId].name;
+    }
     return charactersById[memberId]?.name || "Unknown";
   };
 
@@ -482,7 +510,7 @@ export default function Gallery() {
   return (
     <PageLayout
       showBack
-      backTo="/"
+      backTo={`/?verse=${verseId}`}
       showHome
       headerRight={
         <button
@@ -498,35 +526,32 @@ export default function Gallery() {
         <div className="pt-8 mb-6">
           <div className="flex items-center justify-between mb-2">
             <LargeTitle>Gallery</LargeTitle>
-            {/* Sort selector */}
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortBy)}
-              className="text-sm bg-transparent border border-[--color-border] rounded-lg px-3 py-1.5 text-[--color-text] focus:outline-none focus:ring-1 focus:ring-[--color-text] cursor-pointer"
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Type filter tabs */}
-          <div className="flex items-center gap-2 mb-4">
-            {TYPE_FILTERS.map((filter) => (
-              <button
-                key={filter.value}
-                onClick={() => setTypeFilter(filter.value)}
-                className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors cursor-pointer ${
-                  typeFilter === filter.value
-                    ? "bg-black text-white"
-                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                }`}
-              >
-                {filter.label}
-              </button>
-            ))}
+            <div className="flex items-center gap-1">
+              <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TYPE_FILTERS.map((filter) => (
+                    <SelectItem key={filter.value} value={filter.value}>
+                      {filter.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
@@ -580,7 +605,7 @@ export default function Gallery() {
                 <GenerationGridItem
                   key={gen.id}
                   generation={gen}
-                  characterName={getCharacterName(gen.memberId)}
+                  characterName={getCharacterName(gen.memberId, gen.verseId)}
                   index={index}
                   isHighlighted={gen.id === highlightId}
                   onClick={() => handleGenerationClick(gen)}
@@ -597,7 +622,7 @@ export default function Gallery() {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           generation={selectedGeneration}
-          characterName={getCharacterName(selectedGeneration?.memberId || null)}
+          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.verseId)}
           trackName={getTrackName(selectedGeneration?.musicId || null)}
           motionName={selectedGeneration?.motionName || "Unknown"}
           errorMessage={selectedGeneration?.errorMessage || null}
@@ -615,7 +640,7 @@ export default function Gallery() {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           generation={selectedGeneration}
-          characterName={getCharacterName(selectedGeneration?.memberId || null)}
+          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.verseId)}
           conceptImageName={selectedGeneration?.conceptImageName || null}
           errorMessage={selectedGeneration?.errorMessage || null}
           onDelete={handleDeleteRequest}
@@ -664,6 +689,7 @@ export default function Gallery() {
         onOpenChange={setUploadDialogOpen}
         onUploadComplete={handleUploadComplete}
         characters={loadedCharacters.length > 0 ? loadedCharacters : undefined}
+        verseId={verseId}
       />
     </PageLayout>
   );

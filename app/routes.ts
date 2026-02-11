@@ -25,4 +25,7 @@ export default [
   route("api/update-concept-image", "routes/api.update-concept-image.tsx"),
   route("api/update-generation-concept-image", "routes/api.update-generation-concept-image.tsx"),
   route("api/update-character", "routes/api.update-character.tsx"),
+  route("api/update-verse", "routes/api.update-verse.tsx"),
+  route("api/update-verse-character", "routes/api.update-verse-character.tsx"),
+  route("api/gallery-data", "routes/api.gallery-data.tsx"),
 ] satisfies RouteConfig;

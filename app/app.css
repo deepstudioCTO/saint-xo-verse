@@ -118,3 +118,43 @@ body {
 .animate-fade-in {
   animation: fade-in 300ms ease-out;
 }
+
+/* Skeleton Shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    #e5e5e5 0%,
+    #f0f0f0 40%,
+    #e5e5e5 80%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Glass Utilities — 조합 가능: glass-bg glass-round glass (둘 다) */
+@utility glass-bg {
+  background: rgb(247 247 247);
+}
+
+@utility glass-round {
+  border-radius: 0.125rem;
+}
+
+@utility glass {
+  background: rgb(247 247 247);
+  border-radius: 0.125rem;
+}
+
+@utility glass-bold {
+  background: rgb(237 237 237);
+  border-radius: 0.125rem;
+}

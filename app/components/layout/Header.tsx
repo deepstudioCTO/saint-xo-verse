@@ -7,6 +7,7 @@ interface HeaderProps {
   onBackClick?: () => void;
   showHome?: boolean;
   showGallery?: boolean;
+  galleryTo?: string;
 }
 
 // Icon components for consistent navigation
@@ -68,6 +69,7 @@ export function Header({
   onBackClick,
   showHome,
   showGallery,
+  galleryTo = "/gallery",
 }: HeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-[--color-bg]">
@@ -86,7 +88,7 @@ export function Header({
             )
           ) : (
             <Link to="/" className="text-sm font-bold tracking-tight">
-              Saint XO Verse
+              Saint Verse
             </Link>
           )}
 
@@ -97,7 +99,7 @@ export function Header({
           )}
 
           {showGallery && (
-            <Link to="/gallery" className={navButtonClass}>
+            <Link to={galleryTo} className={navButtonClass}>
               <GalleryIcon />
             </Link>
           )}

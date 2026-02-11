@@ -24,6 +24,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const aspectRatio = (formData.get("aspectRatio") as string) || "2:3";
     const memberId = formData.get("memberId") as string | null;
     const conceptImageId = formData.get("conceptImageId") as string | null;
+    const verseId = formData.get("verseId") as string | null;
 
     if (!characterImageUrl) {
       return Response.json(
@@ -97,6 +98,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         type: "image",
         memberId,
         conceptImageId,
+        verseId,
         prompt,
         resolution,
         imageUrl: characterImageUrl,

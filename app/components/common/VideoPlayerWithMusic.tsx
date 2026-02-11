@@ -27,95 +27,47 @@ export function VideoPlayerWithMusic({
   const audioRef = useRef<HTMLAudioElement>(null);
   const musicPath = getMusicFilePath(musicId);
 
-  // 비디오와 오디오 동기화
-  const syncAudioWithVideo = useCallback(() => {
-    if (!audioRef.current || !videoRef.current || !musicPath) return;
-
-    const video = videoRef.current;
+  const handlePlay = useCallback(() => {
     const audio = audioRef.current;
-
-    // 비디오가 재생 중이면 오디오도 재생
-    if (!video.paused) {
-      audio.currentTime = video.currentTime % audio.duration || 0;
-      audio.play().catch(() => {
-        // Autoplay 정책으로 인한 에러 무시
-      });
-    } else {
-      audio.pause();
-    }
-  }, [musicPath]);
-
-  // 비디오 이벤트 핸들러
-  useEffect(() => {
     const video = videoRef.current;
+    if (!audio || !video) return;
+    audio.currentTime = video.currentTime % (audio.duration || 1);
+    audio.play().catch(() => {});
+  }, []);
+
+  const handlePause = useCallback(() => {
+    audioRef.current?.pause();
+  }, []);
+
+  const handleSeeked = useCallback(() => {
     const audio = audioRef.current;
-    if (!video || !musicPath) return;
+    const video = videoRef.current;
+    if (!audio || !video) return;
+    audio.currentTime = video.currentTime % (audio.duration || 1);
+  }, []);
 
-    const handlePlay = () => {
-      if (audio) {
-        audio.currentTime = video.currentTime % (audio.duration || 1);
-        audio.play().catch(() => {});
-      }
-    };
-
-    const handlePause = () => {
-      if (audio) {
-        audio.pause();
-      }
-    };
-
-    const handleSeeked = () => {
-      if (audio) {
-        audio.currentTime = video.currentTime % (audio.duration || 1);
-      }
-    };
-
-    const handleEnded = () => {
-      if (loop && audio) {
-        audio.currentTime = 0;
-        if (!video.paused) {
-          audio.play().catch(() => {});
-        }
-      }
-    };
-
-    // 루프 시 오디오 리셋
-    const handleTimeUpdate = () => {
-      // 비디오가 처음으로 돌아갔을 때 오디오도 리셋
-      if (audio && video.currentTime < 0.5 && audio.currentTime > 1) {
-        audio.currentTime = 0;
-      }
-    };
-
-    video.addEventListener("play", handlePlay);
-    video.addEventListener("pause", handlePause);
-    video.addEventListener("seeked", handleSeeked);
-    video.addEventListener("ended", handleEnded);
-    video.addEventListener("timeupdate", handleTimeUpdate);
-
-    return () => {
-      video.removeEventListener("play", handlePlay);
-      video.removeEventListener("pause", handlePause);
-      video.removeEventListener("seeked", handleSeeked);
-      video.removeEventListener("ended", handleEnded);
-      video.removeEventListener("timeupdate", handleTimeUpdate);
-    };
-  }, [musicPath, loop]);
-
-  // 초기 autoPlay 처리
-  useEffect(() => {
-    if (autoPlay && videoRef.current) {
-      videoRef.current.play().catch(() => {});
+  const handleTimeUpdate = useCallback(() => {
+    const audio = audioRef.current;
+    const video = videoRef.current;
+    if (!audio || !video) return;
+    if (video.currentTime < 0.5 && audio.currentTime > 1) {
+      audio.currentTime = 0;
     }
+  }, []);
+
+  // autoPlay: HTML 속성 대신 명시적 호출 — React 이벤트 핸들러가 활성화된 후 실행
+  useEffect(() => {
+    if (!autoPlay) return;
+    const video = videoRef.current;
+    if (!video) return;
+    video.play().catch(() => {});
   }, [autoPlay]);
 
-  // 음악이 없는 경우 일반 비디오 재생
   if (!musicPath) {
     return (
       <video
         ref={videoRef}
         src={videoUrl}
-        autoPlay={autoPlay}
         loop={loop}
         controls={controls}
         playsInline
@@ -129,11 +81,14 @@ export function VideoPlayerWithMusic({
       <video
         ref={videoRef}
         src={videoUrl}
-        autoPlay={autoPlay}
         loop={loop}
         controls={controls}
         playsInline
-        muted // 음악이 있으면 원본 오디오는 음소거
+        muted
+        onPlay={handlePlay}
+        onPause={handlePause}
+        onSeeked={handleSeeked}
+        onTimeUpdate={handleTimeUpdate}
         className={className}
       />
       <audio ref={audioRef} src={musicPath} loop={loop} preload="auto" />

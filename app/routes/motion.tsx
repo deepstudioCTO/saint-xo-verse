@@ -27,7 +27,7 @@ import { getDb, motionVideos, conceptImages } from "~/lib/db.server";
 import { getPublicUrl } from "~/lib/supabase.server";
 
 export const meta: Route.MetaFunction = () => [
-  { title: "Motion - Saint XO Verse" },
+  { title: "Motion - Saint Verse" },
 ];
 
 interface MotionVideo {
@@ -112,9 +112,11 @@ export default function Motion() {
   const characterId = searchParams.get("character");
   const variant = searchParams.get("variant") || "default";
   const imageUrl = searchParams.get("imageUrl");
+  const verseId = searchParams.get("verse") || "00";
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<TabType>("video");
+  // Tab state (read initial value from URL)
+  const tabParam = searchParams.get("tab");
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam === "image" ? "image" : "video");
 
   // Video state
   const [videos, setVideos] = useState<MotionVideo[]>(initialVideos);
@@ -176,6 +178,7 @@ export default function Motion() {
       formData.append("memberId", characterId);
       formData.append("musicId", "");
       formData.append("motionVideoId", selectedVideoId);
+      formData.append("verseId", verseId);
 
       const response = await fetch("/api/generate", {
         method: "POST",
@@ -190,7 +193,7 @@ export default function Motion() {
         return;
       }
 
-      navigate(`/gallery?highlight=${data.generationId}`);
+      navigate(`/gallery?verse=${verseId}&highlight=${data.generationId}`);
     } catch (err) {
       console.error("Generation failed:", err);
       alert("An error occurred during generation request.");
@@ -211,6 +214,7 @@ export default function Motion() {
       formData.append("resolution", resolution);
       formData.append("aspectRatio", aspectRatio);
       formData.append("memberId", characterId);
+      formData.append("verseId", verseId);
 
       if (selectedImage?.publicUrl) {
         formData.append("conceptImageUrl", selectedImage.publicUrl);
@@ -235,7 +239,7 @@ export default function Motion() {
         return;
       }
 
-      navigate(`/gallery?highlight=${data.generationId}&type=image`);
+      navigate(`/gallery?verse=${verseId}&highlight=${data.generationId}&type=image`);
     } catch (err) {
       console.error("Image generation failed:", err);
       alert("An error occurred during generation request.");
@@ -414,9 +418,10 @@ export default function Motion() {
   return (
     <PageLayout
       showBack
-      backTo={`/?selected=${characterId}&variant=${variant}`}
+      backTo={`/?verse=${verseId}&selected=${characterId}&variant=${variant}`}
       showHome
       showGallery
+      galleryTo={`/gallery?verse=${verseId}`}
       headerRight={
         <div className="flex items-center gap-3">
           {activeTab === "video" ? (
