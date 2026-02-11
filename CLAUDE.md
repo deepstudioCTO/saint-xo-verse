@@ -107,6 +107,7 @@ export default [
 | 글로벌 스페이스바 | `registerGlobalSpacebar()` → root.tsx 1회 등록 | input/button 위에서는 스킵 |
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
+| 우측 썸네일 vs 하단 바 | 별도 absolute 컨테이너 분리 | 같은 컨테이너면 패널 열릴 때 썸네일이 위로 밀림 |
 
 ### 구성
 - Verse 00 "Showcase": sumin, rumi, geumbi, jiyoon, lei

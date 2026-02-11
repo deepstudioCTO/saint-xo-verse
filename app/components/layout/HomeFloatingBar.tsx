@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { useFetcher } from "react-router";
+import { motion, AnimatePresence } from "motion/react";
 import { useAudioPlayer } from "~/hooks/useAudioPlayer";
 import { GlassButton } from "~/components/ui";
 import { MusicPanel } from "~/components/music/MusicPanel";
@@ -68,6 +69,13 @@ export function HomeFloatingBar({
   const [prompt, setPrompt] = useState("");
   const fetcher = useFetcher();
   const isGenerating = fetcher.state !== "idle";
+
+  const hasSkillSelection = !!(selectedVideo || selectedImage);
+  const canGenerate =
+    !!characterId &&
+    !!characterImageUrl &&
+    !isGenerating &&
+    (selectedVideo ? true : !!prompt.trim());
 
   const handleSubmit = () => {
     if ((!selectedVideo && !prompt.trim()) || !characterId || !characterImageUrl || isGenerating) return;
@@ -245,8 +253,77 @@ export function HomeFloatingBar({
         </div>
       </div>
 
-      {/* Navigation — bottom right */}
-      <div className={`absolute bottom-4 right-6 flex flex-col items-stretch gap-3 ${anyPanelOpen ? "z-30" : "z-[15]"}`}>
+      {/* Thumbnail bar — independent position, anchored above bottom bar */}
+      <AnimatePresence>
+        {!anyPanelOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: 0.2 }}
+            className={`absolute bottom-[calc(1rem+48px+12px)] right-6 w-[26vw] flex flex-col gap-2 ${anyPanelOpen ? "z-30" : "z-[15]"}`}
+          >
+            {/* Music thumbnail */}
+            <div
+              onClick={() => onPanelChange("music")}
+              className="rounded-sm overflow-hidden shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/40"
+            >
+              <img
+                src={currentTrack.cover}
+                alt=""
+                className="w-full aspect-video object-cover"
+              />
+              <p className="px-2 py-1 text-[10px] font-medium text-white/70 tracking-wider truncate">{currentTrack.title}</p>
+            </div>
+
+            {/* Skill thumbnail */}
+            <AnimatePresence>
+              {hasSkillSelection && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={() => onPanelChange("skill")}
+                  className="rounded-sm overflow-hidden shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/40"
+                >
+                  <img
+                    src={(selectedVideo?.thumbnailUrl ?? selectedImage?.publicUrl)!}
+                    alt=""
+                    className="w-full aspect-video object-cover"
+                  />
+                  <p className="px-2 py-1 text-[10px] font-medium text-white/70 tracking-wider truncate">{selectedVideo?.name ?? selectedImage?.name ?? "SKILL"}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Generate button */}
+            <AnimatePresence>
+              {hasSkillSelection && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15, delay: 0.05 }}
+                >
+                  <GlassButton
+                    variant="bold"
+                    onClick={handleSubmit}
+                    disabled={!canGenerate}
+                    className="w-full justify-center"
+                  >
+                    {isGenerating ? "GENERATING..." : "GENERATE"}
+                  </GlassButton>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Bottom bar — panels + buttons */}
+      <div className={`absolute bottom-4 right-6 w-[26vw] ${anyPanelOpen ? "z-30" : "z-[15]"}`}>
+        <div className="flex flex-col items-stretch gap-3">
         {children}
         <MusicPanel
           open={musicPanelOpen}
@@ -255,11 +332,11 @@ export function HomeFloatingBar({
           isPlaying={isPlaying}
           onSelectTrack={selectTrack}
         />
-        <div className="flex items-center gap-2">
+        <div className="grid grid-cols-3 gap-2">
         <GlassButton
           onClick={() => onPanelChange(musicPanelOpen ? null : "music")}
           active={musicPanelOpen}
-          className="text-left min-w-[8vw]"
+          className="text-left w-full"
         >
           <span className="flex items-center gap-2">
             <img
@@ -274,7 +351,7 @@ export function HomeFloatingBar({
           onClick={() => onPanelChange(skillPanelOpen ? null : "skill")}
           disabled={!characterId}
           active={skillPanelOpen}
-          className="text-left min-w-[8vw]"
+          className="text-left w-full"
         >
           <span className="flex items-center gap-2">
             {(selectedVideo?.thumbnailUrl || selectedImage?.publicUrl) && (
@@ -290,10 +367,11 @@ export function HomeFloatingBar({
         <GlassButton
           onClick={() => onPanelChange(galleryOpen ? null : "gallery-compact")}
           active={galleryOpen}
-          className="text-left min-w-[8vw]"
+          className="text-left w-full"
         >
           GALLERY
         </GlassButton>
+        </div>
         </div>
       </div>
     </>
