@@ -52,10 +52,7 @@ export function GenerationGridItem({
   const handleMouseEnter = () => {
     if (!isCompleted) return;
     setIsHovering(true);
-    if (!isImage && videoRef.current) {
-      videoRef.current.currentTime = 0;
-      videoRef.current.play().catch(() => {});
-    }
+    // play() is triggered by onLoadedData (cached = instant, uncached = after load)
   };
 
   const handleMouseLeave = () => {
@@ -78,7 +75,7 @@ export function GenerationGridItem({
       disabled={!isClickable}
       className={`
         relative w-full bg-[--color-border-light] overflow-hidden glass-round
-        transition-all duration-200 ease-out group aspect-[1/2]
+        transition-[transform,box-shadow] duration-200 ease-out group aspect-[1/2]
         ${isHighlighted
           ? "scale-[1.03] shadow-xl shadow-black/25 z-10 ring-2 ring-white/50"
           : isClickable
@@ -124,22 +121,40 @@ export function GenerationGridItem({
       {/* Video (for completed video type) */}
       {isCompleted && !isImage && displayVideoUrl && (
         <>
-          {/* Thumbnail/first frame */}
-          <video
-            src={displayVideoUrl}
-            crossOrigin="anonymous"
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
-              isHovering ? "opacity-0" : "opacity-100"
-            } ${isActive ? "grayscale-0" : "grayscale"}`}
-          />
-          {/* Playing video on hover */}
+          {/* Poster: lightweight thumbnail or video first frame */}
+          {generation.thumbnailUrl ? (
+            <img
+              src={generation.thumbnailUrl}
+              crossOrigin="anonymous"
+              alt={characterName}
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+                isHovering ? "opacity-0" : "opacity-100"
+              } ${isActive ? "grayscale-0" : "grayscale"}`}
+            />
+          ) : (
+            <video
+              src={displayVideoUrl}
+              crossOrigin="anonymous"
+              preload="metadata"
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
+                isHovering ? "opacity-0" : "opacity-100"
+              } ${isActive ? "grayscale-0" : "grayscale"}`}
+            />
+          )}
+          {/* Playing video — src set only on hover (SkillPanel pattern) */}
           <video
             ref={videoRef}
-            src={displayVideoUrl}
+            src={isHovering ? displayVideoUrl : undefined}
             crossOrigin="anonymous"
             muted
             loop
             playsInline
+            onLoadedData={() => {
+              if (videoRef.current) {
+                videoRef.current.currentTime = 0;
+                videoRef.current.play().catch(() => {});
+              }
+            }}
             className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${
               isHovering ? "opacity-100" : "opacity-0"
             }`}
@@ -153,7 +168,7 @@ export function GenerationGridItem({
           src={displayImageUrl}
           alt={characterName}
           crossOrigin="anonymous"
-          className={`absolute inset-0 w-full h-full object-cover transition-all duration-200 ${
+          className={`absolute inset-0 w-full h-full object-cover transition-[filter] duration-200 ${
             isActive ? "grayscale-0" : "grayscale"
           }`}
         />
