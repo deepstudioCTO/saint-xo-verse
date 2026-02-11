@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useSearchParams, useNavigate, useLoaderData, useRevalidator, Link } from "react-router";
+import { useSearchParams, useLoaderData, useRevalidator, Link } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { useGesture } from "@use-gesture/react";
 import type { Route } from "./+types/_index";
@@ -20,8 +20,16 @@ import { HomeFloatingBar, type ActivePanel } from "~/components/layout/HomeFloat
 import { GalleryCompactPanel, GalleryExpandedPanel, GalleryModals } from "~/components/gallery";
 import { useGalleryState } from "~/hooks/useGalleryState";
 import { InputImagePanel } from "~/components/common/InputImagePanel";
+import { useInlineEdit } from "~/hooks/useInlineEdit";
 
-// Video Modal Component
+function PencilIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+      <path d="m15 5 4 4" />
+    </svg>
+  );
+}
 
 export const meta: Route.MetaFunction = () => [
   { title: "Saint Verse" },
@@ -142,12 +150,8 @@ export default function Home() {
     skillImages,
   } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
   const revalidator = useRevalidator();
-  const nameInputRef = useRef<HTMLInputElement>(null);
-  const descInputRef = useRef<HTMLTextAreaElement>(null);
-  const verseNameInputRef = useRef<HTMLInputElement>(null);
-  const verseDescInputRef = useRef<HTMLTextAreaElement>(null);
+  const savingRef = useRef(false);
 
   // Slide direction for verse transitions: 1=down, -1=up
   const [slideDirection, setSlideDirection] = useState(0);
@@ -181,20 +185,85 @@ export default function Home() {
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [inputPanelOpen, setInputPanelOpen] = useState(false);
-  const savingRef = useRef(false);
 
-  // Inline editing state (character)
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingDescription, setIsEditingDescription] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
+  // Inline editing — character name
+  const charNameEdit = useInlineEdit<HTMLInputElement>({
+    onSave: async (trimmed) => {
+      if (!currentCharacter) return;
+      const response = await fetch("/api/update-verse-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verseId: currentVerseId, characterId: currentCharacter.characterId, name: trimmed }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
+      setCharacterList((prev) =>
+        prev.map((c) =>
+          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
+            ? { ...c, name: trimmed } : c
+        )
+      );
+    },
+  });
 
-  // Inline editing state (verse)
-  const [isEditingVerseName, setIsEditingVerseName] = useState(false);
-  const [isEditingVerseDesc, setIsEditingVerseDesc] = useState(false);
-  const [editVerseName, setEditVerseName] = useState("");
-  const [editVerseDesc, setEditVerseDesc] = useState("");
+  // Inline editing — character description
+  const charDescEdit = useInlineEdit<HTMLTextAreaElement>({
+    multiline: true,
+    rejectEmpty: false,
+    onSave: async (trimmed) => {
+      if (!currentCharacter) return;
+      const response = await fetch("/api/update-verse-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verseId: currentVerseId, characterId: currentCharacter.characterId, description: trimmed }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
+      setCharacterList((prev) =>
+        prev.map((c) =>
+          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
+            ? { ...c, description: trimmed } : c
+        )
+      );
+    },
+  });
+
+  // Inline editing — verse name
+  const verseNameEdit = useInlineEdit<HTMLInputElement>({
+    onSave: async (trimmed) => {
+      if (!currentVerse) return;
+      const response = await fetch("/api/update-verse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verseId: currentVerse.id, name: trimmed }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
+      setVerseListState((prev) =>
+        prev.map((v) =>
+          v.id === currentVerse.id
+            ? { ...v, name: trimmed.toLowerCase(), displayName: trimmed } : v
+        )
+      );
+    },
+  });
+
+  // Inline editing — verse description
+  const verseDescEdit = useInlineEdit<HTMLTextAreaElement>({
+    multiline: true,
+    rejectEmpty: false,
+    onSave: async (trimmed) => {
+      if (!currentVerse) return;
+      const response = await fetch("/api/update-verse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verseId: currentVerse.id, description: trimmed || null }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
+      setVerseListState((prev) =>
+        prev.map((v) =>
+          v.id === currentVerse.id ? { ...v, description: trimmed || null } : v
+        )
+      );
+    },
+  });
 
   // Hover state for character dimming
   const [hoveredCharacterId, setHoveredCharacterId] = useState<string | null>(null);
@@ -350,240 +419,6 @@ export default function Home() {
       setUploading(false);
     }
   };
-
-  // Handle name edit start
-  const handleStartEditName = () => {
-    if (!currentCharacter) return;
-    setEditName(currentCharacter.name);
-    setIsEditingName(true);
-    setTimeout(() => nameInputRef.current?.focus(), 0);
-  };
-
-  // Handle description edit start
-  const handleStartEditDescription = () => {
-    if (!currentCharacter) return;
-    setEditDescription(currentCharacter.description);
-    setIsEditingDescription(true);
-    setTimeout(() => descInputRef.current?.focus(), 0);
-  };
-
-  // Save name (to verseCharacters table)
-  const handleSaveName = async () => {
-    if (!currentCharacter || isSaving) return;
-    const trimmedName = editName.trim();
-    if (trimmedName.length === 0 || trimmedName === currentCharacter.name) {
-      setIsEditingName(false);
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const response = await fetch("/api/update-verse-character", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          verseId: currentVerseId,
-          characterId: currentCharacter.characterId,
-          name: trimmedName,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Update failed");
-      }
-
-      // Optimistic update
-      setCharacterList((prev) =>
-        prev.map((c) =>
-          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
-            ? { ...c, name: trimmedName }
-            : c
-        )
-      );
-      setIsEditingName(false);
-    } catch (error) {
-      console.error("Update error:", error);
-      alert(error instanceof Error ? error.message : "Update failed");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Save description (to verseCharacters table)
-  const handleSaveDescription = async () => {
-    if (!currentCharacter || isSaving) return;
-    const trimmedDesc = editDescription.trim();
-    if (trimmedDesc === currentCharacter.description) {
-      setIsEditingDescription(false);
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const response = await fetch("/api/update-verse-character", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          verseId: currentVerseId,
-          characterId: currentCharacter.characterId,
-          description: trimmedDesc,
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Update failed");
-      }
-
-      // Optimistic update
-      setCharacterList((prev) =>
-        prev.map((c) =>
-          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
-            ? { ...c, description: trimmedDesc }
-            : c
-        )
-      );
-      setIsEditingDescription(false);
-    } catch (error) {
-      console.error("Update error:", error);
-      alert(error instanceof Error ? error.message : "Update failed");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Handle name key down
-  const handleNameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSaveName();
-    } else if (e.key === "Escape") {
-      setIsEditingName(false);
-    }
-  };
-
-  // Handle description key down
-  const handleDescKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSaveDescription();
-    } else if (e.key === "Escape") {
-      setIsEditingDescription(false);
-    }
-  };
-
-  // --- Verse name/description editing ---
-  const handleStartEditVerseName = () => {
-    if (!currentVerse) return;
-    setEditVerseName(currentVerse.displayName);
-    setIsEditingVerseName(true);
-    setTimeout(() => verseNameInputRef.current?.focus(), 0);
-  };
-
-  const handleStartEditVerseDesc = () => {
-    if (!currentVerse) return;
-    setEditVerseDesc(currentVerse.description || "");
-    setIsEditingVerseDesc(true);
-    setTimeout(() => verseDescInputRef.current?.focus(), 0);
-  };
-
-  const handleSaveVerseName = async () => {
-    if (!currentVerse || isSaving) return;
-    const trimmed = editVerseName.trim();
-    if (trimmed.length === 0 || trimmed === currentVerse.displayName) {
-      setIsEditingVerseName(false);
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const response = await fetch("/api/update-verse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verseId: currentVerse.id, name: trimmed }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Update failed");
-      }
-      setVerseListState((prev) =>
-        prev.map((v) =>
-          v.id === currentVerse.id
-            ? { ...v, name: trimmed.toLowerCase(), displayName: trimmed }
-            : v
-        )
-      );
-      setIsEditingVerseName(false);
-    } catch (error) {
-      console.error("Verse name update error:", error);
-      alert(error instanceof Error ? error.message : "Update failed");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleSaveVerseDesc = async () => {
-    if (!currentVerse || isSaving) return;
-    const trimmed = editVerseDesc.trim();
-    if (trimmed === (currentVerse.description || "")) {
-      setIsEditingVerseDesc(false);
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      const response = await fetch("/api/update-verse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          verseId: currentVerse.id,
-          description: trimmed || null,
-        }),
-      });
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Update failed");
-      }
-      setVerseListState((prev) =>
-        prev.map((v) =>
-          v.id === currentVerse.id
-            ? { ...v, description: trimmed || null }
-            : v
-        )
-      );
-      setIsEditingVerseDesc(false);
-    } catch (error) {
-      console.error("Verse description update error:", error);
-      alert(error instanceof Error ? error.message : "Update failed");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleVerseNameKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleSaveVerseName();
-    } else if (e.key === "Escape") {
-      setIsEditingVerseName(false);
-    }
-  };
-
-  const handleVerseDescKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSaveVerseDesc();
-    } else if (e.key === "Escape") {
-      setIsEditingVerseDesc(false);
-    }
-  };
-
-  // Reset verse editing on verse change
-  useEffect(() => {
-    setIsEditingVerseName(false);
-    setIsEditingVerseDesc(false);
-  }, [currentVerseId]);
 
   // Save defaultInput (optimistic update + API persist)
   const handleSaveDefaultInput = useCallback(async (url: string | null) => {
@@ -761,15 +596,15 @@ export default function Home() {
             <p className="text-[10px] tracking-wider text-black mb-1">CHARACTER {String(selectedIndex + 1).padStart(2, "0")} / {String(characterList.length).padStart(2, "0")}</p>
             {/* Character Name with inline edit */}
             <div className="group flex items-center gap-2">
-              {isEditingName ? (
+              {charNameEdit.isEditing ? (
                 <input
-                  ref={nameInputRef}
+                  ref={charNameEdit.ref}
                   type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  onKeyDown={handleNameKeyDown}
-                  onBlur={handleSaveName}
-                  disabled={isSaving}
+                  value={charNameEdit.value}
+                  onChange={(e) => charNameEdit.setValue(e.target.value)}
+                  onKeyDown={charNameEdit.keyDown}
+                  onBlur={charNameEdit.save}
+                  disabled={charNameEdit.isSaving}
                   className="text-3xl md:text-4xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white outline-none text-[--color-text] w-full max-w-md"
                   style={{ fontFamily: "inherit" }}
                 />
@@ -777,28 +612,25 @@ export default function Home() {
                 <>
                   <LargeTitle>{currentCharacter.name}</LargeTitle>
                   <button
-                    onClick={handleStartEditName}
+                    onClick={() => charNameEdit.startEdit(currentCharacter.name)}
                     className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 cursor-pointer"
                     title="Edit name"
                   >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                      <path d="m15 5 4 4" />
-                    </svg>
+                    <PencilIcon size={16} />
                   </button>
                 </>
               )}
             </div>
             {/* Character Description with inline edit */}
             <div className="group flex items-start gap-2 mt-2">
-              {isEditingDescription ? (
+              {charDescEdit.isEditing ? (
                 <textarea
-                  ref={descInputRef}
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  onKeyDown={handleDescKeyDown}
-                  onBlur={handleSaveDescription}
-                  disabled={isSaving}
+                  ref={charDescEdit.ref}
+                  value={charDescEdit.value}
+                  onChange={(e) => charDescEdit.setValue(e.target.value)}
+                  onKeyDown={charDescEdit.keyDown}
+                  onBlur={charDescEdit.save}
+                  disabled={charDescEdit.isSaving}
                   rows={3}
                   className="text-sm bg-transparent border border-white/30 focus:border-white/50 rounded-lg outline-none text-[--color-text-secondary] w-full max-w-md p-2 resize-none leading-relaxed"
                 />
@@ -808,14 +640,11 @@ export default function Home() {
                     {currentCharacter.description}
                   </p>
                   <button
-                    onClick={handleStartEditDescription}
+                    onClick={() => charDescEdit.startEdit(currentCharacter.description)}
                     className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0 cursor-pointer"
                     title="Edit description"
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                      <path d="m15 5 4 4" />
-                    </svg>
+                    <PencilIcon size={14} />
                   </button>
                 </>
               )}
@@ -834,15 +663,15 @@ export default function Home() {
               <span className="text-[10px] font-medium tracking-wider text-black mb-1">VERSE&ensp;{String(currentVerseIndex + 1).padStart(2, "0")}/{String(verseListState.length).padStart(2, "0")}</span>
               {/* Verse Name with inline edit */}
               <div className="group flex items-center gap-2">
-                {isEditingVerseName ? (
+                {verseNameEdit.isEditing ? (
                   <input
-                    ref={verseNameInputRef}
+                    ref={verseNameEdit.ref}
                     type="text"
-                    value={editVerseName}
-                    onChange={(e) => setEditVerseName(e.target.value)}
-                    onKeyDown={handleVerseNameKeyDown}
-                    onBlur={handleSaveVerseName}
-                    disabled={isSaving}
+                    value={verseNameEdit.value}
+                    onChange={(e) => verseNameEdit.setValue(e.target.value)}
+                    onKeyDown={verseNameEdit.keyDown}
+                    onBlur={verseNameEdit.save}
+                    disabled={verseNameEdit.isSaving}
                     className="text-3xl md:text-4xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white outline-none text-[--color-text] w-full max-w-md"
                     style={{ fontFamily: "inherit" }}
                   />
@@ -850,28 +679,25 @@ export default function Home() {
                   <>
                     <LargeTitle>{currentVerse ? `${currentVerse.name.toUpperCase()} VERSE` : "SAINT VERSE"}</LargeTitle>
                     <button
-                      onClick={handleStartEditVerseName}
+                      onClick={() => verseNameEdit.startEdit(currentVerse.displayName)}
                       className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 cursor-pointer"
                       title="Edit verse name"
                     >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                        <path d="m15 5 4 4" />
-                      </svg>
+                      <PencilIcon size={16} />
                     </button>
                   </>
                 )}
               </div>
               {/* Verse Description with inline edit */}
               <div className="group flex items-start gap-2 mt-2">
-                {isEditingVerseDesc ? (
+                {verseDescEdit.isEditing ? (
                   <textarea
-                    ref={verseDescInputRef}
-                    value={editVerseDesc}
-                    onChange={(e) => setEditVerseDesc(e.target.value)}
-                    onKeyDown={handleVerseDescKeyDown}
-                    onBlur={handleSaveVerseDesc}
-                    disabled={isSaving}
+                    ref={verseDescEdit.ref}
+                    value={verseDescEdit.value}
+                    onChange={(e) => verseDescEdit.setValue(e.target.value)}
+                    onKeyDown={verseDescEdit.keyDown}
+                    onBlur={verseDescEdit.save}
+                    disabled={verseDescEdit.isSaving}
                     rows={2}
                     className="text-sm bg-transparent border border-white/30 focus:border-white/50 rounded-lg outline-none text-[--color-text-secondary] w-full max-w-md p-2 resize-none leading-relaxed"
                     placeholder="Add verse description..."
@@ -888,19 +714,17 @@ export default function Home() {
                       </p>
                     )}
                     <button
-                      onClick={handleStartEditVerseDesc}
+                      onClick={() => verseDescEdit.startEdit(currentVerse?.description || "")}
                       className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0 cursor-pointer"
                       title="Edit verse description"
                     >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                        <path d="m15 5 4 4" />
-                      </svg>
+                      <PencilIcon size={14} />
                     </button>
                   </>
                 )}
               </div>
-              <span className="flex items-center gap-24 text-[10px] tracking-wider text-black mt-8"><span className="font-medium">CHARACTERS</span><span className="font-bold">{String(characterList.length).padStart(2, "0")}</span></span>
+              <span className="flex items-center text-[10px] tracking-wider text-black mt-8"><span className="font-medium w-40">CHARACTERS</span><span className="font-bold">{String(characterList.length).padStart(2, "0")}</span></span>
+              <span className="flex items-center text-[10px] tracking-wider text-black mt-2"><span className="font-medium w-40">MODE</span><span className="font-bold">{currentVerse?.id === "00" ? "XO" : "XX"}</span></span>
             </motion.div>
           </AnimatePresence>
         )}
