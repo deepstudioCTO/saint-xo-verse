@@ -43,7 +43,7 @@
 # 공통 패턴: 환경변수 로드 후 실행
 export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 ```
-주요 스크립트: `seed-verses.ts`, `seed-verse-characters.ts`, `seed-characters.ts`, `seed-character-images.ts`, `upload-posters.ts`
+주요 스크립트: `seed-verses.ts`, `seed-verse-characters.ts`, `seed-characters.ts`, `seed-character-images.ts`, `upload-posters.ts`, `upload-music.ts`
 
 ## 환경 변수
 
@@ -71,6 +71,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 motion-videos/
 ├── videos/           # 모션 영상
 ├── thumbnails/       # 모션 영상 썸네일
+├── music/            # 음악 트랙 MP3 (Range 요청 지원 필요 → Supabase에서 서빙)
 ├── generated-videos/ # Replicate 생성 영상 (영구 저장)
 ├── upscaled-videos/  # 업스케일된 영상
 ├── uploaded-videos/  # 직접 업로드 결과 영상
@@ -105,13 +106,13 @@ export default [
 | 캐릭터 이미지 (DB) | per-character (verse 무관) | 같은 인물이므로 AI 생성에 구분 불필요 |
 | 하단 패널 상호 배제 | `activePanel` 단일 상태 (`_index.tsx`), 타입은 `HomeFloatingBar`에서 export | 상태 1개로 모든 패널 토글 관리 |
 | 패널 항목 선택 시 자동 닫힘 | 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 |
-| 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, ID 기반 트래킹, verse 무관 전체 트랙 | 라우트 전환 간 재생 유지, verse 전환 시 음악 끊김 방지 |
+| 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, Supabase Storage에서 서빙 (`preload="auto"`) | Range 요청 지원으로 seek 정상 동작, Cloudflare Workers Static Assets는 Range 미지원 |
 | 글로벌 스페이스바 | `registerGlobalSpacebar()` → root.tsx 1회 등록 | input/button 위에서는 스킵 |
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
 | 우측 썸네일 vs 하단 바 | 별도 absolute 컨테이너 분리 | 같은 컨테이너면 패널 열릴 때 썸네일이 위로 밀림 |
 | 하단 레이아웃 3분할 | 트랙 정보(left) / 재생 컨트롤+프로그래스바(center) / 패널 버튼(right) | 음악 플레이어 UX 표준 배치 |
-| 프로그래스바 seek | `setPointerCapture`로 포인터 캡처 | 요소 밖 릴리스 시 seekingRef 해제 누락 방지 |
+| 프로그래스바 seek | document-level `pointerup` 리스너 | `setPointerCapture`는 range input 네이티브 클릭 방해 |
 | 프로그래스바 채움 | CSS `--progress` 변수 + `linear-gradient` (webkit) / `::-moz-range-progress` (FF) | JS에서 % 계산 → CSS 변수로 전달 |
 | Skill 드래그 드롭 감지 | `useDroppable` 미사용, 수동 `getBoundingClientRect()` 히트테스트 | @dnd-kit의 rect 측정이 CSS `scale()` transform에서 고장 |
 | Skill Teaching 생성 | `_index.tsx`에서 `useFetcher`로 API 호출, 드롭 → 확인 다이얼로그 → 생성 + 갤러리 열림 | HomeFloatingBar가 아닌 페이지 레벨에서 생성 관리 |

@@ -14,7 +14,12 @@ import {
   DialogFooter,
 } from "~/components/ui/dialog";
 import { GenerationGridItem, VideoDetailModal, ImageDetailModal, ResultUploadDialog } from "~/components/gallery";
-import { CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById, type Character, type VerseCharacter } from "~/lib/data";
+import {
+  CHARACTERS, CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById,
+  SYNCED_GENERATIONS, SYNCED_SKILL_VIDEOS, SYNCED_SKILL_IMAGES,
+  SYNCED_VERSE_CHARACTERS, buildVerseCharacterMap,
+  type Character, type VerseCharacter,
+} from "~/lib/data";
 import { getDb, generations, motionVideos, conceptImages, characters, verseCharacters } from "~/lib/db.server";
 import { asc } from "drizzle-orm";
 
@@ -63,101 +68,112 @@ interface LoaderData {
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
-  const db = getDb(context.cloudflare as { env: Record<string, string> });
+  try {
+    const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-  // Query all generations (newest first - client will re-sort based on user selection)
-  const allGenerations = await db
-    .select()
-    .from(generations)
-    .orderBy(desc(generations.createdAt));
+    // Query all generations (newest first - client will re-sort based on user selection)
+    const allGenerations = await db
+      .select()
+      .from(generations)
+      .orderBy(desc(generations.createdAt));
 
-  // Query all motion videos for dropdown
-  const allMotionVideos = await db
-    .select({ id: motionVideos.id, name: motionVideos.name })
-    .from(motionVideos)
-    .orderBy(desc(motionVideos.createdAt));
+    // Query all motion videos for dropdown
+    const allMotionVideos = await db
+      .select({ id: motionVideos.id, name: motionVideos.name })
+      .from(motionVideos)
+      .orderBy(desc(motionVideos.createdAt));
 
-  // Query all concept images for dropdown
-  const allConceptImages = await db
-    .select({ id: conceptImages.id, name: conceptImages.name })
-    .from(conceptImages)
-    .orderBy(desc(conceptImages.createdAt));
+    // Query all concept images for dropdown
+    const allConceptImages = await db
+      .select({ id: conceptImages.id, name: conceptImages.name })
+      .from(conceptImages)
+      .orderBy(desc(conceptImages.createdAt));
 
-  // Query all characters for dropdown and display
-  const allCharacters = await db
-    .select()
-    .from(characters)
-    .orderBy(asc(characters.displayOrder));
+    // Query all characters for dropdown and display
+    const allCharacters = await db
+      .select()
+      .from(characters)
+      .orderBy(asc(characters.displayOrder));
 
-  // Build lookup maps
-  const motionVideoMap = new Map(allMotionVideos.map((mv) => [mv.id, mv.name]));
-  const conceptImageMap = new Map(allConceptImages.map((ci) => [ci.id, ci.name]));
+    // Build lookup maps
+    const motionVideoMap = new Map(allMotionVideos.map((mv) => [mv.id, mv.name]));
+    const conceptImageMap = new Map(allConceptImages.map((ci) => [ci.id, ci.name]));
 
-  // Build generations with names
-  const generationsWithNames: Generation[] = allGenerations.map((gen) => {
-    const motionName = gen.motionVideoId
-      ? motionVideoMap.get(gen.motionVideoId) || null
-      : null;
-    const conceptImageName = gen.conceptImageId
-      ? conceptImageMap.get(gen.conceptImageId) || null
-      : null;
-    return {
-      id: gen.id,
-      type: gen.type,
-      memberId: gen.memberId,
-      musicId: gen.musicId,
-      motionVideoId: gen.motionVideoId,
-      conceptImageId: gen.conceptImageId,
-      verseId: gen.verseId,
-      videoUrl: gen.videoUrl,
-      outputUrl: gen.outputUrl,
-      status: gen.status,
-      createdAt: gen.createdAt.toISOString(),
-      motionName,
-      conceptImageName,
-      errorMessage: gen.errorMessage,
-      prompt: gen.prompt,
-      upscaleStatus: gen.upscaleStatus,
-      upscaleModel: gen.upscaleModel,
-      upscaledVideoUrl: gen.upscaledVideoUrl,
-    };
-  });
+    // Build generations with names
+    const generationsWithNames: Generation[] = allGenerations.map((gen) => {
+      const motionName = gen.motionVideoId
+        ? motionVideoMap.get(gen.motionVideoId) || null
+        : null;
+      const conceptImageName = gen.conceptImageId
+        ? conceptImageMap.get(gen.conceptImageId) || null
+        : null;
+      return {
+        id: gen.id,
+        type: gen.type,
+        memberId: gen.memberId,
+        musicId: gen.musicId,
+        motionVideoId: gen.motionVideoId,
+        conceptImageId: gen.conceptImageId,
+        verseId: gen.verseId,
+        videoUrl: gen.videoUrl,
+        outputUrl: gen.outputUrl,
+        status: gen.status,
+        createdAt: gen.createdAt.toISOString(),
+        motionName,
+        conceptImageName,
+        errorMessage: gen.errorMessage,
+        prompt: gen.prompt,
+        upscaleStatus: gen.upscaleStatus,
+        upscaleModel: gen.upscaleModel,
+        upscaledVideoUrl: gen.upscaledVideoUrl,
+      };
+    });
 
-  // Map characters to our type
-  const characterList: Character[] = allCharacters.map((c) => ({
-    id: c.id,
-    name: c.name,
-    description: c.description,
-    video: c.video,
-    poster: c.poster,
-    displayOrder: c.displayOrder,
-  }));
+    // Map characters to our type
+    const characterList: Character[] = allCharacters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      description: c.description,
+      video: c.video,
+      poster: c.poster,
+      displayOrder: c.displayOrder,
+    }));
 
-  // Query all verse characters for name lookup
-  const allVerseCharacters = await db
-    .select({
-      verseId: verseCharacters.verseId,
-      characterId: verseCharacters.characterId,
-      name: verseCharacters.name,
-    })
-    .from(verseCharacters);
+    // Query all verse characters for name lookup
+    const allVerseCharacters = await db
+      .select({
+        verseId: verseCharacters.verseId,
+        characterId: verseCharacters.characterId,
+        name: verseCharacters.name,
+      })
+      .from(verseCharacters);
 
-  // Build nested map: { verseId: { characterId: { name } } }
-  const verseCharacterMap: Record<string, Record<string, { name: string }>> = {};
-  for (const vc of allVerseCharacters) {
-    if (!verseCharacterMap[vc.verseId]) {
-      verseCharacterMap[vc.verseId] = {};
+    // Build nested map: { verseId: { characterId: { name } } }
+    const verseCharacterMap: Record<string, Record<string, { name: string }>> = {};
+    for (const vc of allVerseCharacters) {
+      if (!verseCharacterMap[vc.verseId]) {
+        verseCharacterMap[vc.verseId] = {};
+      }
+      verseCharacterMap[vc.verseId][vc.characterId] = { name: vc.name };
     }
-    verseCharacterMap[vc.verseId][vc.characterId] = { name: vc.name };
-  }
 
-  return {
-    generations: generationsWithNames,
-    motionVideos: allMotionVideos,
-    conceptImages: allConceptImages,
-    characters: characterList,
-    verseCharacterMap,
-  };
+    return {
+      generations: generationsWithNames,
+      motionVideos: allMotionVideos,
+      conceptImages: allConceptImages,
+      characters: characterList,
+      verseCharacterMap,
+    };
+  } catch {
+    // Offline fallback
+    return {
+      generations: SYNCED_GENERATIONS,
+      motionVideos: SYNCED_SKILL_VIDEOS.map((v) => ({ id: v.id, name: v.name })),
+      conceptImages: SYNCED_SKILL_IMAGES.map((i) => ({ id: i.id, name: i.name })),
+      characters: CHARACTERS,
+      verseCharacterMap: buildVerseCharacterMap(SYNCED_VERSE_CHARACTERS),
+    };
+  }
 }
 
 type SortBy = "recent" | "character" | "skill";

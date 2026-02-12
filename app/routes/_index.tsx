@@ -9,6 +9,12 @@ import { navButtonClass } from "~/components/layout/Header";
 import {
   VERSES as DEFAULT_VERSES,
   VERSE_CHARACTERS as DEFAULT_VERSE_CHARACTERS,
+  SYNCED_VERSES,
+  SYNCED_VERSE_CHARACTERS,
+  SYNCED_SKILL_VIDEOS,
+  SYNCED_SKILL_IMAGES,
+  SYNCED_CHARACTER_IMAGES,
+  SYNCED_GENERATIONS,
   type Verse,
   type VerseCharacter,
 } from "~/lib/data";
@@ -58,96 +64,115 @@ interface CharacterImage {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const db = getDb(context.cloudflare as { env: Record<string, string> });
   const url = new URL(request.url);
   const verseParam = url.searchParams.get("verse") || "00";
 
-  // Load all verses
-  const dbVerses = await db
-    .select()
-    .from(verses)
-    .orderBy(asc(verses.displayOrder));
+  try {
+    const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-  const verseList: Verse[] = dbVerses.length > 0
-    ? dbVerses.map((v) => ({
-        id: v.id,
-        name: v.name,
-        displayName: v.displayName,
-        description: v.description,
-        displayOrder: v.displayOrder,
-      }))
-    : DEFAULT_VERSES;
+    // Load all verses
+    const dbVerses = await db
+      .select()
+      .from(verses)
+      .orderBy(asc(verses.displayOrder));
 
-  // Load ALL verse characters (for preloading other verse videos)
-  const dbAllVerseCharacters = await db
-    .select()
-    .from(verseCharacters)
-    .orderBy(asc(verseCharacters.displayOrder));
+    const verseList: Verse[] = dbVerses.length > 0
+      ? dbVerses.map((v) => ({
+          id: v.id,
+          name: v.name,
+          displayName: v.displayName,
+          description: v.description,
+          displayOrder: v.displayOrder,
+        }))
+      : DEFAULT_VERSES;
 
-  const allCharacters: VerseCharacter[] = dbAllVerseCharacters.length > 0
-    ? dbAllVerseCharacters.map((vc) => ({
-        id: vc.id,
-        verseId: vc.verseId,
-        characterId: vc.characterId,
-        name: vc.name,
-        description: vc.description,
-        video: vc.video,
-        poster: vc.poster,
-        defaultInput: vc.defaultInput,
-        displayOrder: vc.displayOrder,
-      }))
-    : DEFAULT_VERSE_CHARACTERS;
+    // Load ALL verse characters (for preloading other verse videos)
+    const dbAllVerseCharacters = await db
+      .select()
+      .from(verseCharacters)
+      .orderBy(asc(verseCharacters.displayOrder));
 
-  // Load all character images from DB (sorted by createdAt so new images appear at end)
-  const images = await db
-    .select()
-    .from(characterImages)
-    .orderBy(asc(characterImages.characterId), asc(characterImages.createdAt));
+    const allCharacters: VerseCharacter[] = dbAllVerseCharacters.length > 0
+      ? dbAllVerseCharacters.map((vc) => ({
+          id: vc.id,
+          verseId: vc.verseId,
+          characterId: vc.characterId,
+          name: vc.name,
+          description: vc.description,
+          video: vc.video,
+          poster: vc.poster,
+          defaultInput: vc.defaultInput,
+          displayOrder: vc.displayOrder,
+        }))
+      : DEFAULT_VERSE_CHARACTERS;
 
-  // Group by characterId
-  const imagesByCharacter: Record<string, CharacterImage[]> = {};
-  for (const img of images) {
-    if (!imagesByCharacter[img.characterId]) {
-      imagesByCharacter[img.characterId] = [];
+    // Load all character images from DB (sorted by createdAt so new images appear at end)
+    const images = await db
+      .select()
+      .from(characterImages)
+      .orderBy(asc(characterImages.characterId), asc(characterImages.createdAt));
+
+    // Group by characterId
+    const imagesByCharacter: Record<string, CharacterImage[]> = {};
+    for (const img of images) {
+      if (!imagesByCharacter[img.characterId]) {
+        imagesByCharacter[img.characterId] = [];
+      }
+      imagesByCharacter[img.characterId].push(img);
     }
-    imagesByCharacter[img.characterId].push(img);
+
+    // Load motion videos, concept images, and story count
+    const cf = context.cloudflare as { env: Record<string, string> };
+    const [dbVideos, dbConceptImages, storiesResult] = await Promise.all([
+      db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
+      db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
+      db.select({ count: sql<number>`count(*)` }).from(generations).where(eq(generations.status, "completed")),
+    ]);
+
+    const skillVideos = dbVideos.map((v) => ({
+      id: v.id,
+      name: v.name,
+      videoUrl: getPublicUrl(cf, v.storagePath),
+      thumbnailUrl: v.thumbnailPath ? getPublicUrl(cf, v.thumbnailPath) : null,
+      duration: v.duration,
+    }));
+
+    const skillImages = dbConceptImages.map((img) => ({
+      id: img.id,
+      name: img.name,
+      publicUrl: img.publicUrl,
+    }));
+
+    const skillsCount = dbVideos.length;
+    const storiesCount = Number(storiesResult[0]?.count || 0);
+
+    return {
+      verses: verseList,
+      currentVerseId: verseParam,
+      allCharacters,
+      imagesByCharacter,
+      skillsCount,
+      storiesCount,
+      skillVideos,
+      skillImages,
+    };
+  } catch {
+    // Offline fallback: use synced data, then manual defaults
+    const fallbackVerses = SYNCED_VERSES.length > 0 ? SYNCED_VERSES : DEFAULT_VERSES;
+    const fallbackChars = SYNCED_VERSE_CHARACTERS.length > 0
+      ? SYNCED_VERSE_CHARACTERS : DEFAULT_VERSE_CHARACTERS;
+
+    return {
+      verses: fallbackVerses,
+      currentVerseId: verseParam,
+      allCharacters: fallbackChars,
+      imagesByCharacter: SYNCED_CHARACTER_IMAGES,
+      skillsCount: SYNCED_SKILL_VIDEOS.length,
+      storiesCount: SYNCED_GENERATIONS.filter((g) => g.status === "completed").length,
+      skillVideos: SYNCED_SKILL_VIDEOS,
+      skillImages: SYNCED_SKILL_IMAGES,
+    };
   }
-
-  // Load motion videos, concept images, and story count
-  const cf = context.cloudflare as { env: Record<string, string> };
-  const [dbVideos, dbConceptImages, storiesResult] = await Promise.all([
-    db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
-    db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
-    db.select({ count: sql<number>`count(*)` }).from(generations).where(eq(generations.status, "completed")),
-  ]);
-
-  const skillVideos = dbVideos.map((v) => ({
-    id: v.id,
-    name: v.name,
-    videoUrl: getPublicUrl(cf, v.storagePath),
-    thumbnailUrl: v.thumbnailPath ? getPublicUrl(cf, v.thumbnailPath) : null,
-    duration: v.duration,
-  }));
-
-  const skillImages = dbConceptImages.map((img) => ({
-    id: img.id,
-    name: img.name,
-    publicUrl: img.publicUrl,
-  }));
-
-  const skillsCount = dbVideos.length;
-  const storiesCount = Number(storiesResult[0]?.count || 0);
-
-  return {
-    verses: verseList,
-    currentVerseId: verseParam,
-    allCharacters,
-    imagesByCharacter,
-    skillsCount,
-    storiesCount,
-    skillVideos,
-    skillImages,
-  };
 }
 
 export default function Home() {

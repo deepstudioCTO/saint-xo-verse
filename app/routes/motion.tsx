@@ -25,6 +25,7 @@ import {
 import { type VideoValidationResult } from "~/lib/video-utils";
 import { getDb, motionVideos, conceptImages } from "~/lib/db.server";
 import { getPublicUrl } from "~/lib/supabase.server";
+import { SYNCED_SKILL_VIDEOS, SYNCED_SKILL_IMAGES } from "~/lib/data";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Motion - Saint Verse" },
@@ -73,36 +74,59 @@ const ASPECT_RATIOS = [
 ];
 
 export async function loader({ context }: Route.LoaderArgs) {
-  const db = getDb(context.cloudflare as { env: Record<string, string> });
+  try {
+    const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-  // Motion videos
-  const videos = await db
-    .select()
-    .from(motionVideos)
-    .orderBy(desc(motionVideos.createdAt));
+    // Motion videos
+    const videos = await db
+      .select()
+      .from(motionVideos)
+      .orderBy(desc(motionVideos.createdAt));
 
-  const videosWithUrls: MotionVideo[] = videos.map((video: typeof videos[0]) => ({
-    ...video,
-    createdAt: video.createdAt ?? new Date(),
-    videoUrl: getPublicUrl(
-      context.cloudflare as { env: Record<string, string> },
-      video.storagePath
-    ),
-    thumbnailUrl: video.thumbnailPath
-      ? getPublicUrl(
-          context.cloudflare as { env: Record<string, string> },
-          video.thumbnailPath
-        )
-      : null,
-  }));
+    const videosWithUrls: MotionVideo[] = videos.map((video: typeof videos[0]) => ({
+      ...video,
+      createdAt: video.createdAt ?? new Date(),
+      videoUrl: getPublicUrl(
+        context.cloudflare as { env: Record<string, string> },
+        video.storagePath
+      ),
+      thumbnailUrl: video.thumbnailPath
+        ? getPublicUrl(
+            context.cloudflare as { env: Record<string, string> },
+            video.thumbnailPath
+          )
+        : null,
+    }));
 
-  // Concept images
-  const images = await db
-    .select()
-    .from(conceptImages)
-    .orderBy(desc(conceptImages.createdAt));
+    // Concept images
+    const images = await db
+      .select()
+      .from(conceptImages)
+      .orderBy(desc(conceptImages.createdAt));
 
-  return { videos: videosWithUrls, conceptImages: images };
+    return { videos: videosWithUrls, conceptImages: images };
+  } catch {
+    // Offline fallback
+    return {
+      videos: SYNCED_SKILL_VIDEOS.map((v) => ({
+        id: v.id,
+        name: v.name,
+        storagePath: "",
+        thumbnailPath: null,
+        duration: v.duration,
+        createdAt: new Date(),
+        videoUrl: v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
+      })),
+      conceptImages: SYNCED_SKILL_IMAGES.map((i) => ({
+        id: i.id,
+        name: i.name,
+        storagePath: "",
+        publicUrl: i.publicUrl,
+        createdAt: new Date(),
+      })),
+    };
+  }
 }
 
 export default function Motion() {
