@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useSyncExternalStore } from "react";
-import { TRACKS, TRACKS_BY_ID, getTracksByVerse } from "~/lib/data";
+import { TRACKS, TRACKS_BY_ID } from "~/lib/data";
 
 export type Track = (typeof TRACKS)[number];
 
@@ -14,7 +14,6 @@ let _autoPlayRequested = false;
 let _interactionUnlocked = false;
 let _shuffle = false;
 let _repeatOne = true;
-let _currentVerseId = "00";
 const _listeners = new Set<() => void>();
 
 function notify() {
@@ -25,8 +24,8 @@ function getCurrentTrack(): Track {
   return TRACKS_BY_ID[_currentTrackId] ?? TRACKS[0];
 }
 
-function getVerseTracks(): Track[] {
-  return getTracksByVerse(_currentVerseId);
+function seekTo(time: number) {
+  getAudio().currentTime = time;
 }
 
 // ─── Core playback primitives ───────────────────────────────────
@@ -70,7 +69,7 @@ function getAudio(): HTMLAudioElement {
   if (!_audio) {
     const audio = new Audio();
     _audio = audio;
-    audio.preload = "metadata";
+    audio.preload = "auto";
     audio.src = getCurrentTrack().src;
 
     audio.addEventListener("ended", () => {
@@ -79,20 +78,13 @@ function getAudio(): HTMLAudioElement {
         return;
       }
 
-      const vt = getVerseTracks();
-      if (vt.length === 0) return;
-
       if (_shuffle) {
-        if (vt.length <= 1) {
-          replayCurrent();
-        } else {
-          const candidates = vt.filter((t) => t.id !== _currentTrackId);
-          const pick = candidates[Math.floor(Math.random() * candidates.length)];
-          changeTrack(pick, true);
-        }
+        const candidates = TRACKS.filter((t) => t.id !== _currentTrackId);
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        changeTrack(pick, true);
       } else {
-        const idx = vt.findIndex((t) => t.id === _currentTrackId);
-        changeTrack(vt[(idx + 1) % vt.length], true);
+        const idx = TRACKS.findIndex((t) => t.id === _currentTrackId);
+        changeTrack(TRACKS[(idx + 1) % TRACKS.length], true);
       }
     });
 
@@ -121,25 +113,6 @@ function onFirstInteraction() {
 
   if (_autoPlayRequested && !_userPaused && !_bgPaused) {
     getAudio().play().catch(() => {});
-  }
-}
-
-// ─── Verse management ───────────────────────────────────────────
-
-function setVerseId(verseId: string) {
-  if (verseId === _currentVerseId) return;
-
-  const wasPlaying = _isPlaying;
-  _currentVerseId = verseId;
-
-  const vt = getVerseTracks();
-  if (vt.some((t) => t.id === _currentTrackId)) {
-    notify();
-    return;
-  }
-
-  if (vt.length > 0) {
-    changeTrack(vt[0], wasPlaying && !_userPaused && !_bgPaused);
   }
 }
 
@@ -203,7 +176,7 @@ export interface UseAudioPlayerReturn {
   isPlaying: boolean;
   shuffle: boolean;
   repeatOne: boolean;
-  verseTracks: Track[];
+  tracks: Track[];
   play: () => void;
   pause: () => void;
   togglePlay: () => void;
@@ -212,18 +185,18 @@ export interface UseAudioPlayerReturn {
   selectTrack: (id: string) => void;
   toggleShuffle: () => void;
   toggleRepeatOne: () => void;
+  seekTo: (time: number) => void;
   getAudioElement: () => HTMLAudioElement | null;
 }
 
 interface UseAudioPlayerOptions {
   autoPlay?: boolean;
-  verseId?: string;
 }
 
 export function useAudioPlayer(
   options: UseAudioPlayerOptions = {}
 ): UseAudioPlayerReturn {
-  const { autoPlay = false, verseId } = options;
+  const { autoPlay = false } = options;
 
   useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
@@ -242,24 +215,16 @@ export function useAudioPlayer(
     }
   }, [autoPlay]);
 
-  useEffect(() => {
-    if (verseId) setVerseId(verseId);
-  }, [verseId]);
-
   const nextTrack = useCallback(() => {
     const shouldPlay = _isPlaying;
-    const vt = getVerseTracks();
-    if (vt.length === 0) return;
-    const idx = vt.findIndex((t) => t.id === _currentTrackId);
-    changeTrack(vt[(idx + 1) % vt.length], shouldPlay);
+    const idx = TRACKS.findIndex((t) => t.id === _currentTrackId);
+    changeTrack(TRACKS[(idx + 1) % TRACKS.length], shouldPlay);
   }, []);
 
   const prevTrack = useCallback(() => {
     const shouldPlay = _isPlaying;
-    const vt = getVerseTracks();
-    if (vt.length === 0) return;
-    const idx = vt.findIndex((t) => t.id === _currentTrackId);
-    changeTrack(vt[(idx - 1 + vt.length) % vt.length], shouldPlay);
+    const idx = TRACKS.findIndex((t) => t.id === _currentTrackId);
+    changeTrack(TRACKS[(idx - 1 + TRACKS.length) % TRACKS.length], shouldPlay);
   }, []);
 
   const selectTrack = useCallback((id: string) => {
@@ -288,13 +253,14 @@ export function useAudioPlayer(
     isPlaying: _isPlaying,
     shuffle: _shuffle,
     repeatOne: _repeatOne,
-    verseTracks: getVerseTracks(),
+    tracks: TRACKS,
     play: useCallback(() => doPlay(), []),
     pause: useCallback(() => doPause(), []),
     togglePlay: useCallback(() => doTogglePlay(), []),
     nextTrack,
     prevTrack,
     selectTrack,
+    seekTo: useCallback((time: number) => seekTo(time), []),
     toggleShuffle,
     toggleRepeatOne,
     getAudioElement,

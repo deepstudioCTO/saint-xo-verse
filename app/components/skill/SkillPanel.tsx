@@ -1,6 +1,17 @@
 import { useState, useRef } from "react";
 import { motion } from "motion/react";
+import { useDraggable } from "@dnd-kit/core";
 import { RevealPanel } from "~/components/common/RevealPanel";
+
+export type SkillDragItem = {
+  type: "video" | "image";
+  id: string;
+  thumbnailUrl: string;
+  name: string;
+  videoUrl?: string;
+  publicUrl?: string;
+  duration?: number;
+};
 
 interface SkillPanelProps {
   open: boolean;
@@ -44,9 +55,22 @@ function VideoSkillItem({
   const [isHovering, setIsHovering] = useState(false);
   const isActive = selected || isHovering;
 
+  const dragData: SkillDragItem = {
+    type: "video",
+    id: video.id,
+    thumbnailUrl: video.thumbnailUrl || "",
+    name: video.name,
+    videoUrl: video.videoUrl,
+    duration: video.duration,
+  };
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `skill-video-${video.id}`,
+    data: dragData,
+  });
+
   const handleMouseEnter = () => {
     setIsHovering(true);
-    // play is handled by onLoadedData when src is set
   };
 
   const handleMouseLeave = () => {
@@ -59,8 +83,11 @@ function VideoSkillItem({
 
   return (
     <motion.button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: isDragging ? 0.4 : 1 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
@@ -128,10 +155,26 @@ function ImageSkillItem({
   const [isHovering, setIsHovering] = useState(false);
   const isActive = selected || isHovering;
 
+  const dragData: SkillDragItem = {
+    type: "image",
+    id: image.id,
+    thumbnailUrl: image.publicUrl,
+    name: image.name || "",
+    publicUrl: image.publicUrl,
+  };
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `skill-image-${image.id}`,
+    data: dragData,
+  });
+
   return (
     <motion.button
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
       initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      animate={{ opacity: isDragging ? 0.4 : 1 }}
       transition={{ duration: 0.3, delay: index * 0.05 }}
       onClick={onClick}
       onMouseEnter={() => setIsHovering(true)}

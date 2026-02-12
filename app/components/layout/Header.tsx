@@ -88,7 +88,7 @@ export function Header({
             )
           ) : (
             <Link to="/" className="text-sm font-bold tracking-tight">
-              Saint Verse
+              HitOS
             </Link>
           )}
 

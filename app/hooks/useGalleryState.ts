@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById, type Character } from "~/lib/data";
 
 export interface Generation {
@@ -85,6 +85,10 @@ export interface UseGalleryStateReturn {
   getCharacterName: (memberId: string | null, verseId?: string | null) => string;
   getTrackName: (musicId: string | null) => string;
 
+  // Optimistic updates
+  addOptimisticGeneration: (gen: Generation) => void;
+  refetch: () => Promise<void>;
+
   // Options (for modals)
   motionVideoOptions: MotionVideoOption[];
   conceptImageOptions: ConceptImageOption[];
@@ -113,9 +117,34 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
   // Upload dialog state
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
 
+  // Optimistic generation tracking
+  const optimisticIdsRef = useRef<Set<string>>(new Set());
+
   const charactersById = loadedCharacters.length > 0
     ? createCharactersById(loadedCharacters)
     : CHARACTERS_BY_ID;
+
+  // Shared fetch logic
+  const applyFetchData = useCallback((data: Record<string, unknown>, clearOptimistic: boolean) => {
+    const fetched = data.generations as Generation[];
+    if (clearOptimistic) {
+      optimisticIdsRef.current.clear();
+      setGenerations(fetched);
+    } else {
+      // Preserve optimistic items not yet in DB
+      const fetchedIds = new Set(fetched.map((g) => g.id));
+      setGenerations((prev) => {
+        const remaining = prev.filter(
+          (g) => optimisticIdsRef.current.has(g.id) && !fetchedIds.has(g.id)
+        );
+        return [...remaining, ...fetched];
+      });
+    }
+    setMotionVideoOptions(data.motionVideos as MotionVideoOption[]);
+    setConceptImageOptions(data.conceptImages as ConceptImageOption[]);
+    setLoadedCharacters(data.characters as Character[]);
+    setVerseCharacterMap(data.verseCharacterMap as Record<string, Record<string, { name: string }>>);
+  }, []);
 
   // Fetch data when panel opens
   useEffect(() => {
@@ -129,11 +158,7 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
         if (!res.ok) throw new Error("Failed to fetch gallery data");
         const data = await res.json();
         if (cancelled) return;
-        setGenerations(data.generations);
-        setMotionVideoOptions(data.motionVideos);
-        setConceptImageOptions(data.conceptImages);
-        setLoadedCharacters(data.characters);
-        setVerseCharacterMap(data.verseCharacterMap);
+        applyFetchData(data, false);
       } catch (err) {
         console.error("Gallery fetch error:", err);
       } finally {
@@ -143,7 +168,7 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [open]);
+  }, [open, applyFetchData]);
 
   // Filtered and sorted generations
   const sortedGenerations = useMemo(() => {
@@ -359,6 +384,24 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
     setGenerations((prev) => [generation, ...prev]);
   }, []);
 
+  // Optimistic update: immediately add a pending generation
+  const addOptimisticGeneration = useCallback((gen: Generation) => {
+    optimisticIdsRef.current.add(gen.id);
+    setGenerations((prev) => [gen, ...prev]);
+  }, []);
+
+  // Full refetch: clears optimistic tracking, replaces all data
+  const refetch = useCallback(async () => {
+    try {
+      const res = await fetch("/api/gallery-data");
+      if (!res.ok) throw new Error("Failed to fetch gallery data");
+      const data = await res.json();
+      applyFetchData(data, true);
+    } catch (err) {
+      console.error("Gallery refetch error:", err);
+    }
+  }, [applyFetchData]);
+
   const getCharacterName = useCallback((memberId: string | null, genVerseId?: string | null) => {
     if (!memberId) return "Unknown";
     if (genVerseId && verseCharacterMap[genVerseId]?.[memberId]) {
@@ -392,6 +435,8 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
     handleUploadComplete,
     uploadDialogOpen,
     setUploadDialogOpen,
+    addOptimisticGeneration,
+    refetch,
     handleUpscaleStart,
     handleMusicChange,
     handleMotionChange,

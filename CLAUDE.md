@@ -58,6 +58,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - Drizzle ORM + PostgreSQL (Supabase)
 - Tailwind CSS v4 + Radix UI (Select)
 - Motion (Framer Motion 후속)
+- @dnd-kit/core (드래그 앤 드롭 — SkillPanel → Persona)
 - ffmpeg.wasm (브라우저 영상 트리밍 + 음악 합성, SharedArrayBuffer 필요)
 - Replicate API (kling-video, nano-banana-pro, real-esrgan, topaz)
 - 폰트: Orbitron (영문) + Pretendard (한글)
@@ -103,11 +104,20 @@ export default [
 | 캐릭터 이미지 (생성 입력) | `defaultInput ?? poster` 폴백 | 캐릭터별 다른 인풋 이미지 지정, poster는 기본값 |
 | 캐릭터 이미지 (DB) | per-character (verse 무관) | 같은 인물이므로 AI 생성에 구분 불필요 |
 | 하단 패널 상호 배제 | `activePanel` 단일 상태 (`_index.tsx`), 타입은 `HomeFloatingBar`에서 export | 상태 1개로 모든 패널 토글 관리 |
-| 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, ID 기반 트래킹 | 라우트 전환 간 재생 유지, verse filtering과 호환 |
+| 패널 항목 선택 시 자동 닫힘 | 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 |
+| 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, ID 기반 트래킹, verse 무관 전체 트랙 | 라우트 전환 간 재생 유지, verse 전환 시 음악 끊김 방지 |
 | 글로벌 스페이스바 | `registerGlobalSpacebar()` → root.tsx 1회 등록 | input/button 위에서는 스킵 |
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
 | 우측 썸네일 vs 하단 바 | 별도 absolute 컨테이너 분리 | 같은 컨테이너면 패널 열릴 때 썸네일이 위로 밀림 |
+| 하단 레이아웃 3분할 | 트랙 정보(left) / 재생 컨트롤+프로그래스바(center) / 패널 버튼(right) | 음악 플레이어 UX 표준 배치 |
+| 프로그래스바 seek | `setPointerCapture`로 포인터 캡처 | 요소 밖 릴리스 시 seekingRef 해제 누락 방지 |
+| 프로그래스바 채움 | CSS `--progress` 변수 + `linear-gradient` (webkit) / `::-moz-range-progress` (FF) | JS에서 % 계산 → CSS 변수로 전달 |
+| Skill 드래그 드롭 감지 | `useDroppable` 미사용, 수동 `getBoundingClientRect()` 히트테스트 | @dnd-kit의 rect 측정이 CSS `scale()` transform에서 고장 |
+| Skill Teaching 생성 | `_index.tsx`에서 `useFetcher`로 API 호출, 드롭 → 확인 다이얼로그 → 생성 + 갤러리 열림 | HomeFloatingBar가 아닌 페이지 레벨에서 생성 관리 |
+| Flying card 타겟 위치 | FLIP: `galleryGridRef` → rAF polling → `getBoundingClientRect()` 측정 | magic number 대신 DOM 측정 = 레이아웃 변경에 안전 |
+| Flying card → 셀 핸드오프 | `flyingCardTargetId` 상태로 조율: 비행 중 셀 숨김(opacity 0) → 카드 도착 시 셀 reveal(scale 0.85→1) + persona-glow | 카드가 큐에 "들어가는" 시각적 인과관계 형성 |
+| 생성 시 갤러리 큐 표시 | optimistic update (`addOptimisticGeneration`) → fetcher 완료 후 `refetch()` | 생성 API(Replicate)가 느려서 갤러리 fetch와 race condition 발생 |
 
 ### 구성
 - Verse 00 "Showcase": sumin, rumi, geumbi, jiyoon, lei
@@ -161,7 +171,7 @@ Workers 시크릿: `npx wrangler secret put <KEY>` (DATABASE_URL, SUPABASE_URL, 
 ```
 app/
 ├── components/
-│   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel
+│   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel, SkillConfirmDialog
 │   ├── layout/          # Header, PageLayout, FloatingBar, HomeFloatingBar
 │   ├── music/           # MusicPanel (트랙 선택 패널)
 │   ├── skill/           # SkillPanel (캐릭터 재탭 시 인라인 생성 패널)

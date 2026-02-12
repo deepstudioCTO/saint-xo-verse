@@ -1,3 +1,4 @@
+import type React from "react";
 import { motion } from "motion/react";
 import { Skeleton } from "~/components/ui/skeleton";
 import { GenerationGridItem } from "./GenerationGridItem";
@@ -13,6 +14,10 @@ interface GalleryGridProps {
   skeletonCount?: number;
   /** Use crossfade skeleton layer (expanded panel style) instead of conditional rendering */
   crossfade?: boolean;
+  /** Ref to the grid container for position measurement (FLIP animation) */
+  gridRef?: React.Ref<HTMLDivElement>;
+  /** ID of the generation that the flying card is targeting (cell hidden until card lands) */
+  flyingCardTargetId?: string | null;
 }
 
 export function GalleryGrid({
@@ -21,44 +26,54 @@ export function GalleryGrid({
   contentReady,
   getCharacterName,
   onGenerationClick,
-  gridClassName = "grid-cols-3 gap-2",
+  gridClassName = "grid-cols-3 gap-3",
   skeletonCount = 9,
   crossfade = false,
+  gridRef,
+  flyingCardTargetId,
 }: GalleryGridProps) {
   if (!crossfade) {
-    // Compact style: simple conditional rendering
-    if (!contentReady) return null;
-
-    if (loading) {
-      return (
-        <div className={`grid ${gridClassName}`}>
-          {Array.from({ length: skeletonCount }).map((_, i) => (
-            <Skeleton key={i} className="aspect-[1/2] rounded-lg" />
-          ))}
-        </div>
-      );
-    }
-
-    if (generations.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-16">
-          <p className="text-neutral-400 text-sm">No results yet</p>
-        </div>
-      );
-    }
+    // Compact style: always mount DOM (for gridRef measurement),
+    // control visibility with opacity transition
+    const showSkeleton = loading;
+    const showEmpty = !loading && generations.length === 0;
+    const showGrid = !loading && generations.length > 0;
 
     return (
-      <div className={`grid ${gridClassName}`}>
-        {generations.map((gen, index) => (
-          <GenerationGridItem
-            key={gen.id}
-            generation={gen}
-            characterName={getCharacterName(gen.memberId, gen.verseId)}
-            index={index}
-            isHighlighted={false}
-            onClick={() => onGenerationClick(gen)}
-          />
-        ))}
+      <div
+        className={`transition-opacity duration-200 ${
+          contentReady ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        {showSkeleton && (
+          <div ref={gridRef} className={`grid ${gridClassName}`}>
+            {Array.from({ length: skeletonCount }).map((_, i) => (
+              <Skeleton key={i} className="aspect-[1/2] rounded-lg" />
+            ))}
+          </div>
+        )}
+
+        {showEmpty && (
+          <div className="flex flex-col items-center justify-center py-16">
+            <p className="text-neutral-400 text-sm">No results yet</p>
+          </div>
+        )}
+
+        {showGrid && (
+          <div ref={gridRef} className={`grid ${gridClassName} p-1`}>
+            {generations.map((gen, index) => (
+              <GenerationGridItem
+                key={gen.id}
+                generation={gen}
+                characterName={getCharacterName(gen.memberId, gen.verseId)}
+                index={index}
+                isHighlighted={false}
+                isReceivingCard={gen.id === flyingCardTargetId}
+                onClick={() => onGenerationClick(gen)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -113,7 +128,7 @@ export function GalleryGrid({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4 }}
-          className={`col-start-1 row-start-1 grid ${gridClassName}`}
+          className={`col-start-1 row-start-1 grid ${gridClassName} p-1`}
         >
           {generations.map((gen, index) => (
             <GenerationGridItem
@@ -122,6 +137,7 @@ export function GalleryGrid({
               characterName={getCharacterName(gen.memberId, gen.verseId)}
               index={index}
               isHighlighted={false}
+              isReceivingCard={gen.id === flyingCardTargetId}
               onClick={() => onGenerationClick(gen)}
             />
           ))}

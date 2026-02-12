@@ -337,7 +337,7 @@ export function ResultUploadDialog({
               onChange={(e) => setSelectedCharacter(e.target.value)}
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:border-transparent"
             >
-              <option value="">Select a character</option>
+              <option value="">Select a persona</option>
               {characterList.map((char) => (
                 <option key={char.id} value={char.id}>
                   {char.name}

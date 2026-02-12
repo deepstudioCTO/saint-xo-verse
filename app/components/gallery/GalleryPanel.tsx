@@ -1,3 +1,4 @@
+import type React from "react";
 import { useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GlassButton } from "~/components/ui/GlassButton";
@@ -16,9 +17,11 @@ interface GalleryCompactPanelProps {
   open: boolean;
   onExpand: () => void;
   galleryState: UseGalleryStateReturn;
+  gridRef?: React.Ref<HTMLDivElement>;
+  flyingCardTargetId?: string | null;
 }
 
-export function GalleryCompactPanel({ open, onExpand, galleryState }: GalleryCompactPanelProps) {
+export function GalleryCompactPanel({ open, onExpand, galleryState, gridRef, flyingCardTargetId }: GalleryCompactPanelProps) {
   const {
     sortedGenerations,
     loading,
@@ -64,6 +67,8 @@ export function GalleryCompactPanel({ open, onExpand, galleryState }: GalleryCom
                 contentReady={contentReady}
                 getCharacterName={getCharacterName}
                 onGenerationClick={handleGenerationClick}
+                gridRef={gridRef}
+                flyingCardTargetId={flyingCardTargetId}
               />
             </div>
           </>
@@ -184,7 +189,7 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, 
               contentReady={contentReady}
               getCharacterName={getCharacterName}
               onGenerationClick={handleGenerationClick}
-              gridClassName="grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"
+              gridClassName="grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
               skeletonCount={12}
               crossfade
             />

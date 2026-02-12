@@ -34,35 +34,35 @@ export interface VerseCharacter {
 export const CHARACTERS: Character[] = [
   {
     id: "sumin",
-    name: "Wednesday Off Sumin",
+    name: "Sumin",
     description: "미드 웬즈데이에서 영감을 받은 수민의 멀티 페르소나. 웬즈데이의 움직임을 연상케하는 왁킹 댄스 스킬이 주특기.",
     video: "/members/sumin.mp4",
     poster: "/members/sumin.png",
   },
   {
     id: "rumi",
-    name: "Red Lotus Rumi",
+    name: "Rumi",
     description: "공포영화 장화, 홍련에서 영감을 받은 루미의 멀티 페르소나. 장화, 홍련 자매의 숨겨진 셋째 딸. 어던 퍼포먼스에서도 일관되게 귀신에 홀린듯한 무표정이 특징.",
     video: "/members/rumi.mp4",
     poster: "/members/rumi.png",
   },
   {
     id: "geumbi",
-    name: "Sky Castle Geumbi",
+    name: "Geumbi",
     description: "드라마 스카이캐슬에서 영감을 받은 금비의 멀티 페르소나. 기교 없이 귀에 꽂히는 보컬 스킬은 '수능 금지곡'을 만들어내는 데에 적합.",
     video: "/members/geumbi.mp4",
     poster: "/members/geumbi.png",
   },
   {
     id: "jiyoon",
-    name: "Jiyoon Gallagher",
+    name: "Jiyoon",
     description: "영국 밴드 오아시스에서 영감받은 지윤의 멀티 페르소나. 해당 페르소나의 콘텐츠들은 욕설이 난무해서 대부분 삐--- 소리로 오디오가 채워지는 경향이 있다. 일렉 기타 연주 스킬이 특징.",
     video: "/members/jiyoon.mp4",
     poster: "/members/jiyoon.png",
   },
   {
     id: "lei",
-    name: "Vivian Waitress Lei",
+    name: "Lei",
     description: "류신레이의 멀티 페르소나. 비비안 웨스트우드 풍의 레스토랑에서 일하는 웨이트리스. 서빙 동작과 유사한 Bob Fosse Dance 스킬을 보유.",
     video: "/members/lei.mp4",
     poster: "/members/lei.png",
@@ -110,7 +110,7 @@ export const VERSE_CHARACTERS: VerseCharacter[] = [
   {
     verseId: "00",
     characterId: "sumin",
-    name: "Wednesday Off Sumin",
+    name: "Sumin",
     description: "미드 웬즈데이에서 영감을 받은 수민의 멀티 페르소나. 웬즈데이의 움직임을 연상케하는 왁킹 댄스 스킬이 주특기.",
     video: "/character/00_sumin.mp4",
     poster: "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/characters/posters/00_sumin.png",
@@ -119,7 +119,7 @@ export const VERSE_CHARACTERS: VerseCharacter[] = [
   {
     verseId: "00",
     characterId: "rumi",
-    name: "Red Lotus Rumi",
+    name: "Rumi",
     description: "공포영화 장화, 홍련에서 영감을 받은 루미의 멀티 페르소나. 장화, 홍련 자매의 숨겨진 셋째 딸. 어던 퍼포먼스에서도 일관되게 귀신에 홀린듯한 무표정이 특징.",
     video: "/character/00_rumi.mp4",
     poster: "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/characters/posters/00_rumi.png",
@@ -128,7 +128,7 @@ export const VERSE_CHARACTERS: VerseCharacter[] = [
   {
     verseId: "00",
     characterId: "geumbi",
-    name: "Sky Castle Geumbi",
+    name: "Geumbi",
     description: "드라마 스카이캐슬에서 영감을 받은 금비의 멀티 페르소나. 기교 없이 귀에 꽂히는 보컬 스킬은 '수능 금지곡'을 만들어내는 데에 적합.",
     video: "/character/00_geumbi.mp4",
     poster: "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/characters/posters/00_geumbi.png",
@@ -137,7 +137,7 @@ export const VERSE_CHARACTERS: VerseCharacter[] = [
   {
     verseId: "00",
     characterId: "jiyoon",
-    name: "Jiyoon Gallagher",
+    name: "Jiyoon",
     description: "영국 밴드 오아시스에서 영감받은 지윤의 멀티 페르소나. 해당 페르소나의 콘텐츠들은 욕설이 난무해서 대부분 삐--- 소리로 오디오가 채워지는 경향이 있다. 일렉 기타 연주 스킬이 특징.",
     video: "/character/00_jiyoon.mp4",
     poster: "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/characters/posters/00_jiyoon.png",
@@ -146,7 +146,7 @@ export const VERSE_CHARACTERS: VerseCharacter[] = [
   {
     verseId: "00",
     characterId: "lei",
-    name: "Vivian Waitress Lei",
+    name: "Lei",
     description: "류신레이의 멀티 페르소나. 비비안 웨스트우드 풍의 레스토랑에서 일하는 웨이트리스. 서빙 동작과 유사한 Bob Fosse Dance 스킬을 보유.",
     video: "/character/00_lei.mp4",
     poster: "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/characters/posters/00_lei.png",
@@ -215,28 +215,26 @@ export function getVerseCharacters(verseId: string): VerseCharacter[] {
 }
 
 // Track data
+const MUSIC_BASE = "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/music";
+
 export const TRACKS = [
   // Verse 00
-  { id: "1", title: "Yum", color: "#1a1a2e", src: "/music/Yum.mp3", cover: "/music/Yum.png", verseId: "00" },
-  { id: "3", title: "I'm lovin' it", color: "#0f3460", src: "/music/I'm lovin' it.mp3", cover: "/music/I'm lovin' it.png", verseId: "00" },
-  { id: "4", title: "ALL EYES ON ME", color: "#2d1b3d", src: "/music/ALL EYES ON ME.mp3", cover: "/music/ALL EYES ON ME.png", verseId: "00" },
-  { id: "6", title: "BURIED ALIVE", color: "#1b2d3d", src: "/music/BURIED ALIVE.mp3", cover: "/music/BURIED ALIVE.jpeg", verseId: "00" },
-  { id: "8", title: "EXTRA", color: "#3d2d1b", src: "/music/EXTRA.mp3", cover: "/music/EXTRA.jpeg", verseId: "00" },
-  { id: "10", title: "LOVE INVASION", color: "#3d1b2d", src: "/music/LOVE INVASION.mp3", cover: "/music/LOVE INVASION.png", verseId: "00" },
-  { id: "12", title: "SEOUL NODE", color: "#1b3d2d", src: "/music/SEOUL NODE.mp3", cover: "/music/SEOUL NODE.png", verseId: "00" },
+  { id: "1", title: "Yum", color: "#1a1a2e", src: `${MUSIC_BASE}/Yum.mp3`, cover: "/music/Yum.png", verseId: "00" },
+  { id: "3", title: "I'm lovin' it", color: "#0f3460", src: `${MUSIC_BASE}/I'm%20lovin'%20it.mp3`, cover: "/music/I'm lovin' it.png", verseId: "00" },
+  { id: "4", title: "ALL EYES ON ME", color: "#2d1b3d", src: `${MUSIC_BASE}/ALL%20EYES%20ON%20ME.mp3`, cover: "/music/ALL EYES ON ME.png", verseId: "00" },
+  { id: "6", title: "BURIED ALIVE", color: "#1b2d3d", src: `${MUSIC_BASE}/BURIED%20ALIVE.mp3`, cover: "/music/BURIED ALIVE.jpeg", verseId: "00" },
+  { id: "8", title: "EXTRA", color: "#3d2d1b", src: `${MUSIC_BASE}/EXTRA.mp3`, cover: "/music/EXTRA.jpeg", verseId: "00" },
+  { id: "10", title: "LOVE INVASION", color: "#3d1b2d", src: `${MUSIC_BASE}/LOVE%20INVASION.mp3`, cover: "/music/LOVE INVASION.png", verseId: "00" },
+  { id: "12", title: "SEOUL NODE", color: "#1b3d2d", src: `${MUSIC_BASE}/SEOUL%20NODE.mp3`, cover: "/music/SEOUL NODE.png", verseId: "00" },
   // Verse 01
-  { id: "2", title: "POP IT", color: "#16213e", src: "/music/POP IT.mp3", cover: "/music/POP IT.png", verseId: "01" },
-  { id: "5", title: "BRING IT UP", color: "#2d3d1b", src: "/music/BRING IT UP.mp3", cover: "/music/BRING IT UP.png", verseId: "01" },
-  { id: "7", title: "DONT LIE TO ME", color: "#3d1b1b", src: "/music/DONT LIE TO ME.mp3", cover: "/music/DONT LIE TO ME.png", verseId: "01" },
-  { id: "9", title: "F4U", color: "#1b1b3d", src: "/music/F4U.mp3", cover: "/music/F4U.jpeg", verseId: "01" },
-  { id: "11", title: "PRETTY POSER", color: "#2d1b1b", src: "/music/PRETTY POSER.mp3", cover: "/music/PRETTY POSER.png", verseId: "01" },
-  { id: "13", title: "BLACK", color: "#0a0a0a", src: "/music/BLACK.mp3", cover: "/music/BLACK.jpeg", verseId: "01" },
-  { id: "14", title: "MOON RUNNER", color: "#1b2d2d", src: "/music/MOON RUNNER.mp3", cover: "/music/MOON RUNNER.png", verseId: "01" },
+  { id: "2", title: "POP IT", color: "#16213e", src: `${MUSIC_BASE}/POP%20IT.mp3`, cover: "/music/POP IT.png", verseId: "01" },
+  { id: "5", title: "BRING IT UP", color: "#2d3d1b", src: `${MUSIC_BASE}/BRING%20IT%20UP.mp3`, cover: "/music/BRING IT UP.png", verseId: "01" },
+  { id: "7", title: "DONT LIE TO ME", color: "#3d1b1b", src: `${MUSIC_BASE}/DONT%20LIE%20TO%20ME.mp3`, cover: "/music/DONT LIE TO ME.png", verseId: "01" },
+  { id: "9", title: "F4U", color: "#1b1b3d", src: `${MUSIC_BASE}/F4U.mp3`, cover: "/music/F4U.jpeg", verseId: "01" },
+  { id: "11", title: "PRETTY POSER", color: "#2d1b1b", src: `${MUSIC_BASE}/PRETTY%20POSER.mp3`, cover: "/music/PRETTY POSER.png", verseId: "01" },
+  { id: "13", title: "BLACK", color: "#0a0a0a", src: `${MUSIC_BASE}/BLACK.mp3`, cover: "/music/BLACK.jpeg", verseId: "01" },
+  { id: "14", title: "MOON RUNNER", color: "#1b2d2d", src: `${MUSIC_BASE}/MOON%20RUNNER.mp3`, cover: "/music/MOON RUNNER.png", verseId: "01" },
 ];
-
-export function getTracksByVerse(verseId: string) {
-  return TRACKS.filter((t) => t.verseId === verseId);
-}
 
 // Track lookup map for quick access by ID
 export const TRACKS_BY_ID: Record<string, typeof TRACKS[0]> = Object.fromEntries(

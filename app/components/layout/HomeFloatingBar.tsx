@@ -1,6 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from "react";
-import { useFetcher } from "react-router";
-import { motion, AnimatePresence } from "motion/react";
+import { useState, useEffect, useRef, useCallback, type ReactNode } from "react";
 import { useAudioPlayer } from "~/hooks/useAudioPlayer";
 import { GlassButton } from "~/components/ui";
 import { MusicPanel } from "~/components/music/MusicPanel";
@@ -37,8 +35,6 @@ interface HomeFloatingBarProps {
 
 export function HomeFloatingBar({
   characterId,
-  characterImageUrl,
-  verseId,
   activePanel,
   onPanelChange,
   selectedVideo,
@@ -55,10 +51,11 @@ export function HomeFloatingBar({
     getAudioElement,
     shuffle,
     repeatOne,
+    seekTo,
     toggleShuffle,
     toggleRepeatOne,
-    verseTracks,
-  } = useAudioPlayer({ autoPlay: true, verseId });
+    tracks,
+  } = useAudioPlayer({ autoPlay: true });
 
   // Derived booleans from activePanel
   const skillPanelOpen = activePanel === "skill";
@@ -66,79 +63,22 @@ export function HomeFloatingBar({
   const galleryOpen = activePanel === "gallery-compact";
   const anyPanelOpen = activePanel !== null;
 
-  const [prompt, setPrompt] = useState("");
-  const fetcher = useFetcher();
-  const isGenerating = fetcher.state !== "idle";
-
-  const hasSkillSelection = !!(selectedVideo || selectedImage);
-  const canGenerate =
-    !!characterId &&
-    !!characterImageUrl &&
-    !isGenerating &&
-    (selectedVideo ? true : !!prompt.trim());
-
-  const handleSubmit = () => {
-    if ((!selectedVideo && !prompt.trim()) || !characterId || !characterImageUrl || isGenerating) return;
-
-    const formData = new FormData();
-    formData.append("prompt", prompt.trim());
-    formData.append("memberId", characterId);
-    formData.append("verseId", verseId);
-
-    if (selectedVideo) {
-      formData.append("imageUrl", characterImageUrl);
-      formData.append("videoUrl", selectedVideo.videoUrl);
-      formData.append("musicId", currentTrack.id);
-      formData.append("motionVideoId", selectedVideo.id);
-
-      fetcher.submit(formData, {
-        method: "POST",
-        action: "/api/generate",
-      });
-    } else {
-      formData.append("characterImageUrl", characterImageUrl);
-      formData.append("resolution", "2K");
-      formData.append("aspectRatio", "2:3");
-
-      if (selectedImage) {
-        formData.append("conceptImageUrl", selectedImage.publicUrl);
-        formData.append("conceptImageId", selectedImage.id);
-      }
-
-      fetcher.submit(formData, {
-        method: "POST",
-        action: "/api/generate-image",
-      });
-    }
-
-    setPrompt("");
-  };
-
-  // fetcher 응답 완료 시 갤러리 자동 열기 (submitting → idle 전이 감지)
-  const prevFetcherState = useRef(fetcher.state);
-  useEffect(() => {
-    const wasSubmitting = prevFetcherState.current !== "idle";
-    prevFetcherState.current = fetcher.state;
-
-    if (wasSubmitting && fetcher.state === "idle" && fetcher.data?.success) {
-      onPanelChange("gallery-compact");
-    }
-  }, [fetcher.state, fetcher.data, onPanelChange]);
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const seekingRef = useRef(false);
+
+  // Track change → reset time display immediately
+  useEffect(() => {
+    setCurrentTime(0);
+    setDuration(0);
+  }, [currentTrack.id]);
 
   useEffect(() => {
     const audio = getAudioElement();
     if (!audio) return;
-    const onTime = () => setCurrentTime(audio.currentTime);
+    const onTime = () => {
+      if (!seekingRef.current) setCurrentTime(audio.currentTime);
+    };
     const onMeta = () => setDuration(audio.duration || 0);
     if (audio.duration) setDuration(audio.duration);
     audio.addEventListener("timeupdate", onTime);
@@ -149,177 +89,112 @@ export function HomeFloatingBar({
     };
   }, [getAudioElement]);
 
-  const verseTrackIndex = verseTracks.findIndex((t) => t.id === currentTrack.id);
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Number(e.target.value);
+    setCurrentTime(value);
+    seekTo(value);
+  };
+
+  const handleSeekPointerDown = useCallback(() => {
+    seekingRef.current = true;
+    const onUp = () => {
+      seekingRef.current = false;
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointerup", onUp);
+  }, []);
+
+  const trackIndex = tracks.findIndex((t) => t.id === currentTrack.id);
 
   return (
     <>
-      {/* Music Controls — bottom left */}
-      <div className="absolute bottom-4 left-6 z-[15] flex items-center gap-1.5">
-        {/* Track info — leftmost */}
-        <div className="flex items-center gap-2 mr-1">
-          <img src={currentTrack.cover} alt={currentTrack.title} className="w-8 h-8 rounded-sm object-cover" />
-          <span className="text-[11px] tracking-wider text-black/70 font-medium max-w-[80px] truncate">
+      {/* Track info — bottom left */}
+      <div className="absolute bottom-4 left-6 z-[15] flex items-center gap-2">
+        <img src={currentTrack.cover} alt={currentTrack.title} className="w-8 h-8 rounded-sm object-cover" />
+        <div className="flex flex-col">
+          <span className="text-[11px] tracking-wider text-black/70 font-medium whitespace-nowrap">
             {currentTrack.title}
           </span>
+          <span className="text-[9px] tracking-wider text-black/30">
+            Saint Vesper
+          </span>
         </div>
-        {/* Shuffle */}
-        <button onClick={toggleShuffle} className={`${ICON_BTN} relative`} title="Shuffle">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="16 3 21 3 21 8" />
-            <line x1="4" y1="20" x2="21" y2="3" />
-            <polyline points="21 16 21 21 16 21" />
-            <line x1="15" y1="15" x2="21" y2="21" />
-            <line x1="4" y1="4" x2="9" y2="9" />
-          </svg>
-          {shuffle && (
-            <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-black/50" />
-          )}
-        </button>
-        {/* Prev */}
-        <button onClick={prevTrack} className="cursor-pointer p-1 text-black" title="Previous track">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 20L9 12L19 4V20Z" />
-            <rect x="4" y="4" width="3" height="16" rx="0.5" />
-          </svg>
-        </button>
-        {/* Play/Pause */}
-        <button onClick={togglePlay} className="cursor-pointer p-1 text-black" title={isPlaying ? "Pause" : "Play"}>
-          {isPlaying ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="5" y="3" width="5" height="18" rx="1" />
-              <rect x="14" y="3" width="5" height="18" rx="1" />
-            </svg>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M6 3.5L20 12L6 20.5V3.5Z" />
-            </svg>
-          )}
-        </button>
-        {/* Next */}
-        <button onClick={nextTrack} className="cursor-pointer p-1 text-black" title="Next track">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M5 4L15 12L5 20V4Z" />
-            <rect x="17" y="4" width="3" height="16" rx="0.5" />
-          </svg>
-        </button>
-        {/* Repeat */}
-        <button onClick={toggleRepeatOne} className={`${ICON_BTN} relative`} title={repeatOne ? "Repeat one" : "Repeat all"}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="17 1 21 5 17 9" />
-            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-            <polyline points="7 23 3 19 7 15" />
-            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-          </svg>
-          {repeatOne && (
-            <span className="absolute top-0 -right-0.5 text-[6px] font-bold text-black/50 leading-none">1</span>
-          )}
-        </button>
-        {/* Duration */}
-        <span className="text-[10px] tracking-wider text-black/40 tabular-nums ml-1">
-          {formatTime(currentTime)} / {formatTime(duration)}
-        </span>
       </div>
 
-      {/* Prompt Input — bottom center */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[15] w-full max-w-[35vw] px-6">
-        <div className="relative">
-          <input
-            type="text"
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={!characterId || isGenerating}
-            placeholder={
-              !characterId
-                ? "Select a character first"
-                : isGenerating
-                  ? "Generating..."
-                  : selectedVideo
-                    ? "Add a prompt (optional)"
-                    : "Describe the image..."
-            }
-            className="w-full px-5 pr-12 py-3 text-sm rounded-full bg-black/5 focus:bg-black/10 outline-none placeholder:text-black/30 text-black/70 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={(!selectedVideo && !prompt.trim()) || !characterId || isGenerating}
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors disabled:opacity-0 cursor-pointer"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
+      {/* Music Controls — bottom center */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[15] flex flex-col items-center gap-0.5">
+        {/* Playback buttons */}
+        <div className="flex items-center gap-1">
+          <button onClick={toggleShuffle} className={`${ICON_BTN} relative`} title="Shuffle">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 3 21 3 21 8" />
+              <line x1="4" y1="20" x2="21" y2="3" />
+              <polyline points="21 16 21 21 16 21" />
+              <line x1="15" y1="15" x2="21" y2="21" />
+              <line x1="4" y1="4" x2="9" y2="9" />
+            </svg>
+            {shuffle && (
+              <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-black/50" />
+            )}
+          </button>
+          <button onClick={prevTrack} className="cursor-pointer p-1 text-black" title="Previous track">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 20L9 12L19 4V20Z" />
+              <rect x="4" y="4" width="3" height="16" rx="0.5" />
             </svg>
           </button>
+          <button onClick={togglePlay} className="cursor-pointer p-1 text-black" title={isPlaying ? "Pause" : "Play"}>
+            {isPlaying ? (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="3" width="5" height="18" rx="1" />
+                <rect x="14" y="3" width="5" height="18" rx="1" />
+              </svg>
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M6 3.5L20 12L6 20.5V3.5Z" />
+              </svg>
+            )}
+          </button>
+          <button onClick={nextTrack} className="cursor-pointer p-1 text-black" title="Next track">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M5 4L15 12L5 20V4Z" />
+              <rect x="17" y="4" width="3" height="16" rx="0.5" />
+            </svg>
+          </button>
+          <button onClick={toggleRepeatOne} className={`${ICON_BTN} relative`} title={repeatOne ? "Repeat one" : "Repeat all"}>
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="17 1 21 5 17 9" />
+              <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+              <polyline points="7 23 3 19 7 15" />
+              <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+            </svg>
+            {repeatOne && (
+              <span className="absolute top-0 -right-0.5 text-[6px] font-bold text-black/50 leading-none">1</span>
+            )}
+          </button>
+        </div>
+        {/* Progress bar */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] tracking-wider text-black/40 tabular-nums w-[30px] text-right">
+            {formatTime(currentTime)}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={duration || 0}
+            value={currentTime}
+            step={0.1}
+            onChange={handleSeek}
+            onPointerDown={handleSeekPointerDown}
+            aria-label="Seek"
+            style={{ "--progress": `${duration ? (currentTime / duration) * 100 : 0}%` } as React.CSSProperties}
+            className="music-progress w-[18vw] appearance-none cursor-pointer"
+          />
+          <span className="text-[10px] tracking-wider text-black/40 tabular-nums w-[30px]">
+            {formatTime(duration)}
+          </span>
         </div>
       </div>
-
-      {/* Thumbnail bar — independent position, anchored above bottom bar */}
-      <AnimatePresence>
-        {!anyPanelOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.2 }}
-            className={`absolute bottom-[calc(1rem+48px+12px)] right-6 w-[26vw] flex flex-col gap-2 ${anyPanelOpen ? "z-30" : "z-[15]"}`}
-          >
-            {/* Music thumbnail */}
-            <div
-              onClick={() => onPanelChange("music")}
-              className="rounded-sm overflow-hidden shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/40"
-            >
-              <img
-                src={currentTrack.cover}
-                alt=""
-                className="w-full aspect-video object-cover"
-              />
-              <p className="px-2 py-1 text-[10px] font-medium text-white/70 tracking-wider truncate">{currentTrack.title}</p>
-            </div>
-
-            {/* Skill thumbnail */}
-            <AnimatePresence>
-              {hasSkillSelection && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={() => onPanelChange("skill")}
-                  className="rounded-sm overflow-hidden shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-black/40"
-                >
-                  <img
-                    src={(selectedVideo?.thumbnailUrl ?? selectedImage?.publicUrl)!}
-                    alt=""
-                    className="w-full aspect-video object-cover"
-                  />
-                  <p className="px-2 py-1 text-[10px] font-medium text-white/70 tracking-wider truncate">{selectedVideo?.name ?? selectedImage?.name ?? "SKILL"}</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Generate button */}
-            <AnimatePresence>
-              {hasSkillSelection && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.15, delay: 0.05 }}
-                >
-                  <GlassButton
-                    variant="bold"
-                    onClick={handleSubmit}
-                    disabled={!canGenerate}
-                    className="w-full justify-center"
-                  >
-                    {isGenerating ? "GENERATING..." : "GENERATE"}
-                  </GlassButton>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Bottom bar — panels + buttons */}
       <div className={`absolute bottom-4 right-6 w-[26vw] ${anyPanelOpen ? "z-30" : "z-[15]"}`}>
@@ -327,10 +202,10 @@ export function HomeFloatingBar({
         {children}
         <MusicPanel
           open={musicPanelOpen}
-          tracks={verseTracks}
-          currentTrackIndex={verseTrackIndex}
+          tracks={tracks}
+          currentTrackIndex={trackIndex}
           isPlaying={isPlaying}
-          onSelectTrack={selectTrack}
+          onSelectTrack={(id) => { selectTrack(id); onPanelChange(null); }}
         />
         <div className="grid grid-cols-3 gap-2">
         <GlassButton

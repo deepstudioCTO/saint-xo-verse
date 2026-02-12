@@ -158,3 +158,103 @@ body {
   background: rgb(237 237 237);
   border-radius: 0.125rem;
 }
+
+/* Music progress slider — filled track via CSS variable --progress */
+.music-progress {
+  height: 16px;
+  background: transparent;
+}
+
+.music-progress::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    rgb(0 0 0 / 0.45) var(--progress, 0%),
+    rgb(0 0 0 / 0.12) var(--progress, 0%)
+  );
+}
+
+.music-progress::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  margin-top: -3px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.music-progress:hover::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.music-progress::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.12);
+  border: none;
+}
+
+.music-progress::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: rgb(0 0 0 / 0.45);
+}
+
+.music-progress::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgb(0 0 0 / 0.55);
+  border: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.music-progress:hover::-moz-range-thumb {
+  opacity: 1;
+}
+
+/* Persona Glow — rotating holographic gradient behind selected persona during drag */
+@property --glow-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes rotate-glow {
+  from { --glow-angle: 0deg; }
+  to { --glow-angle: 360deg; }
+}
+
+.persona-glow {
+  background: conic-gradient(
+    from var(--glow-angle),
+    transparent 20%,
+    rgba(120, 180, 255, 0.3) 35%,
+    rgba(200, 140, 255, 0.5) 45%,
+    rgba(255, 180, 220, 0.5) 50%,
+    rgba(200, 140, 255, 0.5) 55%,
+    rgba(120, 180, 255, 0.3) 65%,
+    transparent 80%
+  );
+  animation: rotate-glow 2.5s linear infinite;
+  filter: blur(1px);
+}
+
+.persona-glow-intense {
+  background: conic-gradient(
+    from var(--glow-angle),
+    transparent 15%,
+    rgba(120, 180, 255, 0.5) 30%,
+    rgba(200, 140, 255, 0.7) 42%,
+    rgba(255, 180, 220, 0.7) 50%,
+    rgba(200, 140, 255, 0.7) 58%,
+    rgba(120, 180, 255, 0.5) 70%,
+    transparent 85%
+  );
+  animation: rotate-glow 2.5s linear infinite;
+  filter: blur(1.5px);
+}
