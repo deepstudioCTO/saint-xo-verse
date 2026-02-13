@@ -49,6 +49,105 @@ function PencilIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+const VERSE_CREDITS: Record<string, { role: string; name: string }[]> = {
+  "00": [
+    { role: "PRODUCTION", name: "YSLX" },
+    { role: "PHOTOGRAPHER", name: "YSLX" },
+    { role: "HAIR", name: "YSLX" },
+    { role: "STYLIST", name: "YSLX" },
+    { role: "MAKEUP", name: "YSLX" },
+  ],
+  "01": [
+    { role: "PRODUCTION", name: "YIRANG MOON" },
+    { role: "PHOTOGRAPHER", name: "YIRANG MOON" },
+    { role: "HAIR", name: "YIRANG MOON" },
+    { role: "STYLIST", name: "YIRANG MOON" },
+    { role: "MAKEUP", name: "YIRANG MOON" },
+  ],
+};
+
+function VerseCredits({ verseId }: { verseId: string }) {
+  const [open, setOpen] = useState(false);
+  const credits = VERSE_CREDITS[verseId] ?? [];
+  const lastIdx = credits.length - 1;
+
+  const roleVariants = {
+    hidden: { opacity: 0 },
+    visible: (i: number) => ({
+      opacity: 1,
+      transition: { duration: 0, delay: i * 0.12 },
+    }),
+    exit: (i: number) => ({
+      opacity: 0,
+      transition: { duration: 0, delay: 0.3 + (lastIdx - i) * 0.08 },
+    }),
+  };
+
+  const nameVariants = {
+    hidden: { opacity: 0 },
+    visible: (i: number) => ({
+      opacity: 1,
+      transition: { duration: 0, delay: 0.36 + i * 0.12 },
+    }),
+    exit: (i: number) => ({
+      opacity: 0,
+      transition: { duration: 0, delay: (lastIdx - i) * 0.08 },
+    }),
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center text-[10px] tracking-wider text-black mt-2 cursor-pointer hover:opacity-60 transition-opacity"
+      >
+        <span className="font-medium">CREDITS</span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="credits-list"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="mt-2"
+          >
+            {credits.map((credit, i) => (
+              <div key={credit.role} className="flex items-center text-[10px] tracking-wider text-black mt-2.5">
+                <motion.span custom={i} variants={roleVariants} className="font-medium w-40">
+                  {credit.role}
+                </motion.span>
+                <motion.span custom={i} variants={nameVariants} className="font-black">
+                  {credit.name}
+                </motion.span>
+              </div>
+            ))}
+
+            <motion.div
+              className="flex justify-center mt-3 mb-1"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: { opacity: 1, transition: { duration: 0, delay: 0.36 + lastIdx * 0.12 + 0.12 } },
+                exit: { opacity: 0, transition: { duration: 0, delay: 0.3 + lastIdx * 0.08 + 0.08 } },
+              }}
+            >
+              <button
+                onClick={() => setOpen(false)}
+                className="cursor-pointer hover:opacity-60 transition-opacity p-1"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m18 15-6-6-6 6" />
+                </svg>
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
 export const meta: Route.MetaFunction = () => [
   { title: "HitOS" },
   { name: "description", content: "Fan-made short-form video creation platform" },
@@ -908,6 +1007,7 @@ export default function Home() {
               </div>
               <span className="flex items-center text-[10px] tracking-wider text-black mt-8"><span className="font-medium w-40">PERSONAS</span><span className="font-bold">{String(characterList.length).padStart(2, "0")}</span></span>
               <span className="flex items-center text-[10px] tracking-wider text-black mt-2"><span className="font-medium w-40">MODE</span><span className="font-bold">{currentVerse?.id === "00" ? "XO" : "XX"}</span></span>
+              <VerseCredits verseId={currentVerseId} />
             </motion.div>
           </AnimatePresence>
         )}
