@@ -123,24 +123,6 @@ function VerseCredits({ verseId }: { verseId: string }) {
                 </motion.span>
               </div>
             ))}
-
-            <motion.div
-              className="flex justify-center mt-3 mb-1"
-              variants={{
-                hidden: { opacity: 0 },
-                visible: { opacity: 1, transition: { duration: 0, delay: 0.36 + lastIdx * 0.12 + 0.12 } },
-                exit: { opacity: 0, transition: { duration: 0, delay: 0.3 + lastIdx * 0.08 + 0.08 } },
-              }}
-            >
-              <button
-                onClick={() => setOpen(false)}
-                className="cursor-pointer hover:opacity-60 transition-opacity p-1"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m18 15-6-6-6 6" />
-                </svg>
-              </button>
-            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -871,7 +853,7 @@ export default function Home() {
       </header>
 
       {/* Layer 3: Title */}
-      <div className="absolute top-28 left-0 right-0 z-20 px-6">
+      <div className="absolute top-28 left-0 right-0 z-20 px-6 pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_textarea]:pointer-events-auto [&_a]:pointer-events-auto">
         {isSelecting && currentCharacter ? (
           <>
             {/* Character Step Indicator */}
