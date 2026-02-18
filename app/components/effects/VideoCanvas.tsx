@@ -14,8 +14,8 @@ export const EFFECT_PRESETS = {
     },
     // 줌 펀치 효과: 글리치 시작 시 "두둥" 확대 후 복귀
     impact: {
-      scale: 1.025, // 최대 2.5% 확대
-      duration: 0.08, // 80ms 동안 복귀
+      scale: 1.006, // 최대 0.6% 확대
+      duration: 0.05, // 50ms 동안 복귀
     },
   },
   intense: {
