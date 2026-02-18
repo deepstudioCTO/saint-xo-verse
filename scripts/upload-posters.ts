@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { verseCharacters } from "../drizzle/schema";
+import { personas } from "../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
@@ -58,20 +58,26 @@ async function main() {
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(storagePath);
     console.log(`Uploaded ${file} → ${data.publicUrl}`);
 
-    // Update DB: parse verseId and characterId from filename (e.g. "00_sumin.png")
-    const match = file.match(/^(\d+)_(.+)\.png$/);
-    if (match) {
-      const [, verseId, characterId] = match;
+    // Update DB: parse lookId and characterId from filename
+    // Handles: "00_02_sumin.png" (new) and "00_sumin.png" (legacy → 00_01)
+    const name = file.replace(/\.png$/, "");
+    const newMatch = name.match(/^(\d{2}_\d{2})_(.+)$/);
+    const legacyMatch = !newMatch ? name.match(/^(\d{2})_(.+)$/) : null;
+
+    const lookId = newMatch ? newMatch[1] : legacyMatch ? `${legacyMatch[1]}_01` : null;
+    const characterId = newMatch ? newMatch[2] : legacyMatch ? legacyMatch[2] : null;
+
+    if (lookId && characterId) {
       await db
-        .update(verseCharacters)
+        .update(personas)
         .set({ poster: data.publicUrl })
         .where(
           and(
-            eq(verseCharacters.verseId, verseId),
-            eq(verseCharacters.characterId, characterId)
+            eq(personas.lookId, lookId),
+            eq(personas.characterId, characterId)
           )
         );
-      console.log(`  → DB updated: verse ${verseId} / ${characterId}`);
+      console.log(`  → DB updated: look ${lookId} / ${characterId}`);
     }
   }
 

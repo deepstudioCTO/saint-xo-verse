@@ -8,7 +8,7 @@ interface GalleryGridProps {
   generations: Generation[];
   loading: boolean;
   contentReady: boolean;
-  getCharacterName: (memberId: string | null, verseId?: string | null) => string;
+  getCharacterName: (memberId: string | null, lookId?: string | null) => string;
   onGenerationClick: (gen: Generation) => void;
   gridClassName?: string;
   skeletonCount?: number;
@@ -65,7 +65,7 @@ export function GalleryGrid({
               <GenerationGridItem
                 key={gen.id}
                 generation={gen}
-                characterName={getCharacterName(gen.memberId, gen.verseId)}
+                characterName={getCharacterName(gen.memberId, gen.lookId)}
                 index={index}
                 isHighlighted={false}
                 isReceivingCard={gen.id === flyingCardTargetId}
@@ -134,7 +134,7 @@ export function GalleryGrid({
             <GenerationGridItem
               key={gen.id}
               generation={gen}
-              characterName={getCharacterName(gen.memberId, gen.verseId)}
+              characterName={getCharacterName(gen.memberId, gen.lookId)}
               index={index}
               isHighlighted={false}
               isReceivingCard={gen.id === flyingCardTargetId}

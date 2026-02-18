@@ -17,7 +17,8 @@ export const generations = pgTable("generations", {
   musicId: text("music_id"), // 선택한 음악 ID
   motionVideoId: uuid("motion_video_id"), // 선택한 모션 비디오 ID
   conceptImageId: uuid("concept_image_id"), // 참조용 컨셉 이미지 ID (이미지 생성용)
-  verseId: text("verse_id"), // verse ID (nullable for backward compat)
+  lookbookId: text("lookbook_id"), // lookbook ID (nullable for backward compat)
+  lookId: text("look_id"), // look ID (nullable, 정밀 look 추적용)
   prompt: text("prompt"), // 이미지 생성 프롬프트
   resolution: text("resolution"), // '1K' | '2K' | '4K'
   imageUrl: text("image_url").notNull(),
@@ -84,11 +85,11 @@ export const characters = pgTable("characters", {
     .$onUpdate(() => sql`now()`),
 });
 
-export const verses = pgTable("verses", {
+export const lookbooks = pgTable("lookbooks", {
   id: text("id").primaryKey(), // "00", "01" 등
   name: text("name").notNull(), // "showcase", "ojos"
   displayName: text("display_name").notNull(), // "Showcase", "Ojos"
-  description: text("description"), // verse 설명 (nullable)
+  description: text("description"), // lookbook 설명 (nullable)
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
@@ -97,14 +98,39 @@ export const verses = pgTable("verses", {
     .$onUpdate(() => sql`now()`),
 });
 
-export const verseCharacters = pgTable("verse_characters", {
+export const looks = pgTable("looks", {
+  id: text("id").primaryKey(), // "00_01"~"00_04", "01_01"
+  lookbookId: text("lookbook_id").notNull(),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => sql`now()`),
+});
+
+export const editorProjects = pgTable("editor_projects", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull().default("Untitled Project"),
+  nodes: text("nodes").notNull().default("[]"),
+  edges: text("edges").notNull().default("[]"),
+  viewport: text("viewport").notNull().default('{"x":0,"y":0,"zoom":1}'),
+  sourceGenerationId: text("source_generation_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => sql`now()`),
+});
+
+export const personas = pgTable("personas", {
   id: uuid("id").primaryKey().defaultRandom(),
-  verseId: text("verse_id").notNull(), // "00", "01"
+  lookId: text("look_id").notNull(), // "00_01", "00_02" 등
   characterId: text("character_id").notNull(), // "sumin", "rumi"
-  name: text("name").notNull(), // verse별 페르소나 이름
-  description: text("description").notNull(), // verse별 설명
-  video: text("video").notNull(), // verse별 영상 경로
-  poster: text("poster").notNull(), // verse별 포스터 경로
+  name: text("name").notNull(), // look별 페르소나 이름
+  description: text("description").notNull(), // look별 설명
+  video: text("video").notNull(), // look별 영상 경로
+  poster: text("poster").notNull(), // look별 포스터 경로
   defaultInput: text("default_input"), // poster 대체 URL (nullable, null이면 poster 사용)
   displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),

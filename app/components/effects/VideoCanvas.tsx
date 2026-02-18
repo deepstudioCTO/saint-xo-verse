@@ -106,7 +106,12 @@ function FallbackVideo({
       disablePictureInPicture
       draggable={false}
       className={className}
-      style={style}
+      style={{
+        ...style,
+        backgroundImage: poster ? `url(${poster})` : undefined,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     />
   );
 }

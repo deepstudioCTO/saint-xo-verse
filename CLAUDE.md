@@ -43,7 +43,7 @@
 # 공통 패턴: 환경변수 로드 후 실행
 export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 ```
-주요 스크립트: `seed-verses.ts`, `seed-verse-characters.ts`, `seed-characters.ts`, `seed-character-images.ts`, `upload-posters.ts`, `upload-music.ts`
+주요 스크립트: `seed-verses.ts` (lookbooks), `seed-verse-characters.ts` (personas), `seed-characters.ts`, `seed-character-images.ts`, `upload-posters.ts`, `upload-character-videos.ts`, `upload-music.ts`
 
 ## 환경 변수
 
@@ -59,6 +59,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - Tailwind CSS v4 + Radix UI (Select)
 - Motion (Framer Motion 후속)
 - @dnd-kit/core (드래그 앤 드롭 — SkillPanel → Persona)
+- @xyflow/react (노드 기반 에디터 캔버스)
 - ffmpeg.wasm (브라우저 영상 트리밍 + 음악 합성, SharedArrayBuffer 필요)
 - Replicate API (kling-video, nano-banana-pro, real-esrgan, topaz)
 - 폰트: Orbitron (영문) + Pretendard (한글)
@@ -80,7 +81,8 @@ motion-videos/
 └── generated-images/ # AI 생성 이미지
 
 characters/
-└── posters/          # verse별 캐릭터 포스터 (Replicate API 입력용)
+├── posters/          # look별 캐릭터 포스터 (Replicate API 입력용)
+└── videos/           # look별 캐릭터 영상 (프로덕션 서빙)
 ```
 
 ## 라우트 등록 (중요!)
@@ -97,14 +99,21 @@ export default [
 ] satisfies RouteConfig;
 ```
 
-## Verse 시스템
+## Lookbook/Look/Persona 시스템
+
+3단 계층: **Lookbook** (최상위, ↑↓ 전환) → **Look** (하위 그룹, ←→ 전환) → **Persona** (캐릭터, 선택 시 ←→ 이동)
+- Lookbook 00: 4 looks (00_01~00_04), Lookbook 01: 1 look (01_01)
+- Persona 이동은 look 경계를 넘을 수 있음 (마지막 persona에서 → = 다음 look 첫 persona)
+- URL: `?lookbook=00&look=00_01&selected=sumin` (하위 호환: `?verse=` → `?lookbook=` 리다이렉트)
+- Gallery persona 이름 해소: `personaMap[lookId][characterId]` 우선, fallback으로 전체 look 검색
 
 ### 핵심 설계 결정
 | 항목 | 결정 | 이유 |
 |------|------|------|
 | 캐릭터 이미지 (생성 입력) | `defaultInput ?? poster` 폴백 | 캐릭터별 다른 인풋 이미지 지정, poster는 기본값 |
 | 캐릭터 이미지 (DB) | per-character (verse 무관) | 같은 인물이므로 AI 생성에 구분 불필요 |
-| 하단 패널 상호 배제 | `activePanel` 단일 상태 (`_index.tsx`), 타입은 `HomeFloatingBar`에서 export | 상태 1개로 모든 패널 토글 관리 |
+| 하단 패널 상호 배제 | `activePanel` 단일 상태 (`_index.tsx`), 타입은 `HomeFloatingBar`에서 export. Skill·Gallery 모두 `*-compact` / `*-expanded` 쌍 | 상태 1개로 모든 패널 토글 관리 |
+| Compact↔Expanded 패턴 | 공용 콘텐츠 props 타입 + 공유 서브컴포넌트(TabBar/Grid), 패널별 셸만 다름. `_index.tsx`에서 콜백은 `useCallback`으로 1회 정의 후 양쪽 전달 | DRY — 그리드·탭·콜백 중복 방지 |
 | 패널 항목 선택 시 자동 닫힘 | 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 |
 | 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, Supabase Storage에서 서빙 (`preload="auto"`) | Range 요청 지원으로 seek 정상 동작, Cloudflare Workers Static Assets는 Range 미지원 |
 | 글로벌 스페이스바 | `registerGlobalSpacebar()` → root.tsx 1회 등록 | input/button 위에서는 스킵 |
@@ -119,19 +128,41 @@ export default [
 | Flying card 타겟 위치 | FLIP: `galleryGridRef` → rAF polling → `getBoundingClientRect()` 측정 | magic number 대신 DOM 측정 = 레이아웃 변경에 안전 |
 | Flying card → 셀 핸드오프 | `flyingCardTargetId` 상태로 조율: 비행 중 셀 숨김(opacity 0) → 카드 도착 시 셀 reveal(scale 0.85→1) + persona-glow | 카드가 큐에 "들어가는" 시각적 인과관계 형성 |
 | 생성 시 갤러리 큐 표시 | optimistic update (`addOptimisticGeneration`) → fetcher 완료 후 `refetch()` | 생성 API(Replicate)가 느려서 갤러리 fetch와 race condition 발생 |
+| 버튼 레이블 ↔ 패널 타입 | DEMO→`music-*`, SKILLS→`skill-*`, LIBRARY→`gallery-*`. 상단 우측 4버튼(AudioVisual Lab, Moodboard, Launch, Playground)은 placeholder | 표시 레이블 리브랜딩, 내부 패널 타입명은 유지 |
+| 캐릭터 영상/포스터 서빙 | Supabase Storage (`characters` 버킷), DB에 절대 URL 저장 | Cloudflare Workers Static Assets 배포 사이즈 제한 회피, music과 동일 패턴 |
+| 에셋 파일명 → DB 매핑 | 2단계 파싱: `{lookId}_{charId}` 먼저, 실패 시 `{lookbookId}_{charId}` → lookId=`{id}_01` | 레거시(`00_sumin`) + 신규(`00_02_sumin`) 네이밍 공존 |
+| 영상 비율 보정 | WebGL 셰이더에서 `u_videoAspect` uniform으로 cover-crop UV 보정 (zoom punch/글리치 앞단에서 적용) | look별 영상 비율이 다름 (00_01: 1:2, 00_02~04: 9:16). 컨테이너 `aspect-[1/2]`는 고정, 셰이더가 자동 crop |
+| 내비게이션 트랜지션 | `_index.tsx`에 단일 `transition` 상태(`{ type: "lookbook"\|"look", direction }`)로 통합, 훅들은 `onTransition` 콜백만 호출 | 훅별 분리 direction 상태는 리셋되지 않아 스테일 버그 유발, 이벤트 시그널을 상위에서 단일 관리 |
+| 포스터 프리로드 | `usePreloadPosters`로 전체 persona poster 즉시 로드 + WebGLGlitchVideo·FallbackVideo에 `background-image: poster` 적용 | idle 콜백은 WebGL+비디오 초기화로 지연됨, canvas `opacity:0` 동안 poster가 보이도록 다층 배경 |
+
+## 노드 에디터 (`/editor`)
+
+### 핵심 설계 결정
+| 항목 | 결정 | 이유 |
+|------|------|------|
+| nodeTypes 위치 | 모듈 스코프 정의 (`EditorCanvas.tsx` 상단) | 인라인 정의 시 매 렌더마다 노드 리마운트 |
+| 자막 입력 영역 | `className="nodrag nopan nowheel"` | React Flow 이벤트가 input 포커스/스크롤 가로채기 방지 |
+| 프리뷰 업스트림 데이터 | `useHandleConnections` + `useNodesData` | React Flow v12 권장 패턴, 엣지 연결 기반 데이터 흐름 |
+| CSS import | `base.css` (not `style.css`) | `style.css`는 Tailwind와 충돌 가능 |
+| 미디어 선택 | SourceNode 클릭 → MediaBrowser 모달 → `/api/gallery-data` fetch | 기존 갤러리 API 재활용 |
+| 테마 | 다크 테마 (`colorMode="dark"`), Header 없이 전체 화면 캔버스 | 홈/갤러리와 독립된 시네마틱 UI, 에디터 페이지만 스코프 |
+| 미디어 표시 | `MediaDisplay` 공용 컴포넌트 (SourceNode·PreviewNode 공유), play 버튼 `stopPropagation` | DRY + SourceNode는 onNodeClick→MediaBrowser 열림과 play 클릭을 분리해야 함 |
+| SourceNode 래퍼 | `<div>` (not `<button>`) | MediaDisplay 내부 play `<button>`과 중첩 시 hydration mismatch → React 트리 리마운트 |
+| AutoSave URL 정리 | 첫 저장 성공 후 `replaceState("/editor")` | URL params는 초기 진입 힌트일 뿐, 저장 후엔 DB가 진실의 원천. 새로고침 시 savedProject에서 복원 |
+| AutoSave 초기화 우선순위 | `savedProject > initialMedia > empty` | savedProject 있으면 자막·위치 등 전체 상태 복원. initialMedia는 savedProject 없을 때만 사용 |
+| AutoSave sourceGenerationId | ref로 관리 (`sourceGenIdRef`) | useEffect deps는 `[nodes, edges]`만, setTimeout 내부에서 stale closure 방지 |
 
 ### 구성
-- Verse 00 "Showcase": sumin, rumi, geumbi, jiyoon, lei
-- Verse 01 "Ojos": sumin, rumi, geumbi, lei, siori, yui
-- 영상: `public/character/{verseId}_{characterId}.mp4`
-- 포스터: `characters` 버킷 `posters/{verseId}_{characterId}.png` (DB `poster` 컬럼에 절대 URL)
-
-### URL 파라미터 플로우
-```
-_index.tsx → motion.tsx → gallery.tsx
-/?verse=00&selected=sumin → /motion?verse=00&character=sumin&imageUrl=... → /gallery?verse=00
-```
-`verse` 파라미터를 항상 네비게이션 체인에 전달할 것.
+- Lookbook 00 "Showcase": 4 looks
+  - Look 00_01: sumin, rumi, geumbi, jiyoon, lei
+  - Look 00_02: sumin, rumi, geumbi, jiyoon, lei (다른 컨셉)
+  - Look 00_03: sumin_01, sumin_02, jiyoon_01, jiyoon_02, lei_01, lei_02
+  - Look 00_04: sumin, rumi, geumbi, jiyoon, lei (다른 컨셉)
+- Lookbook 01 "Ojos": 1 look
+  - Look 01_01: sumin, rumi, geumbi, lei, siori, yui
+- 영상/포스터: Supabase Storage `characters` 버킷에서 서빙 (DB에 절대 URL 저장)
+- `public/character/`에 로컬 사본 유지 (dev용), `.assetsignore`로 mp4는 배포 제외
+- 업로드: `upload-character-videos.ts` / `upload-posters.ts` (파일명 → lookId+characterId 파싱 후 DB 업데이트)
 
 ## Slack MCP
 
@@ -172,26 +203,31 @@ Workers 시크릿: `npx wrangler secret put <KEY>` (DATABASE_URL, SUPABASE_URL, 
 ```
 app/
 ├── components/
-│   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel, SkillConfirmDialog
-│   ├── layout/          # Header, PageLayout, FloatingBar, HomeFloatingBar
+│   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel, SkillConfirmDialog, CharacterInfoPanel, LookbookInfoPanel
+│   ├── layout/          # HomeFloatingBar
 │   ├── music/           # MusicPanel (트랙 선택 패널)
 │   ├── skill/           # SkillPanel (캐릭터 재탭 시 인라인 생성 패널)
-│   ├── motion/          # 모션/컨셉 이미지 업로드, 그리드, 트리밍
 │   ├── gallery/         # GalleryPanel(compact/expanded), GalleryGrid, GalleryModals, VideoDetailModal, ImageDetailModal
-│   └── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
+│   ├── editor/          # 노드 에디터 (EditorCanvas, MediaBrowser, nodes/)
+│   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
+│   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등
 ├── lib/
-│   ├── data.ts          # CHARACTERS, TRACKS, VERSES 폴백 데이터 + 타입 + 룩업 맵
+│   ├── data.ts          # CHARACTERS, TRACKS, LOOKBOOKS, LOOKS, PERSONAS 폴백 데이터 + 타입 + 룩업 맵
 │   ├── db.server.ts     # Drizzle DB 연결 + 모든 schema 테이블 export
 │   └── supabase.server.ts  # Storage 헬퍼
 ├── hooks/
-│   ├── useAudioPlayer.ts # 음악 재생 훅 (TRACKS 기반, play/pause/next/prev)
-│   ├── useContentReady.ts # 패널 열림 후 지연 콘텐츠 표시 (RevealPanel·GalleryExpandedPanel 공용)
-│   └── useGalleryState.ts # Gallery 데이터·필터·모달 상태 통합 훅
+│   ├── useAudioPlayer.ts       # 음악 재생 훅
+│   ├── useLookbookNavigation.ts # Lookbook ↑↓ 키보드 내비게이션
+│   ├── useLookNavigation.ts    # Look ←→ 키보드 내비게이션 (미선택 시)
+│   ├── usePersonaNavigation.ts # Persona ←→ 키보드/스와이프 + 크로스-look 경계
+│   ├── useCharacterImages.ts   # 캐릭터 이미지 업로드/삭제/defaultInput
+│   ├── useContentReady.ts      # 패널 열림 후 지연 콘텐츠 표시
+│   ├── useGalleryState.ts      # Gallery 데이터·필터·모달 상태 통합 훅
+│   ├── useSkillTeaching.ts     # DnD → 확인 → 생성 → flying card 플로우
+│   └── usePreloadPosters.ts   # 전체 persona poster 즉시 프리로드
 ├── routes/
 │   ├── _index.tsx       # 홈 (캐릭터 선택, verse 전환)
-│   ├── motion.tsx       # 스킬 선택 (Video/Image 탭)
-│   ├── gallery.tsx      # 갤러리 (타입 필터, 정렬, 폴링)
-│   ├── result.$id.tsx   # 결과 상세
+│   ├── editor.tsx       # 노드 기반 영상 편집 에디터
 │   └── api.*.tsx        # REST API 엔드포인트들
 ├── routes.ts            # ⚠️ 라우트 수동 등록 필수
 scripts/                 # 시드, 버킷 생성, 이미지 업로드

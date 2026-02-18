@@ -54,6 +54,7 @@ uniform vec2 u_resolution;
 uniform float u_dpr;
 uniform float u_referenceWidth;
 uniform float u_impactScale; // 현재 스케일 값 (1.0 ~ impactScale)
+uniform float u_videoAspect; // video.videoWidth / video.videoHeight (0이면 미적용)
 
 varying vec2 v_texCoord;
 
@@ -67,8 +68,21 @@ float rand2(vec2 co) {
 }
 
 void main() {
-  // 줌 펀치 효과: 중심 기준 스케일 적용
   vec2 uv = v_texCoord;
+
+  // Cover-crop: 비율 보정 (object-fit: cover 동작)
+  if (u_videoAspect > 0.0) {
+    float containerAspect = u_resolution.x / u_resolution.y;
+    if (u_videoAspect > containerAspect) {
+      float scale = containerAspect / u_videoAspect;
+      uv.x = uv.x * scale + (1.0 - scale) * 0.5;
+    } else if (containerAspect > u_videoAspect) {
+      float scale = u_videoAspect / containerAspect;
+      uv.y = uv.y * scale + (1.0 - scale) * 0.5;
+    }
+  }
+
+  // 줌 펀치 효과: 중심 기준 스케일 적용
   if (u_impactScale > 1.0) {
     // 중심(0.5, 0.5)을 기준으로 스케일 변환
     uv = (uv - 0.5) / u_impactScale + 0.5;
@@ -263,6 +277,7 @@ export function WebGLGlitchVideo({
     u_dpr: WebGLUniformLocation | null;
     u_referenceWidth: WebGLUniformLocation | null;
     u_impactScale: WebGLUniformLocation | null;
+    u_videoAspect: WebGLUniformLocation | null;
   } | null>(null);
 
   const [isWebGLReady, setIsWebGLReady] = useState(false);
@@ -363,6 +378,7 @@ export function WebGLGlitchVideo({
       u_dpr: gl.getUniformLocation(program, "u_dpr"),
       u_referenceWidth: gl.getUniformLocation(program, "u_referenceWidth"),
       u_impactScale: gl.getUniformLocation(program, "u_impactScale"),
+      u_videoAspect: gl.getUniformLocation(program, "u_videoAspect"),
     };
 
     // 버퍼 생성 - 풀스크린 쿼드
@@ -506,6 +522,10 @@ export function WebGLGlitchVideo({
       gl.uniform1f(uniforms.u_dpr, dpr);
       gl.uniform1f(uniforms.u_referenceWidth, referenceWidth);
       gl.uniform1f(uniforms.u_impactScale, currentImpactScale);
+      const videoAspect = video.videoWidth > 0 && video.videoHeight > 0
+        ? video.videoWidth / video.videoHeight
+        : 0.0;
+      gl.uniform1f(uniforms.u_videoAspect, videoAspect);
 
       // 그리기
       gl.drawArrays(gl.TRIANGLES, 0, 6);
@@ -546,6 +566,9 @@ export function WebGLGlitchVideo({
         overflow: "hidden",
         width: "100%",
         height: "100%",
+        backgroundImage: poster ? `url(${poster})` : undefined,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
         ...style,
       }}
     >

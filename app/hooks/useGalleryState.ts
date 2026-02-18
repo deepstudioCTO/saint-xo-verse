@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { toast } from "sonner";
 import { CHARACTERS_BY_ID, TRACKS_BY_ID, createCharactersById, type Character } from "~/lib/data";
 
 export interface Generation {
@@ -8,7 +9,8 @@ export interface Generation {
   musicId: string | null;
   motionVideoId: string | null;
   conceptImageId: string | null;
-  verseId: string | null;
+  lookbookId: string | null;
+  lookId: string | null;
   videoUrl: string | null;
   outputUrl: string | null;
   status: string;
@@ -82,7 +84,7 @@ export interface UseGalleryStateReturn {
   handleConceptImageChange: (id: string, conceptImageId: string | null, conceptImageName: string | null) => void;
 
   // Lookup
-  getCharacterName: (memberId: string | null, verseId?: string | null) => string;
+  getCharacterName: (memberId: string | null, lookId?: string | null) => string;
   getTrackName: (musicId: string | null) => string;
 
   // Optimistic updates
@@ -93,7 +95,7 @@ export interface UseGalleryStateReturn {
   motionVideoOptions: MotionVideoOption[];
   conceptImageOptions: ConceptImageOption[];
   loadedCharacters: Character[];
-  verseCharacterMap: Record<string, Record<string, { name: string }>>;
+  personaMap: Record<string, Record<string, { name: string }>>;
   charactersById: Record<string, Character>;
 }
 
@@ -102,7 +104,7 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
   const [motionVideoOptions, setMotionVideoOptions] = useState<MotionVideoOption[]>([]);
   const [conceptImageOptions, setConceptImageOptions] = useState<ConceptImageOption[]>([]);
   const [loadedCharacters, setLoadedCharacters] = useState<Character[]>([]);
-  const [verseCharacterMap, setVerseCharacterMap] = useState<Record<string, Record<string, { name: string }>>>({});
+  const [personaMap, setPersonaMap] = useState<Record<string, Record<string, { name: string }>>>({});
   const [loading, setLoading] = useState(false);
 
   const [selectedGeneration, setSelectedGeneration] = useState<Generation | null>(null);
@@ -119,6 +121,10 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
 
   // Optimistic generation tracking
   const optimisticIdsRef = useRef<Set<string>>(new Set());
+
+  // Ref for stable polling (avoids interval recreation on every generations change)
+  const generationsRef = useRef(generations);
+  generationsRef.current = generations;
 
   const charactersById = loadedCharacters.length > 0
     ? createCharactersById(loadedCharacters)
@@ -143,7 +149,7 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
     setMotionVideoOptions(data.motionVideos as MotionVideoOption[]);
     setConceptImageOptions(data.conceptImages as ConceptImageOption[]);
     setLoadedCharacters(data.characters as Character[]);
-    setVerseCharacterMap(data.verseCharacterMap as Record<string, Record<string, { name: string }>>);
+    setPersonaMap(data.personaMap as Record<string, Record<string, { name: string }>>);
   }, []);
 
   // Fetch data when panel opens
@@ -243,9 +249,9 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
     }
   }, [generations, selectedGeneration]);
 
-  // Polling: pending/processing generations
+  // Polling: pending/processing generations (uses ref for stable interval)
   const pollPendingGenerations = useCallback(async () => {
-    const pendingItems = generations.filter(
+    const pendingItems = generationsRef.current.filter(
       (g) => g.status === "pending" || g.status === "processing"
     );
     if (pendingItems.length === 0) return;
@@ -285,11 +291,11 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
         return gen;
       })
     );
-  }, [generations]);
+  }, []);
 
-  // Polling: upscaling generations
+  // Polling: upscaling generations (uses ref for stable interval)
   const pollUpscalingGenerations = useCallback(async () => {
-    const upscalingIds = generations
+    const upscalingIds = generationsRef.current
       .filter((g) => g.upscaleStatus === "pending" || g.upscaleStatus === "processing")
       .map((g) => g.id);
     if (upscalingIds.length === 0) return;
@@ -324,25 +330,31 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
       }
       return prev;
     });
-  }, [generations]);
+  }, []);
 
-  // Pending polling effect
+  // Derived booleans for stable polling intervals
+  const hasPending = useMemo(
+    () => generations.some((g) => g.status === "pending" || g.status === "processing"),
+    [generations]
+  );
+  const hasUpscaling = useMemo(
+    () => generations.some((g) => g.upscaleStatus === "pending" || g.upscaleStatus === "processing"),
+    [generations]
+  );
+
+  // Pending polling effect (interval only recreated when hasPending toggles)
   useEffect(() => {
-    if (!open) return;
-    const hasPending = generations.some((g) => g.status === "pending" || g.status === "processing");
-    if (!hasPending) return;
+    if (!open || !hasPending) return;
     const interval = setInterval(pollPendingGenerations, 5000);
     return () => clearInterval(interval);
-  }, [open, generations, pollPendingGenerations]);
+  }, [open, hasPending, pollPendingGenerations]);
 
-  // Upscale polling effect
+  // Upscale polling effect (interval only recreated when hasUpscaling toggles)
   useEffect(() => {
-    if (!open) return;
-    const hasUpscaling = generations.some((g) => g.upscaleStatus === "pending" || g.upscaleStatus === "processing");
-    if (!hasUpscaling) return;
+    if (!open || !hasUpscaling) return;
     const interval = setInterval(pollUpscalingGenerations, 5000);
     return () => clearInterval(interval);
-  }, [open, generations, pollUpscalingGenerations]);
+  }, [open, hasUpscaling, pollUpscalingGenerations]);
 
   const handleGenerationClick = useCallback((gen: Generation) => {
     if (gen.status !== "completed" && gen.status !== "failed") return;
@@ -365,7 +377,7 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
       });
       const data = await response.json();
       if (data.error) {
-        alert(`Delete failed: ${data.error}`);
+        toast.error(`Delete failed: ${data.error}`);
         return;
       }
       setGenerations((prev) => prev.filter((g) => g.id !== deleteTarget));
@@ -373,7 +385,7 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
       setSelectedGeneration(null);
     } catch (err) {
       console.error("Delete failed:", err);
-      alert("An error occurred during deletion.");
+      toast.error("An error occurred during deletion.");
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);
@@ -402,20 +414,25 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
     }
   }, [applyFetchData]);
 
-  const getCharacterName = useCallback((memberId: string | null, genVerseId?: string | null) => {
+  const getCharacterName = useCallback((memberId: string | null, lookId?: string | null) => {
     if (!memberId) return "Unknown";
-    if (genVerseId && verseCharacterMap[genVerseId]?.[memberId]) {
-      return verseCharacterMap[genVerseId][memberId].name;
+    // Try lookId-based lookup first (precise)
+    if (lookId && personaMap[lookId]?.[memberId]) {
+      return personaMap[lookId][memberId].name;
+    }
+    // Fallback: search all looks in personaMap for this memberId
+    for (const lookPersonas of Object.values(personaMap)) {
+      if (lookPersonas[memberId]) return lookPersonas[memberId].name;
     }
     return charactersById[memberId]?.name || "Unknown";
-  }, [verseCharacterMap, charactersById]);
+  }, [personaMap, charactersById]);
 
   const getTrackName = useCallback((musicId: string | null) => {
     if (!musicId) return "Unknown";
     return TRACKS_BY_ID[musicId]?.title || "Unknown";
   }, []);
 
-  return {
+  return useMemo(() => ({
     generations,
     sortedGenerations,
     loading,
@@ -446,7 +463,16 @@ export function useGalleryState(open: boolean): UseGalleryStateReturn {
     motionVideoOptions,
     conceptImageOptions,
     loadedCharacters,
-    verseCharacterMap,
+    personaMap,
     charactersById,
-  };
+  }), [
+    generations, sortedGenerations, loading, typeFilter, sortBy,
+    selectedGeneration, modalOpen, deleteTarget, isDeleting, uploadDialogOpen,
+    handleGenerationClick, handleDeleteRequest, handleDeleteConfirm,
+    handleUploadComplete, addOptimisticGeneration, refetch,
+    handleUpscaleStart, handleMusicChange, handleMotionChange,
+    handleConceptImageChange, getCharacterName, getTrackName,
+    motionVideoOptions, conceptImageOptions, loadedCharacters,
+    personaMap, charactersById,
+  ]);
 }

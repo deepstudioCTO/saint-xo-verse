@@ -1,4 +1,4 @@
-// Shared types for characters, verses, and verse characters
+// Shared types for characters, lookbooks, looks, and personas
 
 export interface Character {
   id: string;
@@ -9,7 +9,7 @@ export interface Character {
   displayOrder?: number;
 }
 
-export interface Verse {
+export interface Lookbook {
   id: string;
   name: string;
   displayName: string;
@@ -17,9 +17,15 @@ export interface Verse {
   displayOrder?: number;
 }
 
-export interface VerseCharacter {
+export interface Look {
+  id: string;
+  lookbookId: string;
+  displayOrder?: number;
+}
+
+export interface Persona {
   id?: string;
-  verseId: string;
+  lookId: string;
   characterId: string;
   name: string;
   description: string;
@@ -58,7 +64,8 @@ export interface Generation {
   musicId: string | null;
   motionVideoId: string | null;
   conceptImageId: string | null;
-  verseId: string | null;
+  lookbookId: string | null;
+  lookId: string | null;
   videoUrl: string | null;
   outputUrl: string | null;
   status: string;
@@ -71,3 +78,7 @@ export interface Generation {
   upscaleModel: string | null;
   upscaledVideoUrl: string | null;
 }
+
+// Backward compatibility aliases
+export type Verse = Lookbook;
+export type VerseCharacter = Persona & { verseId?: string };

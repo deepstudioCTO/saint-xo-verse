@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { VerseCharacter } from "~/lib/data";
+import type { Persona } from "~/lib/data";
 
 interface CharacterImage {
   id: string;
@@ -13,9 +13,8 @@ interface CharacterImage {
 interface InputImagePanelProps {
   open: boolean;
   onToggle: (open: boolean) => void;
-  character: VerseCharacter;
+  character: Persona;
   images: CharacterImage[];
-  verseId: string;
   onSaveDefaultInput: (url: string | null) => void;
   onDeleteImage: (imageId: string) => void;
   onUploadImage: (file: File) => void;

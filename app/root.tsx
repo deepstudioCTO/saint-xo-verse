@@ -7,6 +7,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { Toaster } from "sonner";
 
 import type { Route } from "./+types/root";
 import { registerGlobalSpacebar } from "~/hooks/useAudioPlayer";
@@ -36,6 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster position="bottom-center" theme="dark" richColors />
         <ScrollRestoration />
         <Scripts />
       </body>

@@ -62,7 +62,7 @@ export function GalleryModals({ galleryState }: GalleryModalsProps) {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           generation={selectedGeneration}
-          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.verseId)}
+          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.lookId)}
           trackName={getTrackName(selectedGeneration?.musicId || null)}
           motionName={selectedGeneration?.motionName || "Unknown"}
           errorMessage={selectedGeneration?.errorMessage || null}
@@ -80,7 +80,7 @@ export function GalleryModals({ galleryState }: GalleryModalsProps) {
           open={modalOpen}
           onClose={() => setModalOpen(false)}
           generation={selectedGeneration}
-          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.verseId)}
+          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.lookId)}
           conceptImageName={selectedGeneration?.conceptImageName || null}
           errorMessage={selectedGeneration?.errorMessage || null}
           onDelete={handleDeleteRequest}

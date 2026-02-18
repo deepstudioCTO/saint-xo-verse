@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import { downloadBlob } from "~/lib/audio-merge";
 import { TRACKS } from "~/lib/data";
 
@@ -153,7 +154,7 @@ export function ImageDetailModal({
       }
     } else {
       await navigator.clipboard.writeText(generation.outputUrl);
-      alert("Link copied!");
+      toast.success("Link copied!");
     }
   };
 

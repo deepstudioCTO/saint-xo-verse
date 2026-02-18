@@ -18,7 +18,8 @@ interface Generation {
   musicId: string | null;
   motionVideoId: string | null;
   conceptImageId: string | null;
-  verseId: string | null;
+  lookbookId: string | null;
+  lookId: string | null;
   videoUrl: string | null;
   outputUrl: string | null;
   status: string;
@@ -37,7 +38,7 @@ interface ResultUploadDialogProps {
   onOpenChange: (open: boolean) => void;
   onUploadComplete: (generation: Generation) => void;
   characters?: Character[];
-  verseId?: string;
+  lookbookId?: string;
 }
 
 export function ResultUploadDialog({
@@ -45,7 +46,7 @@ export function ResultUploadDialog({
   onOpenChange,
   onUploadComplete,
   characters: propCharacters,
-  verseId,
+  lookbookId,
 }: ResultUploadDialogProps) {
   // Use prop characters if provided, otherwise fallback to defaults
   const characterList = propCharacters || CHARACTERS;
@@ -165,8 +166,8 @@ export function ResultUploadDialog({
       const formData = new FormData();
       formData.append("mediaType", mediaType);
       formData.append("memberId", selectedCharacter);
-      if (verseId) {
-        formData.append("verseId", verseId);
+      if (lookbookId) {
+        formData.append("lookbookId", lookbookId);
       }
 
       if (mediaType === "video") {

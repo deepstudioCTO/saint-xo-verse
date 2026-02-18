@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { verses } from "../drizzle/schema";
-import { VERSES } from "../app/lib/data";
+import { lookbooks } from "../drizzle/schema";
+import { LOOKBOOKS } from "../app/lib/data";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -11,31 +11,31 @@ if (!databaseUrl) {
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client);
 
-async function seedVerses() {
-  console.log("Seeding verses...");
+async function seedLookbooks() {
+  console.log("Seeding lookbooks...");
 
-  for (const verse of VERSES) {
+  for (const lookbook of LOOKBOOKS) {
     try {
       await db
-        .insert(verses)
+        .insert(lookbooks)
         .values({
-          id: verse.id,
-          name: verse.name,
-          displayName: verse.displayName,
-          displayOrder: verse.displayOrder ?? 0,
+          id: lookbook.id,
+          name: lookbook.name,
+          displayName: lookbook.displayName,
+          displayOrder: lookbook.displayOrder ?? 0,
         })
         .onConflictDoUpdate({
-          target: verses.id,
+          target: lookbooks.id,
           set: {
-            name: verse.name,
-            displayName: verse.displayName,
-            displayOrder: verse.displayOrder ?? 0,
+            name: lookbook.name,
+            displayName: lookbook.displayName,
+            displayOrder: lookbook.displayOrder ?? 0,
           },
         });
 
-      console.log(`✓ Seeded verse: ${verse.id} (${verse.displayName})`);
+      console.log(`✓ Seeded lookbook: ${lookbook.id} (${lookbook.displayName})`);
     } catch (error) {
-      console.error(`✗ Failed to seed verse ${verse.id}:`, error);
+      console.error(`✗ Failed to seed lookbook ${lookbook.id}:`, error);
     }
   }
 
@@ -43,4 +43,4 @@ async function seedVerses() {
   await client.end();
 }
 
-seedVerses().catch(console.error);
+seedLookbooks().catch(console.error);

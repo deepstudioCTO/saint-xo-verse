@@ -24,7 +24,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     const memberId = formData.get("memberId") as string | null;
     const musicId = formData.get("musicId") as string | null;
     const motionVideoId = formData.get("motionVideoId") as string | null;
-    const verseId = formData.get("verseId") as string | null;
+    const lookbookId = formData.get("lookbookId") as string | null;
+    const lookId = formData.get("lookId") as string | null;
 
     const imageFile = formData.get("image") as File | null;
     const videoFile = formData.get("video") as File | null;
@@ -114,7 +115,8 @@ export async function action({ request, context }: Route.ActionArgs) {
         memberId,
         musicId,
         motionVideoId,
-        verseId,
+        lookbookId,
+        lookId,
         imageUrl,
         motionVideoUrl: videoUrl,
         status: "pending",

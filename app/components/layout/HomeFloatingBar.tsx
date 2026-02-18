@@ -10,12 +10,12 @@ function formatTime(s: number) {
   return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
 }
 
-export type ActivePanel = null | "music" | "skill" | "gallery-compact" | "gallery-expanded";
+export type ActivePanel = null | "music" | "skill-compact" | "skill-expanded" | "gallery-compact" | "gallery-expanded";
 
 interface HomeFloatingBarProps {
   characterId: string | null;
   characterImageUrl: string;
-  verseId: string;
+  lookbookId: string;
   activePanel: ActivePanel;
   onPanelChange: (panel: ActivePanel) => void;
   selectedVideo: {
@@ -58,7 +58,7 @@ export function HomeFloatingBar({
   } = useAudioPlayer({ autoPlay: true });
 
   // Derived booleans from activePanel
-  const skillPanelOpen = activePanel === "skill";
+  const skillPanelOpen = activePanel === "skill-compact" || activePanel === "skill-expanded";
   const musicPanelOpen = activePanel === "music";
   const galleryOpen = activePanel === "gallery-compact";
   const anyPanelOpen = activePanel !== null;
@@ -219,11 +219,11 @@ export function HomeFloatingBar({
               alt=""
               className="w-5 h-5 rounded-sm object-cover"
             />
-            MUSIC
+            DEMO
           </span>
         </GlassButton>
         <GlassButton
-          onClick={() => onPanelChange(skillPanelOpen ? null : "skill")}
+          onClick={() => onPanelChange(skillPanelOpen ? null : "skill-compact")}
           disabled={!characterId}
           active={skillPanelOpen}
           className="text-left w-full"
@@ -244,7 +244,7 @@ export function HomeFloatingBar({
           active={galleryOpen}
           className="text-left w-full"
         >
-          GALLERY
+          LIBRARY
         </GlassButton>
         </div>
         </div>

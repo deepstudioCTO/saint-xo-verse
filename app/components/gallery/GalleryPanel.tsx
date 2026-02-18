@@ -86,10 +86,10 @@ interface GalleryExpandedPanelProps {
   onClose: () => void;
   onCollapse: () => void;
   galleryState: UseGalleryStateReturn;
-  verseId: string;
+  lookbookId: string;
 }
 
-export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, verseId }: GalleryExpandedPanelProps) {
+export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, lookbookId }: GalleryExpandedPanelProps) {
   const {
     sortedGenerations,
     loading,
@@ -201,7 +201,7 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, 
             onOpenChange={setUploadDialogOpen}
             onUploadComplete={handleUploadComplete}
             characters={loadedCharacters.length > 0 ? loadedCharacters : undefined}
-            verseId={verseId}
+            lookbookId={lookbookId}
           />
         </motion.div>
         </>

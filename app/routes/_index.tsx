@@ -1,34 +1,41 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useSearchParams, useLoaderData, useRevalidator, useFetcher, Link } from "react-router";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { useSearchParams, useLoaderData, useRevalidator, Link, isRouteErrorResponse } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
-import { useGesture } from "@use-gesture/react";
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragStartEvent, type DragEndEvent, type DragMoveEvent, type Modifier } from "@dnd-kit/core";
+import { DndContext, DragOverlay, type Modifier } from "@dnd-kit/core";
 import type { Route } from "./+types/_index";
-import { LargeTitle } from "~/components/ui";
-import { navButtonClass } from "~/components/layout/Header";
 import {
-  VERSES as DEFAULT_VERSES,
-  VERSE_CHARACTERS as DEFAULT_VERSE_CHARACTERS,
-  SYNCED_VERSES,
-  SYNCED_VERSE_CHARACTERS,
+  LOOKBOOKS as DEFAULT_LOOKBOOKS,
+  LOOKS as DEFAULT_LOOKS,
+  PERSONAS as DEFAULT_PERSONAS,
+  SYNCED_LOOKBOOKS,
+  SYNCED_LOOKS,
+  SYNCED_PERSONAS,
   SYNCED_SKILL_VIDEOS,
   SYNCED_SKILL_IMAGES,
   SYNCED_CHARACTER_IMAGES,
   SYNCED_GENERATIONS,
-  type Verse,
-  type VerseCharacter,
+  type Lookbook,
+  type Look,
+  type Persona,
 } from "~/lib/data";
-import { getDb, characterImages, verses, verseCharacters, motionVideos, conceptImages, generations } from "~/lib/db.server";
+import { getDb, characterImages, lookbooks, looks, personas, motionVideos, conceptImages, generations } from "~/lib/db.server";
 import { getPublicUrl } from "~/lib/supabase.server";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { VideoCanvas } from "~/components/effects/VideoCanvas";
-import { SkillPanel, type SkillDragItem } from "~/components/skill/SkillPanel";
+import { SkillCompactPanel, SkillExpandedPanel } from "~/components/skill/SkillPanel";
 import { HomeFloatingBar, type ActivePanel } from "~/components/layout/HomeFloatingBar";
 import { GalleryCompactPanel, GalleryExpandedPanel, GalleryModals } from "~/components/gallery";
 import { useGalleryState } from "~/hooks/useGalleryState";
 import { InputImagePanel } from "~/components/common/InputImagePanel";
-import { useInlineEdit } from "~/hooks/useInlineEdit";
 import { SkillConfirmDialog } from "~/components/common/SkillConfirmDialog";
+import { CharacterInfoPanel } from "~/components/common/CharacterInfoPanel";
+import { LookbookInfoPanel } from "~/components/common/LookbookInfoPanel";
+import { useLookbookNavigation } from "~/hooks/useLookbookNavigation";
+import { useLookNavigation } from "~/hooks/useLookNavigation";
+import { usePersonaNavigation } from "~/hooks/usePersonaNavigation";
+import { useSkillTeaching } from "~/hooks/useSkillTeaching";
+import { useCharacterImages } from "~/hooks/useCharacterImages";
+import { usePreloadPosters } from "~/hooks/usePreloadPosters";
 
 const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform }) => {
   if (!activatorEvent || !activeNodeRect) return transform;
@@ -40,102 +47,11 @@ const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform })
   };
 };
 
-function PencilIcon({ size = 16 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-      <path d="m15 5 4 4" />
-    </svg>
-  );
-}
-
-const VERSE_CREDITS: Record<string, { role: string; name: string }[]> = {
-  "00": [
-    { role: "PRODUCTION", name: "YSLX" },
-    { role: "PHOTOGRAPHER", name: "YSLX" },
-    { role: "HAIR", name: "YSLX" },
-    { role: "STYLIST", name: "YSLX" },
-    { role: "MAKEUP", name: "YSLX" },
-  ],
-  "01": [
-    { role: "PRODUCTION", name: "YIRANG MOON" },
-    { role: "PHOTOGRAPHER", name: "YIRANG MOON" },
-    { role: "HAIR", name: "YIRANG MOON" },
-    { role: "STYLIST", name: "YIRANG MOON" },
-    { role: "MAKEUP", name: "YIRANG MOON" },
-  ],
-};
-
-function VerseCredits({ verseId }: { verseId: string }) {
-  const [open, setOpen] = useState(false);
-  const credits = VERSE_CREDITS[verseId] ?? [];
-  const lastIdx = credits.length - 1;
-
-  const roleVariants = {
-    hidden: { opacity: 0 },
-    visible: (i: number) => ({
-      opacity: 1,
-      transition: { duration: 0, delay: i * 0.12 },
-    }),
-    exit: (i: number) => ({
-      opacity: 0,
-      transition: { duration: 0, delay: 0.3 + (lastIdx - i) * 0.08 },
-    }),
-  };
-
-  const nameVariants = {
-    hidden: { opacity: 0 },
-    visible: (i: number) => ({
-      opacity: 1,
-      transition: { duration: 0, delay: 0.36 + i * 0.12 },
-    }),
-    exit: (i: number) => ({
-      opacity: 0,
-      transition: { duration: 0, delay: (lastIdx - i) * 0.08 },
-    }),
-  };
-
-  return (
-    <>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center text-[10px] tracking-wider text-black mt-2 cursor-pointer hover:opacity-60 transition-opacity"
-      >
-        <span className="font-medium">CREDITS</span>
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="credits-list"
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="mt-2"
-          >
-            {credits.map((credit, i) => (
-              <div key={credit.role} className="flex items-center text-[10px] tracking-wider text-black mt-2.5">
-                <motion.span custom={i} variants={roleVariants} className="font-medium w-40">
-                  {credit.role}
-                </motion.span>
-                <motion.span custom={i} variants={nameVariants} className="font-black">
-                  {credit.name}
-                </motion.span>
-              </div>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
-  );
-}
-
 export const meta: Route.MetaFunction = () => [
   { title: "HitOS" },
   { name: "description", content: "Fan-made short-form video creation platform" },
 ];
 
-// Character image type from DB
 interface CharacterImage {
   id: string;
   characterId: string;
@@ -146,54 +62,60 @@ interface CharacterImage {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
-  const verseParam = url.searchParams.get("verse") || "00";
+
+  // Backward compat: redirect ?verse= to ?lookbook=
+  const verseParam = url.searchParams.get("verse");
+  if (verseParam) {
+    url.searchParams.set("lookbook", verseParam);
+    url.searchParams.delete("verse");
+    return Response.redirect(url.toString(), 302);
+  }
+
+  const lookbookParam = url.searchParams.get("lookbook") || "00";
+  const lookParam = url.searchParams.get("look"); // nullable — will default to first look
 
   try {
     const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-    // Load all verses
-    const dbVerses = await db
-      .select()
-      .from(verses)
-      .orderBy(asc(verses.displayOrder));
+    const [dbLookbooks, dbLooks, dbPersonas, images] = await Promise.all([
+      db.select().from(lookbooks).orderBy(asc(lookbooks.displayOrder)),
+      db.select().from(looks).orderBy(asc(looks.displayOrder)),
+      db.select().from(personas).orderBy(asc(personas.displayOrder)),
+      db.select().from(characterImages).orderBy(asc(characterImages.characterId), asc(characterImages.createdAt)),
+    ]);
 
-    const verseList: Verse[] = dbVerses.length > 0
-      ? dbVerses.map((v) => ({
+    const lookbookList: Lookbook[] = dbLookbooks.length > 0
+      ? dbLookbooks.map((v) => ({
           id: v.id,
           name: v.name,
           displayName: v.displayName,
           description: v.description,
           displayOrder: v.displayOrder,
         }))
-      : DEFAULT_VERSES;
+      : DEFAULT_LOOKBOOKS;
 
-    // Load ALL verse characters (for preloading other verse videos)
-    const dbAllVerseCharacters = await db
-      .select()
-      .from(verseCharacters)
-      .orderBy(asc(verseCharacters.displayOrder));
-
-    const allCharacters: VerseCharacter[] = dbAllVerseCharacters.length > 0
-      ? dbAllVerseCharacters.map((vc) => ({
-          id: vc.id,
-          verseId: vc.verseId,
-          characterId: vc.characterId,
-          name: vc.name,
-          description: vc.description,
-          video: vc.video,
-          poster: vc.poster,
-          defaultInput: vc.defaultInput,
-          displayOrder: vc.displayOrder,
+    const lookList: Look[] = dbLooks.length > 0
+      ? dbLooks.map((l) => ({
+          id: l.id,
+          lookbookId: l.lookbookId,
+          displayOrder: l.displayOrder,
         }))
-      : DEFAULT_VERSE_CHARACTERS;
+      : DEFAULT_LOOKS;
 
-    // Load all character images from DB (sorted by createdAt so new images appear at end)
-    const images = await db
-      .select()
-      .from(characterImages)
-      .orderBy(asc(characterImages.characterId), asc(characterImages.createdAt));
+    const allPersonas: Persona[] = dbPersonas.length > 0
+      ? dbPersonas.map((p) => ({
+          id: p.id,
+          lookId: p.lookId,
+          characterId: p.characterId,
+          name: p.name,
+          description: p.description,
+          video: p.video,
+          poster: p.poster,
+          defaultInput: p.defaultInput,
+          displayOrder: p.displayOrder,
+        }))
+      : DEFAULT_PERSONAS;
 
-    // Group by characterId
     const imagesByCharacter: Record<string, CharacterImage[]> = {};
     for (const img of images) {
       if (!imagesByCharacter[img.characterId]) {
@@ -202,7 +124,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       imagesByCharacter[img.characterId].push(img);
     }
 
-    // Load motion videos, concept images, and story count
     const cf = context.cloudflare as { env: Record<string, string> };
     const [dbVideos, dbConceptImages, storiesResult] = await Promise.all([
       db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
@@ -227,10 +148,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const skillsCount = dbVideos.length;
     const storiesCount = Number(storiesResult[0]?.count || 0);
 
+    // Resolve current look
+    const currentLookbookLooks = lookList.filter((l) => l.lookbookId === lookbookParam);
+    const currentLookId = lookParam && currentLookbookLooks.some((l) => l.id === lookParam)
+      ? lookParam
+      : currentLookbookLooks[0]?.id || lookList[0]?.id || "00_01";
+
     return {
-      verses: verseList,
-      currentVerseId: verseParam,
-      allCharacters,
+      lookbooks: lookbookList,
+      looks: lookList,
+      currentLookbookId: lookbookParam,
+      currentLookId,
+      allPersonas,
       imagesByCharacter,
       skillsCount,
       storiesCount,
@@ -238,15 +167,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       skillImages,
     };
   } catch {
-    // Offline fallback: use synced data, then manual defaults
-    const fallbackVerses = SYNCED_VERSES.length > 0 ? SYNCED_VERSES : DEFAULT_VERSES;
-    const fallbackChars = SYNCED_VERSE_CHARACTERS.length > 0
-      ? SYNCED_VERSE_CHARACTERS : DEFAULT_VERSE_CHARACTERS;
+    const fallbackLookbooks = SYNCED_LOOKBOOKS.length > 0 ? SYNCED_LOOKBOOKS : DEFAULT_LOOKBOOKS;
+    const fallbackLooks = SYNCED_LOOKS.length > 0 ? SYNCED_LOOKS : DEFAULT_LOOKS;
+    const fallbackPersonas = SYNCED_PERSONAS.length > 0 ? SYNCED_PERSONAS : DEFAULT_PERSONAS;
+
+    const currentLookbookLooks = fallbackLooks.filter((l) => l.lookbookId === lookbookParam);
+    const currentLookId = lookParam && currentLookbookLooks.some((l) => l.id === lookParam)
+      ? lookParam
+      : currentLookbookLooks[0]?.id || fallbackLooks[0]?.id || "00_01";
 
     return {
-      verses: fallbackVerses,
-      currentVerseId: verseParam,
-      allCharacters: fallbackChars,
+      lookbooks: fallbackLookbooks,
+      looks: fallbackLooks,
+      currentLookbookId: lookbookParam,
+      currentLookId,
+      allPersonas: fallbackPersonas,
       imagesByCharacter: SYNCED_CHARACTER_IMAGES,
       skillsCount: SYNCED_SKILL_VIDEOS.length,
       storiesCount: SYNCED_GENERATIONS.filter((g) => g.status === "completed").length,
@@ -258,9 +193,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 export default function Home() {
   const {
-    verses: verseList,
-    currentVerseId,
-    allCharacters,
+    lookbooks: lookbookList,
+    looks: allLooks,
+    currentLookbookId,
+    currentLookId: loaderLookId,
+    allPersonas,
     imagesByCharacter,
     skillsCount,
     storiesCount,
@@ -269,125 +206,49 @@ export default function Home() {
   } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const revalidator = useRevalidator();
-  const savingRef = useRef(false);
 
-  // Slide direction for verse transitions: 1=down, -1=up
-  const [slideDirection, setSlideDirection] = useState(0);
+  // Current lookbook ID from URL (with fallback)
+  const activeLookbookId = searchParams.get("lookbook") || currentLookbookId;
+  const activeLookId = searchParams.get("look") || loaderLookId;
 
-  // Current verse characters (with optimistic update support)
-  const dbCharacters = useMemo(
-    () => allCharacters.filter((c) => c.verseId === currentVerseId),
-    [allCharacters, currentVerseId]
+  // Looks for current lookbook
+  const currentLookbookLooks = useMemo(
+    () => allLooks.filter((l) => l.lookbookId === activeLookbookId),
+    [allLooks, activeLookbookId]
   );
-  const [characterList, setCharacterList] = useState<VerseCharacter[]>(dbCharacters);
+  const currentLookIndex = currentLookbookLooks.findIndex((l) => l.id === activeLookId);
 
-  useEffect(() => {
-    setCharacterList(dbCharacters);
-  }, [currentVerseId, allCharacters]);
+  // Current lookbook personas (filtered to current look, with optimistic update support)
+  const dbPersonas = useMemo(
+    () => allPersonas.filter((p) => p.lookId === activeLookId),
+    [allPersonas, activeLookId]
+  );
+  const [personaList, setPersonaList] = useState<Persona[]>(dbPersonas);
+  useEffect(() => { setPersonaList(dbPersonas); }, [dbPersonas]);
 
+  // Personas grouped by look (for cross-look persona navigation)
+  const personasByLook = useMemo(() => {
+    const map: Record<string, Persona[]> = {};
+    for (const p of allPersonas) {
+      if (!currentLookbookLooks.some((l) => l.id === p.lookId)) continue;
+      if (!map[p.lookId]) map[p.lookId] = [];
+      map[p.lookId].push(p);
+    }
+    return map;
+  }, [allPersonas, currentLookbookLooks]);
+
+  // Lookbook list state (for optimistic updates)
+  const [lookbookListState, setLookbookListState] = useState<Lookbook[]>(lookbookList);
+  useEffect(() => { setLookbookListState(lookbookList); }, [lookbookList]);
+
+  const currentLookbook = lookbookListState.find((v) => v.id === activeLookbookId) || lookbookListState[0];
+  const currentLookbookIndex = lookbookListState.findIndex((v) => v.id === activeLookbookId);
+
+  // Derived persona selection
   const selectedId = searchParams.get("selected");
-  const selectedIndex = characterList.findIndex((c) => c.characterId === selectedId);
+  const selectedIndex = personaList.findIndex((c) => c.characterId === selectedId);
   const isSelecting = selectedIndex >= 0;
-  const currentCharacter = isSelecting ? characterList[selectedIndex] : null;
-
-  // Verse list state (for optimistic updates)
-  const [verseListState, setVerseListState] = useState<Verse[]>(verseList);
-  useEffect(() => {
-    setVerseListState(verseList);
-  }, [verseList]);
-
-  // Current verse (use stateful list for optimistic updates)
-  const currentVerse = verseListState.find((v) => v.id === currentVerseId) || verseListState[0];
-  const currentVerseIndex = verseListState.findIndex((v) => v.id === currentVerseId);
-
-  const [uploading, setUploading] = useState(false);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [inputPanelOpen, setInputPanelOpen] = useState(false);
-
-  // Inline editing — character name
-  const charNameEdit = useInlineEdit<HTMLInputElement>({
-    onSave: async (trimmed) => {
-      if (!currentCharacter) return;
-      const response = await fetch("/api/update-verse-character", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verseId: currentVerseId, characterId: currentCharacter.characterId, name: trimmed }),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
-      setCharacterList((prev) =>
-        prev.map((c) =>
-          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
-            ? { ...c, name: trimmed } : c
-        )
-      );
-    },
-  });
-
-  // Inline editing — character description
-  const charDescEdit = useInlineEdit<HTMLTextAreaElement>({
-    multiline: true,
-    rejectEmpty: false,
-    onSave: async (trimmed) => {
-      if (!currentCharacter) return;
-      const response = await fetch("/api/update-verse-character", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verseId: currentVerseId, characterId: currentCharacter.characterId, description: trimmed }),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
-      setCharacterList((prev) =>
-        prev.map((c) =>
-          c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
-            ? { ...c, description: trimmed } : c
-        )
-      );
-    },
-  });
-
-  // Inline editing — verse name
-  const verseNameEdit = useInlineEdit<HTMLInputElement>({
-    onSave: async (trimmed) => {
-      if (!currentVerse) return;
-      const response = await fetch("/api/update-verse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verseId: currentVerse.id, name: trimmed }),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
-      setVerseListState((prev) =>
-        prev.map((v) =>
-          v.id === currentVerse.id
-            ? { ...v, name: trimmed.toLowerCase(), displayName: trimmed } : v
-        )
-      );
-    },
-  });
-
-  // Inline editing — verse description
-  const verseDescEdit = useInlineEdit<HTMLTextAreaElement>({
-    multiline: true,
-    rejectEmpty: false,
-    onSave: async (trimmed) => {
-      if (!currentVerse) return;
-      const response = await fetch("/api/update-verse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ verseId: currentVerse.id, description: trimmed || null }),
-      });
-      if (!response.ok) throw new Error((await response.json()).error || "Update failed");
-      setVerseListState((prev) =>
-        prev.map((v) =>
-          v.id === currentVerse.id ? { ...v, description: trimmed || null } : v
-        )
-      );
-    },
-  });
-
-  // Hover state for character dimming
-  const [hoveredCharacterId, setHoveredCharacterId] = useState<string | null>(null);
-
-  // Get images for current character
-  const currentImages = currentCharacter ? imagesByCharacter[currentCharacter.characterId] || [] : [];
+  const currentCharacter = isSelecting ? personaList[selectedIndex] : null;
 
   // Selected image URL (shared by SkillPanel and HomeFloatingBar)
   const selectedImgUrl = useMemo(() => {
@@ -395,372 +256,139 @@ export default function Home() {
     return currentCharacter.defaultInput ?? currentCharacter.poster;
   }, [currentCharacter]);
 
-  // Unified panel state — only one panel open at a time
+  // Images for current character
+  const currentImages = currentCharacter ? imagesByCharacter[currentCharacter.characterId] || [] : [];
+
+  // Panel state (shared across skill/gallery/music)
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-  const skillPanelOpen = activePanel === "skill";
-  const galleryCompactOpen = activePanel === "gallery-compact";
-  const galleryExpandedOpen = activePanel === "gallery-expanded";
-  const galleryState = useGalleryState(galleryCompactOpen || galleryExpandedOpen);
-  const [skillTab, setSkillTab] = useState<"video" | "image">("video");
-  const [selectedSkillVideoId, setSelectedSkillVideoId] = useState<string | null>(null);
-  const [selectedSkillImageId, setSelectedSkillImageId] = useState<string | null>(null);
+  const galleryOpen = activePanel === "gallery-compact" || activePanel === "gallery-expanded";
+  const galleryState = useGalleryState(galleryOpen);
 
-  // Resolved selected objects for HomeFloatingBar
-  const selectedSkillVideo = useMemo(
-    () => (selectedSkillVideoId ? skillVideos.find((v) => v.id === selectedSkillVideoId) ?? null : null),
-    [selectedSkillVideoId, skillVideos]
-  );
-  const selectedSkillImage = useMemo(
-    () => (selectedSkillImageId ? skillImages.find((img) => img.id === selectedSkillImageId) ?? null : null),
-    [selectedSkillImageId, skillImages]
-  );
+  // Unified transition state (replaces separate slideDirection / lookSlideDirection)
+  const [transition, setTransition] = useState<{ type: "lookbook" | "look"; direction: number }>({
+    type: "look", direction: 0,
+  });
 
-  // === DnD: Drag-to-Persona Skill Teaching Flow ===
-  const [activeDragItem, setActiveDragItem] = useState<SkillDragItem | null>(null);
-  const [confirmDialog, setConfirmDialog] = useState<SkillDragItem | null>(null);
-  const [flyingCard, setFlyingCard] = useState<{
-    thumbnailUrl: string;
-    startX: number;
-    startY: number;
-    endX: number;
-    endY: number;
-  } | null>(null);
-  const [flyingCardTargetId, setFlyingCardTargetId] = useState<string | null>(null);
-  const personaRef = useRef<HTMLDivElement | null>(null);
-  const galleryGridRef = useRef<HTMLDivElement | null>(null);
-  const isDragging = activeDragItem !== null;
+  // Lookbook navigation (↑↓)
+  useLookbookNavigation({
+    lookbookList: lookbookListState,
+    currentLookbookIndex,
+    setSearchParams,
+    onTransition: useCallback((direction: number) => setTransition({ type: "lookbook", direction }), []),
+  });
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
-  );
+  // Look navigation (←→ when not selecting)
+  useLookNavigation({
+    lookList: currentLookbookLooks,
+    currentLookIndex,
+    currentLookbookId: activeLookbookId,
+    isSelecting,
+    setSearchParams,
+    onTransition: useCallback((direction: number) => setTransition({ type: "look", direction }), []),
+  });
 
-  const [isOverPersona, setIsOverPersona] = useState(false);
-  const dragStartPos = useRef<{ x: number; y: number } | null>(null);
+  // Skill teaching (DnD, confirm, flying card)
+  const skill = useSkillTeaching({
+    currentCharacter,
+    currentLookbookId: activeLookbookId,
+    currentLookId: activeLookId,
+    selectedImgUrl,
+    skillVideos,
+    skillImages,
+    galleryState,
+    activePanel,
+    setActivePanel,
+    selectedId,
+  });
 
-  const fetcher = useFetcher();
-  const isGenerating = fetcher.state !== "idle";
+  // Persona navigation (←→ when selecting, with cross-look boundary)
+  const charNav = usePersonaNavigation({
+    personaList,
+    selectedId,
+    currentLookbookId: activeLookbookId,
+    currentLookId: activeLookId,
+    isSelecting,
+    isDragging: skill.isDragging,
+    lookList: currentLookbookLooks,
+    personasByLook,
+    setSearchParams,
+    onLookTransition: useCallback((direction: number) => setTransition({ type: "look", direction }), []),
+  });
 
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveDragItem(event.active.data.current as SkillDragItem);
-    const ev = event.activatorEvent as PointerEvent;
-    dragStartPos.current = { x: ev.clientX, y: ev.clientY };
-  }, []);
+  // Character images (upload, delete, defaultInput)
+  const charImages = useCharacterImages({
+    currentCharacter,
+    currentLookId: activeLookId,
+    currentImages,
+    setCharacterList: setPersonaList,
+    revalidate: revalidator.revalidate,
+  });
 
-  const handleDragMove = useCallback((event: DragMoveEvent) => {
-    if (!dragStartPos.current || !personaRef.current) return;
-    const px = dragStartPos.current.x + event.delta.x;
-    const py = dragStartPos.current.y + event.delta.y;
-    const rect = personaRef.current.getBoundingClientRect();
-    const over = px >= rect.left && px <= rect.right && py >= rect.top && py <= rect.bottom;
-    setIsOverPersona(over);
-  }, []);
+  // Preload all persona posters for instant look/lookbook transitions
+  usePreloadPosters(allPersonas);
 
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
-    if (dragStartPos.current && personaRef.current) {
-      const px = dragStartPos.current.x + event.delta.x;
-      const py = dragStartPos.current.y + event.delta.y;
-      const rect = personaRef.current.getBoundingClientRect();
-      if (px >= rect.left && px <= rect.right && py >= rect.top && py <= rect.bottom) {
-        setConfirmDialog(event.active.data.current as SkillDragItem);
-      }
-    }
-    setActiveDragItem(null);
-    setIsOverPersona(false);
-    dragStartPos.current = null;
-  }, []);
-
-  const handleProduce = useCallback((prompt?: string) => {
-    if (!confirmDialog || !currentCharacter) return;
-
-    // FLIP: measure start position from persona
-    const personaRect = personaRef.current?.getBoundingClientRect();
-    const startX = personaRect ? personaRect.left + personaRect.width / 2 - 30 : window.innerWidth / 2;
-    const startY = personaRect ? personaRect.top + personaRect.height * 0.3 : window.innerHeight / 2;
-    const thumbnailUrl = confirmDialog.thumbnailUrl;
-
-    // Build FormData and submit
-    const formData = new FormData();
-
-    if (confirmDialog.type === "video") {
-      formData.append("imageUrl", selectedImgUrl);
-      formData.append("videoUrl", confirmDialog.videoUrl || "");
-      formData.append("memberId", currentCharacter.characterId);
-      formData.append("motionVideoId", confirmDialog.id);
-      formData.append("verseId", currentVerseId);
-      if (prompt) formData.append("prompt", prompt);
-      fetcher.submit(formData, { method: "post", action: "/api/generate" });
-    } else {
-      formData.append("characterImageUrl", selectedImgUrl);
-      formData.append("conceptImageUrl", confirmDialog.publicUrl || "");
-      formData.append("conceptImageId", confirmDialog.id);
-      formData.append("prompt", prompt || "");
-      formData.append("memberId", currentCharacter.characterId);
-      formData.append("verseId", currentVerseId);
-      fetcher.submit(formData, { method: "post", action: "/api/generate-image" });
-    }
-
-    // Optimistic update: immediately add pending generation to gallery
-    const optimisticId = `optimistic-${Date.now()}`;
-    setFlyingCardTargetId(optimisticId);
-    galleryState.addOptimisticGeneration({
-      id: optimisticId,
-      type: confirmDialog.type,
-      memberId: currentCharacter.characterId,
-      musicId: null,
-      motionVideoId: confirmDialog.type === "video" ? confirmDialog.id : null,
-      conceptImageId: confirmDialog.type === "image" ? confirmDialog.id : null,
-      verseId: currentVerseId,
-      videoUrl: null,
-      outputUrl: null,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      motionName: confirmDialog.type === "video" ? confirmDialog.name : null,
-      conceptImageName: confirmDialog.type === "image" ? confirmDialog.name : null,
-      errorMessage: null,
-      prompt: prompt || null,
-      upscaleStatus: null,
-      upscaleModel: null,
-      upscaledVideoUrl: null,
-    });
-
-    // Open gallery + close dialog
-    setActivePanel("gallery-compact");
-    setConfirmDialog(null);
-
-    // FLIP: poll for gallery grid mount, measure first cell, then start flying card
-    const pollForGrid = () => {
-      const gridEl = galleryGridRef.current;
-      if (gridEl) {
-        const rect = gridEl.getBoundingClientRect();
-        const cellW = (rect.width - 16) / 3; // grid-cols-3, 2 gaps of gap-2(8px)
-        const endX = rect.left + cellW / 2 - 30; // center 60px card in cell
-        const endY = rect.top + cellW - 40; // center 80px card (aspect-[3/4]) in cell (aspect-[1/2])
-        setFlyingCard({ thumbnailUrl, startX, startY, endX, endY });
-      } else {
-        requestAnimationFrame(pollForGrid);
-      }
-    };
-    requestAnimationFrame(pollForGrid);
-  }, [confirmDialog, currentCharacter, selectedImgUrl, currentVerseId, fetcher, galleryState]);
-
-  // Refetch gallery data when generation API completes (optimistic → real data)
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data) {
-      galleryState.refetch();
-    }
-  }, [fetcher.state, fetcher.data, galleryState]);
-
-  // Close panels and reset skill selections when character changes or deselects
+  // Reset panels on character change
   useEffect(() => {
     setActivePanel(null);
-    setInputPanelOpen(false);
-    setSelectedSkillVideoId(null);
-    setSelectedSkillImageId(null);
-  }, [selectedId]);
+    charImages.setInputPanelOpen(false);
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Verse navigation — just update the URL param, no loader rerun needed
-  const handleVerseChange = useCallback((direction: "up" | "down") => {
-    const newIndex = direction === "up"
-      ? currentVerseIndex - 1
-      : currentVerseIndex + 1;
-    if (newIndex < 0 || newIndex >= verseListState.length) return;
-
-    setSlideDirection(direction === "down" ? 1 : -1);
-    setSearchParams({ verse: verseListState[newIndex].id }, { replace: true });
-  }, [currentVerseIndex, verseListState, setSearchParams]);
-
-  // Navigate to prev/next character
-  const navigateCharacter = useCallback((direction: "prev" | "next") => {
-    const idx = characterList.findIndex((c) => c.characterId === selectedId);
-    if (idx < 0) return;
-    const newIdx = direction === "prev" ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= characterList.length) return;
-    setSearchParams({ selected: characterList[newIdx].characterId, verse: currentVerseId });
-  }, [characterList, selectedId, currentVerseId, setSearchParams]);
-
-  // Keyboard arrow keys for verse + character navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (isSelecting) {
-        if (e.key === "ArrowLeft") {
-          e.preventDefault();
-          navigateCharacter("prev");
-        } else if (e.key === "ArrowRight") {
-          e.preventDefault();
-          navigateCharacter("next");
-        }
-      }
-      if (verseListState.length > 1) {
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          handleVerseChange("up");
-        } else if (e.key === "ArrowDown") {
-          e.preventDefault();
-          handleVerseChange("down");
-        }
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isSelecting, verseListState, handleVerseChange, navigateCharacter]);
-
-  // Close compact panels on Escape
-  useEffect(() => {
-    if (!activePanel || activePanel === "gallery-expanded") return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActivePanel(null);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [activePanel]);
-
-  // Swipe (touch/mouse drag) + trackpad scroll for character navigation
-  const charNavRef = useRef<HTMLDivElement>(null);
-  const gestureActive = useRef(false);
-  useGesture(
-    {
-      onDrag: ({ active, movement: [mx], direction: [dx], cancel }) => {
-        if (!isSelecting || isDragging) return;
-        if (active && Math.abs(mx) > 50) {
-          cancel();
-          navigateCharacter(dx > 0 ? "prev" : "next");
-        }
-      },
-      onWheel: ({ event, direction: [dx], distance: [distX, distY] }) => {
-        if (!isSelecting || distX < distY) return;
-        event.preventDefault();
-        if (gestureActive.current) return;
-        if (distX > 60) {
-          gestureActive.current = true;
-          navigateCharacter(dx > 0 ? "next" : "prev");
-          setTimeout(() => { gestureActive.current = false; }, 400);
-        }
-      },
-    },
-    {
-      target: charNavRef,
-      drag: { axis: "x", filterTaps: true },
-      wheel: { eventOptions: { passive: false } },
-    },
-  );
-
-  // Handle image upload
-  const handleUpload = async (file: File) => {
-    if (!currentCharacter) return;
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("image", file);
-      formData.append("characterId", currentCharacter.characterId);
-
-      const response = await fetch("/api/upload-character-image", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Upload failed");
-      }
-
-      revalidator.revalidate();
-    } catch (error) {
-      console.error("Upload error:", error);
-      alert(error instanceof Error ? error.message : "Upload failed");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  // Save defaultInput (optimistic update + API persist)
-  const handleSaveDefaultInput = useCallback(async (url: string | null) => {
-    if (!currentCharacter || savingRef.current) return;
-    savingRef.current = true;
-
-    setCharacterList((prev) =>
+  // Optimistic persona update callback
+  const handleCharacterUpdate = useCallback((characterId: string, updates: Partial<Persona>) => {
+    setPersonaList((prev) =>
       prev.map((c) =>
-        c.characterId === currentCharacter.characterId && c.verseId === currentVerseId
-          ? { ...c, defaultInput: url }
-          : c
+        c.characterId === characterId && c.lookId === activeLookId
+          ? { ...c, ...updates } : c
       )
     );
+  }, [activeLookId]);
 
-    try {
-      const response = await fetch("/api/update-verse-character", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          verseId: currentVerseId,
-          characterId: currentCharacter.characterId,
-          defaultInput: url,
-        }),
-      });
+  // Optimistic lookbook update callback
+  const handleLookbookUpdate = useCallback((lookbookId: string, updates: Partial<Lookbook>) => {
+    setLookbookListState((prev) =>
+      prev.map((v) => v.id === lookbookId ? { ...v, ...updates } : v)
+    );
+  }, []);
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Update failed");
-      }
-    } catch (error) {
-      console.error("DefaultInput update error:", error);
-      revalidator.revalidate();
-    } finally {
-      savingRef.current = false;
-    }
-  }, [currentCharacter, currentVerseId, revalidator]);
+  // Derived panel booleans
+  const skillCompactOpen = activePanel === "skill-compact";
+  const skillExpandedOpen = activePanel === "skill-expanded";
+  const galleryCompactOpen = activePanel === "gallery-compact";
+  const galleryExpandedOpen = activePanel === "gallery-expanded";
 
-  // Handle image delete
-  const handleDelete = async (imageId: string) => {
-    if (!currentCharacter) return;
+  // Animation key combines lookbook + look for both vertical and horizontal transitions
+  const animationKey = `${activeLookbookId}_${activeLookId}`;
 
-    setDeleting(imageId);
-    try {
-      const response = await fetch("/api/delete-character-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: imageId }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Delete failed");
-      }
-
-      // If deleted image was the defaultInput, reset it
-      const deletedImage = currentImages.find((img) => img.id === imageId);
-      if (deletedImage && currentCharacter.defaultInput === deletedImage.publicUrl) {
-        await handleSaveDefaultInput(null);
-      }
-
-      revalidator.revalidate();
-    } catch (error) {
-      console.error("Delete error:", error);
-      alert(error instanceof Error ? error.message : "Delete failed");
-    } finally {
-      setDeleting(null);
-    }
-  };
+  // Transition type and direction from unified state
+  const { type: transitionType, direction: animDirection } = transition;
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
+    <DndContext sensors={skill.sensors} onDragStart={skill.handleDragStart} onDragMove={skill.handleDragMove} onDragEnd={skill.handleDragEnd}>
     <div className="relative w-full h-screen overflow-hidden bg-[--color-bg]">
-      {/* Layer 1: Current verse characters (AnimatePresence slide transition) */}
-      <AnimatePresence mode="wait" initial={false} custom={slideDirection}>
+      {/* Layer 1: Current look personas */}
+      <AnimatePresence mode="wait" initial={false}>
         <motion.div
-          key={currentVerseId}
-          custom={slideDirection}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          key={animationKey}
+          initial={{
+            opacity: 0,
+            x: transitionType === "look" ? animDirection * 30 : 0,
+            y: transitionType === "lookbook" ? animDirection * 30 : 0,
+          }}
+          animate={{ opacity: 1, x: 0, y: 0 }}
+          exit={{
+            opacity: 0,
+            x: transitionType === "look" ? -animDirection * 30 : 0,
+            y: transitionType === "lookbook" ? -animDirection * 30 : 0,
+          }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          ref={charNavRef}
+          ref={charNav.charNavRef}
           className="absolute inset-0 flex items-center justify-center overflow-hidden touch-none"
         >
-          {characterList.map((character, index) => {
+          {personaList.map((character, index) => {
             const isSelected = index === selectedIndex;
             const diff = index - selectedIndex;
             const absDiff = Math.abs(diff);
-            const centerIndex = (characterList.length - 1) / 2;
+            const centerIndex = (personaList.length - 1) / 2;
 
             const homeX = (index - centerIndex) * 165;
             const selectX = diff * 22;
@@ -782,17 +410,16 @@ export default function Home() {
                 opacity = 0.08;
               }
             } else {
-              // Home view: dim non-hovered characters
-              if (hoveredCharacterId && character.characterId !== hoveredCharacterId) {
+              if (charNav.hoveredCharacterId && character.characterId !== charNav.hoveredCharacterId) {
                 opacity = 0.3;
               }
             }
 
             return (
               <div
-                key={`${character.verseId}-${character.characterId}`}
+                key={`${character.lookId}-${character.characterId}`}
                 ref={isSelected ? (node: HTMLDivElement | null) => {
-                  personaRef.current = node;
+                  skill.personaRef.current = node;
                 } : undefined}
                 className="absolute cursor-pointer transition-[transform,opacity] duration-500 ease-out"
                 style={{
@@ -803,18 +430,15 @@ export default function Home() {
                   zIndex: isSelected ? 10 : 5 - absDiff,
                 }}
                 onClick={() => {
-                  if (isSelecting && character.characterId === selectedId) {
-                    return;
-                  }
-                  setSearchParams({ selected: character.characterId, verse: currentVerseId });
+                  if (isSelecting && character.characterId === selectedId) return;
+                  setSearchParams({ selected: character.characterId, lookbook: activeLookbookId, look: activeLookId });
                 }}
-                onMouseEnter={() => !isSelecting && setHoveredCharacterId(character.characterId)}
-                onMouseLeave={() => !isSelecting && setHoveredCharacterId(null)}
+                onMouseEnter={() => !isSelecting && charNav.setHoveredCharacterId(character.characterId)}
+                onMouseLeave={() => !isSelecting && charNav.setHoveredCharacterId(null)}
               >
-                {/* Glow effect during drag */}
-                {isSelected && isDragging && (
+                {isSelected && skill.isDragging && (
                   <div
-                    className={`absolute -inset-[3px] rounded-sm ${isOverPersona ? "persona-glow-intense" : "persona-glow"} transition-opacity duration-300`}
+                    className={`absolute -inset-[3px] rounded-sm ${skill.isOverPersona ? "persona-glow-intense" : "persona-glow"} transition-opacity duration-300`}
                     style={{ zIndex: -1 }}
                   />
                 )}
@@ -823,7 +447,7 @@ export default function Home() {
                   style={{
                     backgroundImage: character.poster ? `url(${character.poster})` : undefined,
                     backgroundSize: "cover",
-                    backgroundPosition: "center top",
+                    backgroundPosition: "center center",
                   }}
                 >
                   <VideoCanvas
@@ -845,157 +469,44 @@ export default function Home() {
           <div className="flex flex-col">
             <Link to="/" className="text-lg font-black italic tracking-wider text-black cursor-pointer hover:opacity-70 transition-opacity" style={{ fontWeight: 900 }}>HitOS</Link>
             <div className="flex items-center gap-3 text-[10px] tracking-wider mt-1.5">
-              <button onClick={() => setActivePanel(prev => prev === "skill" ? null : "skill")} disabled={!isSelecting} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"><span className="font-semibold text-black">SKILLS</span><span className="text-gray-400">{String(skillsCount).padStart(2, "0")}</span></button>
-              <button onClick={() => setActivePanel(prev => prev === "gallery-compact" || prev === "gallery-expanded" ? null : "gallery-compact")} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"><span className="font-semibold text-black">GALLERY</span><span className="text-gray-400">{String(storiesCount).padStart(2, "0")}</span></button>
+              <button onClick={() => setActivePanel(prev => prev === "skill-compact" || prev === "skill-expanded" ? null : "skill-compact")} disabled={!isSelecting} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"><span className="font-semibold text-black">SKILLS</span><span className="text-gray-400">{String(skillsCount).padStart(2, "0")}</span></button>
+              <button onClick={() => setActivePanel(prev => prev === "gallery-compact" || prev === "gallery-expanded" ? null : "gallery-compact")} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"><span className="font-semibold text-black">LIBRARY</span><span className="text-gray-400">{String(storiesCount).padStart(2, "0")}</span></button>
             </div>
           </div>
+        </div>
+        <div className="flex items-center gap-5 text-[10px] tracking-wider">
+          <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">AudioVisual Lab</span>
+          <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Moodboard</span>
+          <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Launch</span>
+          <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Playground</span>
         </div>
       </header>
 
       {/* Layer 3: Title */}
       <div className="absolute top-28 left-0 right-0 z-20 px-6 pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_textarea]:pointer-events-auto [&_a]:pointer-events-auto">
         {isSelecting && currentCharacter ? (
-          <>
-            {/* Character Step Indicator */}
-            <p className="text-[10px] tracking-wider text-black mb-1">PERSONA {String(selectedIndex + 1).padStart(2, "0")} / {String(characterList.length).padStart(2, "0")}</p>
-            {/* Character Name with inline edit */}
-            <div className="group flex items-center gap-2">
-              {charNameEdit.isEditing ? (
-                <input
-                  ref={charNameEdit.ref}
-                  type="text"
-                  value={charNameEdit.value}
-                  onChange={(e) => charNameEdit.setValue(e.target.value)}
-                  onKeyDown={charNameEdit.keyDown}
-                  onBlur={charNameEdit.save}
-                  disabled={charNameEdit.isSaving}
-                  className="text-3xl md:text-4xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white outline-none text-[--color-text] w-full max-w-md"
-                  style={{ fontFamily: "inherit" }}
-                />
-              ) : (
-                <>
-                  <LargeTitle>{currentCharacter.name}</LargeTitle>
-                  <button
-                    onClick={() => charNameEdit.startEdit(currentCharacter.name)}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 cursor-pointer"
-                    title="Edit name"
-                  >
-                    <PencilIcon size={16} />
-                  </button>
-                </>
-              )}
-            </div>
-            {/* Character Description with inline edit */}
-            <div className="group flex items-start gap-2 mt-2">
-              {charDescEdit.isEditing ? (
-                <textarea
-                  ref={charDescEdit.ref}
-                  value={charDescEdit.value}
-                  onChange={(e) => charDescEdit.setValue(e.target.value)}
-                  onKeyDown={charDescEdit.keyDown}
-                  onBlur={charDescEdit.save}
-                  disabled={charDescEdit.isSaving}
-                  rows={3}
-                  className="text-sm bg-transparent border border-white/30 focus:border-white/50 rounded-lg outline-none text-[--color-text-secondary] w-full max-w-md p-2 resize-none leading-relaxed"
-                />
-              ) : (
-                <>
-                  <p className="text-sm text-[--color-text-secondary] max-w-md leading-relaxed">
-                    {currentCharacter.description}
-                  </p>
-                  <button
-                    onClick={() => charDescEdit.startEdit(currentCharacter.description)}
-                    className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0 cursor-pointer"
-                    title="Edit description"
-                  >
-                    <PencilIcon size={14} />
-                  </button>
-                </>
-              )}
-            </div>
-          </>
+          <CharacterInfoPanel
+            character={currentCharacter}
+            lookId={activeLookId}
+            selectedIndex={selectedIndex}
+            totalCharacters={personaList.length}
+            onCharacterUpdate={handleCharacterUpdate}
+          />
         ) : (
-          <AnimatePresence mode="wait" custom={slideDirection}>
-            <motion.div
-              key={currentVerseId}
-              custom={slideDirection}
-              initial={{ opacity: 0, y: slideDirection * 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -slideDirection * 10 }}
-              transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-            >
-              <span className="text-[10px] font-medium tracking-wider text-black mb-1">COLLECTION&ensp;{String(currentVerseIndex + 1).padStart(2, "0")}/{String(verseListState.length).padStart(2, "0")}</span>
-              {/* Verse Name with inline edit */}
-              <div className="group flex items-center gap-2">
-                {verseNameEdit.isEditing ? (
-                  <input
-                    ref={verseNameEdit.ref}
-                    type="text"
-                    value={verseNameEdit.value}
-                    onChange={(e) => verseNameEdit.setValue(e.target.value)}
-                    onKeyDown={verseNameEdit.keyDown}
-                    onBlur={verseNameEdit.save}
-                    disabled={verseNameEdit.isSaving}
-                    className="text-3xl md:text-4xl font-bold bg-transparent border-b-2 border-white/50 focus:border-white outline-none text-[--color-text] w-full max-w-md"
-                    style={{ fontFamily: "inherit" }}
-                  />
-                ) : (
-                  <>
-                    <LargeTitle>{currentVerse ? currentVerse.name.toUpperCase() : "HitOS"}</LargeTitle>
-                    <button
-                      onClick={() => verseNameEdit.startEdit(currentVerse.displayName)}
-                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 cursor-pointer"
-                      title="Edit verse name"
-                    >
-                      <PencilIcon size={16} />
-                    </button>
-                  </>
-                )}
-              </div>
-              {/* Verse Description with inline edit */}
-              <div className="group flex items-start gap-2 mt-2">
-                {verseDescEdit.isEditing ? (
-                  <textarea
-                    ref={verseDescEdit.ref}
-                    value={verseDescEdit.value}
-                    onChange={(e) => verseDescEdit.setValue(e.target.value)}
-                    onKeyDown={verseDescEdit.keyDown}
-                    onBlur={verseDescEdit.save}
-                    disabled={verseDescEdit.isSaving}
-                    rows={2}
-                    className="text-sm bg-transparent border border-white/30 focus:border-white/50 rounded-lg outline-none text-[--color-text-secondary] w-full max-w-md p-2 resize-none leading-relaxed"
-                    placeholder="Add verse description..."
-                  />
-                ) : (
-                  <>
-                    {currentVerse?.description ? (
-                      <p className="text-sm text-[--color-text-secondary] max-w-md leading-relaxed">
-                        {currentVerse.description}
-                      </p>
-                    ) : (
-                      <p className="text-sm text-[--color-text-secondary]/40 max-w-md leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity">
-                        Add description...
-                      </p>
-                    )}
-                    <button
-                      onClick={() => verseDescEdit.startEdit(currentVerse?.description || "")}
-                      className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity p-1 flex-shrink-0 cursor-pointer"
-                      title="Edit verse description"
-                    >
-                      <PencilIcon size={14} />
-                    </button>
-                  </>
-                )}
-              </div>
-              <span className="flex items-center text-[10px] tracking-wider text-black mt-8"><span className="font-medium w-40">PERSONAS</span><span className="font-bold">{String(characterList.length).padStart(2, "0")}</span></span>
-              <span className="flex items-center text-[10px] tracking-wider text-black mt-2"><span className="font-medium w-40">MODE</span><span className="font-bold">{currentVerse?.id === "00" ? "XO" : "XX"}</span></span>
-              <VerseCredits verseId={currentVerseId} />
-            </motion.div>
-          </AnimatePresence>
+          <LookbookInfoPanel
+            lookbook={currentLookbook}
+            lookbookIndex={currentLookbookIndex}
+            totalLookbooks={lookbookListState.length}
+            currentLookIndex={currentLookIndex >= 0 ? currentLookIndex : 0}
+            totalLooks={currentLookbookLooks.length}
+            slideDirection={animDirection}
+            currentLookbookId={activeLookbookId}
+            onLookbookUpdate={handleLookbookUpdate}
+          />
         )}
       </div>
 
-      {/* Image Input Selection — subtle bar toggle + expandable panel */}
+      {/* Image Input Selection */}
       <AnimatePresence>
         {isSelecting && currentCharacter && (
           <motion.div
@@ -1006,151 +517,115 @@ export default function Home() {
             className="absolute top-[300px] left-6 z-20"
           >
             <InputImagePanel
-              open={inputPanelOpen}
-              onToggle={setInputPanelOpen}
+              open={charImages.inputPanelOpen}
+              onToggle={charImages.setInputPanelOpen}
               character={currentCharacter}
               images={currentImages}
-              verseId={currentVerseId}
-              onSaveDefaultInput={handleSaveDefaultInput}
-              onDeleteImage={handleDelete}
-              onUploadImage={handleUpload}
-              uploading={uploading}
-              deleting={deleting}
+              onSaveDefaultInput={charImages.handleSaveDefaultInput}
+              onDeleteImage={charImages.handleDelete}
+              onUploadImage={charImages.handleUpload}
+              uploading={charImages.uploading}
+              deleting={charImages.deleting}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Floating Bar */}
-      {/* Click-outside backdrop for compact panels (music/skill/gallery-compact) */}
-      {activePanel && activePanel !== "gallery-expanded" && (
+      {/* Click-outside backdrop for compact panels */}
+      {activePanel && activePanel !== "gallery-expanded" && activePanel !== "skill-expanded" && (
         <div className="fixed inset-0 z-[25]" onClick={() => setActivePanel(null)} />
       )}
 
       <HomeFloatingBar
         characterId={currentCharacter?.characterId ?? null}
         characterImageUrl={selectedImgUrl}
-        verseId={currentVerseId}
+        lookbookId={activeLookbookId}
         activePanel={activePanel}
         onPanelChange={setActivePanel}
-        selectedVideo={selectedSkillVideo}
-        selectedImage={selectedSkillImage}
+        selectedVideo={skill.selectedSkillVideo}
+        selectedImage={skill.selectedSkillImage}
       >
         {isSelecting && currentCharacter && (
-          <SkillPanel
-            open={skillPanelOpen}
+          <SkillCompactPanel
+            open={skillCompactOpen}
             videos={skillVideos}
             images={skillImages}
-            tab={skillTab}
-            selectedVideoId={selectedSkillVideoId}
-            selectedImageId={selectedSkillImageId}
-            onTabChange={(t) => {
-              setSkillTab(t);
-              if (t === "video") setSelectedSkillImageId(null);
-              else setSelectedSkillVideoId(null);
-            }}
-            onSelectVideo={(id) => { setSelectedSkillVideoId(id); if (id) setActivePanel(null); }}
-            onSelectImage={(id) => { setSelectedSkillImageId(id); if (id) setActivePanel(null); }}
+            tab={skill.skillTab}
+            selectedVideoId={skill.selectedSkillVideoId}
+            selectedImageId={skill.selectedSkillImageId}
+            onTabChange={skill.handleSkillTabChange}
+            onSelectVideo={skill.handleSkillSelectVideo}
+            onSelectImage={skill.handleSkillSelectImage}
+            onExpand={() => setActivePanel("skill-expanded")}
           />
         )}
         <GalleryCompactPanel
           open={galleryCompactOpen}
           onExpand={() => setActivePanel("gallery-expanded")}
           galleryState={galleryState}
-          gridRef={galleryGridRef}
-          flyingCardTargetId={flyingCardTargetId}
+          gridRef={skill.galleryGridRef}
+          flyingCardTargetId={skill.flyingCardTargetId}
         />
       </HomeFloatingBar>
 
-      {/* Verse Navigation (right side, only when not selecting) */}
-      {!isSelecting && verseListState.length > 1 && (
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-3">
-          <button
-            onClick={() => handleVerseChange("up")}
-            disabled={currentVerseIndex === 0}
-            className={`${navButtonClass} ${
-              currentVerseIndex === 0 ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
-            }`}
-            title="Previous Verse"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="18 15 12 9 6 15" />
-            </svg>
-          </button>
-
-          {/* Verse indicator dots */}
-          <div className="flex flex-col items-center gap-1.5 py-1">
-            {verseListState.map((v, i) => (
-              <div
-                key={v.id}
-                className={`w-1.5 h-1.5 rounded-full transition-all ${
-                  i === currentVerseIndex ? "bg-white scale-125" : "bg-white/30"
-                }`}
-              />
-            ))}
-          </div>
-
-          <button
-            onClick={() => handleVerseChange("down")}
-            disabled={currentVerseIndex === verseListState.length - 1}
-            className={`${navButtonClass} ${
-              currentVerseIndex === verseListState.length - 1 ? "opacity-30 cursor-not-allowed" : "cursor-pointer"
-            }`}
-            title="Next Verse"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-        </div>
+      {isSelecting && currentCharacter && (
+        <SkillExpandedPanel
+          open={skillExpandedOpen}
+          onClose={() => setActivePanel(null)}
+          onCollapse={() => setActivePanel("skill-compact")}
+          videos={skillVideos}
+          images={skillImages}
+          tab={skill.skillTab}
+          selectedVideoId={skill.selectedSkillVideoId}
+          selectedImageId={skill.selectedSkillImageId}
+          onTabChange={skill.handleSkillTabChange}
+          onSelectVideo={skill.handleSkillSelectVideo}
+          onSelectImage={skill.handleSkillSelectImage}
+        />
       )}
 
-      {/* Gallery Expanded Panel */}
       <GalleryExpandedPanel
         open={galleryExpandedOpen}
         onClose={() => setActivePanel(null)}
         onCollapse={() => setActivePanel("gallery-compact")}
         galleryState={galleryState}
-        verseId={currentVerseId}
+        lookbookId={activeLookbookId}
       />
 
-      {/* Gallery Modals — root level so z-50 escapes all stacking contexts */}
       <GalleryModals galleryState={galleryState} />
-
     </div>
 
-    {/* DragOverlay — outside overflow:hidden container */}
+    {/* DragOverlay */}
     <DragOverlay modifiers={[centerOnCursor]} dropAnimation={null}>
-      {activeDragItem && (
+      {skill.activeDragItem && (
         <div className="w-[60px] aspect-[3/4] rounded-sm overflow-hidden shadow-lg">
-          <img src={activeDragItem.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+          <img src={skill.activeDragItem.thumbnailUrl} alt="" className="w-full h-full object-cover" />
         </div>
       )}
     </DragOverlay>
 
-    {/* Skill confirm dialog */}
     <SkillConfirmDialog
-      open={confirmDialog !== null}
-      item={confirmDialog}
-      onCancel={() => setConfirmDialog(null)}
-      onProduce={handleProduce}
-      isProducing={isGenerating}
+      open={skill.confirmDialog !== null}
+      item={skill.confirmDialog}
+      onCancel={() => skill.setConfirmDialog(null)}
+      onProduce={skill.handleProduce}
+      isProducing={skill.isGenerating}
     />
 
     {/* Flying card animation */}
     <AnimatePresence>
-      {flyingCard && (
+      {skill.flyingCard && (
         <motion.div
           className="fixed top-0 left-0 z-[60] w-[60px] aspect-[3/4] pointer-events-none rounded-sm overflow-hidden"
           initial={{
-            x: flyingCard.startX,
-            y: flyingCard.startY,
+            x: skill.flyingCard.startX,
+            y: skill.flyingCard.startY,
             scale: 1,
             opacity: 1,
           }}
           animate={{
-            x: [flyingCard.startX, flyingCard.startX + (flyingCard.endX - flyingCard.startX) * 0.4, flyingCard.endX, flyingCard.endX],
-            y: [flyingCard.startY, flyingCard.startY - 80, flyingCard.endY, flyingCard.endY],
+            x: [skill.flyingCard.startX, skill.flyingCard.startX + (skill.flyingCard.endX - skill.flyingCard.startX) * 0.4, skill.flyingCard.endX, skill.flyingCard.endX],
+            y: [skill.flyingCard.startY, skill.flyingCard.startY - 80, skill.flyingCard.endY, skill.flyingCard.endY],
             scale: [1, 0.8, 0.5, 0.3],
             opacity: [1, 1, 1, 0],
           }}
@@ -1159,15 +634,28 @@ export default function Home() {
             times: [0, 0.35, 0.75, 1],
           }}
           onAnimationComplete={() => {
-            setFlyingCard(null);
-            setFlyingCardTargetId(null);
+            skill.setFlyingCard(null);
+            skill.setFlyingCardTargetId(null);
           }}
         >
-          <img src={flyingCard.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+          <img src={skill.flyingCard.thumbnailUrl} alt="" className="w-full h-full object-cover" />
         </motion.div>
       )}
     </AnimatePresence>
 
     </DndContext>
+  );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const message = isRouteErrorResponse(error) ? `${error.status} ${error.statusText}` : "Something went wrong";
+  return (
+    <div className="w-full h-screen flex items-center justify-center bg-[--color-bg]">
+      <div className="text-center">
+        <h1 className="text-2xl font-bold text-black mb-2">Error</h1>
+        <p className="text-black/60 mb-4">{message}</p>
+        <a href="/" className="text-blue-600 hover:underline">Reload</a>
+      </div>
+    </div>
   );
 }

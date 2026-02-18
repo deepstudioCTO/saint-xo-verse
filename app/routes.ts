@@ -2,11 +2,6 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   index("routes/_index.tsx"),
-  route("motion", "routes/motion.tsx"),
-  route("generate", "routes/generate.tsx"),
-  route("gallery", "routes/gallery.tsx"),
-  route("result/:id", "routes/result.$id.tsx"),
-  route("test", "routes/test.tsx"),
   route("api/generate", "routes/api.generate.tsx"),
   route("api/download", "routes/api.download.tsx"),
   route("api/upload-motion", "routes/api.upload-motion.tsx"),
@@ -25,7 +20,9 @@ export default [
   route("api/update-concept-image", "routes/api.update-concept-image.tsx"),
   route("api/update-generation-concept-image", "routes/api.update-generation-concept-image.tsx"),
   route("api/update-character", "routes/api.update-character.tsx"),
-  route("api/update-verse", "routes/api.update-verse.tsx"),
-  route("api/update-verse-character", "routes/api.update-verse-character.tsx"),
+  route("api/update-lookbook", "routes/api.update-lookbook.tsx"),
+  route("api/update-persona", "routes/api.update-persona.tsx"),
   route("api/gallery-data", "routes/api.gallery-data.tsx"),
+  route("api/editor-save", "routes/api.editor-save.tsx"),
+  route("editor", "routes/editor.tsx"),
 ] satisfies RouteConfig;

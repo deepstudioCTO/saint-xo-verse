@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router";
+import { toast } from "sonner";
 import { VideoPlayerWithMusic } from "~/components/common/VideoPlayerWithMusic";
 import { getMusicFilePath } from "~/lib/music-data";
 import { mergeVideoWithMusic, downloadBlob, type MergeProgress } from "~/lib/audio-merge";
@@ -239,7 +241,7 @@ export function VideoDetailModal({
       downloadBlob(mergedBlob, filename);
     } catch (err) {
       console.error("Merge failed:", err);
-      alert("Video merge failed. Downloading original video.");
+      toast.error("Video merge failed. Downloading original video.");
       // Fallback: download original
       try {
         const response = await fetch(videoToDownload);
@@ -267,7 +269,7 @@ export function VideoDetailModal({
       }
     } else {
       await navigator.clipboard.writeText(shareUrl);
-      alert("Link copied!");
+      toast.success("Link copied!");
     }
   };
 
@@ -597,6 +599,17 @@ export function VideoDetailModal({
             {/* Show these buttons only for completed videos */}
             {!isFailed && (
               <>
+                {/* Edit in editor */}
+                <Link
+                  to={`/editor?media=${encodeURIComponent(
+                    showUpscaledVideo && upscaledVideoUrl ? upscaledVideoUrl : generation.videoUrl || ""
+                  )}&type=video&name=${encodeURIComponent(motionName)}&generationId=${generation.id}`}
+                  onClick={onClose}
+                  className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  Edit
+                </Link>
+
                 {/* Upscale button */}
                 <div className="relative">
                   <button

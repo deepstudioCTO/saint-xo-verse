@@ -71,6 +71,20 @@
       "when": 1770779671479,
       "tag": "0009_flashy_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1739900000000,
+      "tag": "0010_verse_to_lookbook",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1771417834510,
+      "tag": "0011_cloudy_nocturne",
+      "breakpoints": true
     }
   ]
 }

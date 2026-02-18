@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, type RefObject } from "react";
+import { toast } from "sonner";
 
 interface UseInlineEditOptions {
   /** Called with trimmed value on save. Return false to indicate save failure. */
@@ -58,7 +59,7 @@ export function useInlineEdit<E extends HTMLInputElement | HTMLTextAreaElement =
       setIsEditing(false);
     } catch (error) {
       console.error("Inline edit save error:", error);
-      alert(error instanceof Error ? error.message : "Update failed");
+      toast.error(error instanceof Error ? error.message : "Update failed");
     } finally {
       setIsSaving(false);
     }

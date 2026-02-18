@@ -1,22 +1,22 @@
 import { desc, asc } from "drizzle-orm";
 import type { Route } from "./+types/api.gallery-data";
-import { getDb, generations, motionVideos, conceptImages, characters, verseCharacters } from "~/lib/db.server";
+import { getDb, generations, motionVideos, conceptImages, characters, personas } from "~/lib/db.server";
 import {
   CHARACTERS,
   SYNCED_GENERATIONS, SYNCED_SKILL_VIDEOS, SYNCED_SKILL_IMAGES,
-  SYNCED_VERSE_CHARACTERS, buildVerseCharacterMap,
+  SYNCED_PERSONAS, buildPersonaMap,
 } from "~/lib/data";
 
 export async function loader({ context }: Route.LoaderArgs) {
   try {
     const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-    const [allGenerations, allMotionVideos, allConceptImages, allCharacters, allVerseCharacters] = await Promise.all([
+    const [allGenerations, allMotionVideos, allConceptImages, allCharacters, allPersonas] = await Promise.all([
       db.select().from(generations).orderBy(desc(generations.createdAt)),
       db.select({ id: motionVideos.id, name: motionVideos.name }).from(motionVideos).orderBy(desc(motionVideos.createdAt)),
       db.select({ id: conceptImages.id, name: conceptImages.name }).from(conceptImages).orderBy(desc(conceptImages.createdAt)),
       db.select().from(characters).orderBy(asc(characters.displayOrder)),
-      db.select({ verseId: verseCharacters.verseId, characterId: verseCharacters.characterId, name: verseCharacters.name }).from(verseCharacters),
+      db.select({ lookId: personas.lookId, characterId: personas.characterId, name: personas.name }).from(personas),
     ]);
 
     // Build lookup maps
@@ -30,7 +30,8 @@ export async function loader({ context }: Route.LoaderArgs) {
       musicId: gen.musicId,
       motionVideoId: gen.motionVideoId,
       conceptImageId: gen.conceptImageId,
-      verseId: gen.verseId,
+      lookbookId: gen.lookbookId,
+      lookId: gen.lookId,
       videoUrl: gen.videoUrl,
       outputUrl: gen.outputUrl,
       status: gen.status,
@@ -53,13 +54,13 @@ export async function loader({ context }: Route.LoaderArgs) {
       displayOrder: c.displayOrder,
     }));
 
-    // Build nested map: { verseId: { characterId: { name } } }
-    const verseCharacterMap: Record<string, Record<string, { name: string }>> = {};
-    for (const vc of allVerseCharacters) {
-      if (!verseCharacterMap[vc.verseId]) {
-        verseCharacterMap[vc.verseId] = {};
+    // Build nested map: { lookId: { characterId: { name } } }
+    const personaMap: Record<string, Record<string, { name: string }>> = {};
+    for (const p of allPersonas) {
+      if (!personaMap[p.lookId]) {
+        personaMap[p.lookId] = {};
       }
-      verseCharacterMap[vc.verseId][vc.characterId] = { name: vc.name };
+      personaMap[p.lookId][p.characterId] = { name: p.name };
     }
 
     return {
@@ -67,7 +68,7 @@ export async function loader({ context }: Route.LoaderArgs) {
       motionVideos: allMotionVideos,
       conceptImages: allConceptImages,
       characters: characterList,
-      verseCharacterMap,
+      personaMap,
     };
   } catch {
     // Offline fallback
@@ -76,7 +77,7 @@ export async function loader({ context }: Route.LoaderArgs) {
       motionVideos: SYNCED_SKILL_VIDEOS.map((v) => ({ id: v.id, name: v.name })),
       conceptImages: SYNCED_SKILL_IMAGES.map((i) => ({ id: i.id, name: i.name })),
       characters: CHARACTERS,
-      verseCharacterMap: buildVerseCharacterMap(SYNCED_VERSE_CHARACTERS),
+      personaMap: buildPersonaMap(SYNCED_PERSONAS),
     };
   }
 }

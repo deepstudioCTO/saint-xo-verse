@@ -1,0 +1,4 @@
+wrangler.json
+.dev.vars
+gallery/
+character/*.mp4

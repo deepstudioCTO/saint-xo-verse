@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { verseCharacters } from "../drizzle/schema";
-import { VERSE_CHARACTERS } from "../app/lib/data";
+import { personas } from "../drizzle/schema";
+import { PERSONAS } from "../app/data/personas";
 import { and, eq } from "drizzle-orm";
 
 const databaseUrl = process.env.DATABASE_URL;
@@ -12,19 +12,19 @@ if (!databaseUrl) {
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client);
 
-async function seedVerseCharacters() {
-  console.log("Seeding verse characters...");
+async function seedPersonas() {
+  console.log("Seeding personas...");
 
-  for (const vc of VERSE_CHARACTERS) {
+  for (const p of PERSONAS) {
     try {
       // Check if already exists
       const existing = await db
         .select()
-        .from(verseCharacters)
+        .from(personas)
         .where(
           and(
-            eq(verseCharacters.verseId, vc.verseId),
-            eq(verseCharacters.characterId, vc.characterId)
+            eq(personas.lookId, p.lookId),
+            eq(personas.characterId, p.characterId)
           )
         )
         .limit(1);
@@ -32,33 +32,33 @@ async function seedVerseCharacters() {
       if (existing.length > 0) {
         // Update existing
         await db
-          .update(verseCharacters)
+          .update(personas)
           .set({
-            name: vc.name,
-            description: vc.description,
-            video: vc.video,
-            poster: vc.poster,
-            displayOrder: vc.displayOrder ?? 0,
+            name: p.name,
+            description: p.description,
+            video: p.video,
+            poster: p.poster,
+            displayOrder: p.displayOrder ?? 0,
           })
-          .where(eq(verseCharacters.id, existing[0].id));
-        console.log(`✓ Updated verse character: ${vc.verseId}/${vc.characterId} (${vc.name})`);
+          .where(eq(personas.id, existing[0].id));
+        console.log(`✓ Updated persona: ${p.lookId}/${p.characterId} (${p.name})`);
       } else {
         // Insert new
         await db
-          .insert(verseCharacters)
+          .insert(personas)
           .values({
-            verseId: vc.verseId,
-            characterId: vc.characterId,
-            name: vc.name,
-            description: vc.description,
-            video: vc.video,
-            poster: vc.poster,
-            displayOrder: vc.displayOrder ?? 0,
+            lookId: p.lookId,
+            characterId: p.characterId,
+            name: p.name,
+            description: p.description,
+            video: p.video,
+            poster: p.poster,
+            displayOrder: p.displayOrder ?? 0,
           });
-        console.log(`✓ Seeded verse character: ${vc.verseId}/${vc.characterId} (${vc.name})`);
+        console.log(`✓ Seeded persona: ${p.lookId}/${p.characterId} (${p.name})`);
       }
     } catch (error) {
-      console.error(`✗ Failed to seed verse character ${vc.verseId}/${vc.characterId}:`, error);
+      console.error(`✗ Failed to seed persona ${p.lookId}/${p.characterId}:`, error);
     }
   }
 
@@ -66,4 +66,4 @@ async function seedVerseCharacters() {
   await client.end();
 }
 
-seedVerseCharacters().catch(console.error);
+seedPersonas().catch(console.error);
