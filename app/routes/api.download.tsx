@@ -1,7 +1,11 @@
 import type { Route } from "./+types/api.download";
+import { requireAuthApi } from "~/lib/auth.server";
 
 // GET /api/download?url=xxx — Replicate 영상 URL을 프록시하여 다운로드
-export async function loader({ request }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
+
   const url = new URL(request.url);
   const targetUrl = url.searchParams.get("url");
 

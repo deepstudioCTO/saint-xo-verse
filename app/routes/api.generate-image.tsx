@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.generate-image";
 import { getDb, generations } from "~/lib/db.server";
 import { uploadGeneratedImage } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 const MODEL_VERSION =
   "0785fb14f5aaa30eddf06fd49b6cbdaac4541b8854eb314211666e23a29087e3";
@@ -12,6 +13,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const formData = await request.formData();
@@ -121,6 +125,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 // GET /api/generate-image?id=xxx — 상태 폴링
 export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
+
   const TOKEN = context.cloudflare.env.REPLICATE_TOKEN;
   const url = new URL(request.url);
   const id = url.searchParams.get("id");

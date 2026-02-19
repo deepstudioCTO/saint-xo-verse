@@ -1,17 +1,22 @@
 import { isRouteErrorResponse, useSearchParams } from "react-router";
+import { data } from "react-router";
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/editor";
 import { getDb, editorProjects } from "~/lib/db.server";
 import { EditorCanvas } from "~/components/editor/EditorCanvas";
+import { requireAuth } from "~/lib/auth.server";
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuth(request, env);
+
   const db = getDb(context.cloudflare as { env: Record<string, string> });
   const rows = await db
     .select()
     .from(editorProjects)
     .where(eq(editorProjects.id, "default"))
     .limit(1);
-  return { savedProject: rows[0] ?? null };
+  return data({ savedProject: rows[0] ?? null }, { headers: authHeaders });
 }
 
 export default function Editor({ loaderData }: Route.ComponentProps) {

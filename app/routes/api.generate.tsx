@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.generate";
 import { getDb, generations } from "~/lib/db.server";
 import { uploadGeneratedVideo } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 const MODEL_VERSION =
   "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896";
@@ -12,6 +13,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const formData = await request.formData();
@@ -135,6 +139,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 // GET /api/generate?id=xxx — 상태 폴링
 export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
+
   const TOKEN = context.cloudflare.env.REPLICATE_TOKEN;
   const url = new URL(request.url);
   const id = url.searchParams.get("id");

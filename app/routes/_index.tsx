@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams, useLoaderData, useRevalidator, Link, isRouteErrorResponse } from "react-router";
+import { useSearchParams, useLoaderData, useRevalidator, Link, Form, isRouteErrorResponse } from "react-router";
+import { data } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { DndContext, DragOverlay, type Modifier } from "@dnd-kit/core";
 import type { Route } from "./+types/_index";
+import { requireAuth } from "~/lib/auth.server";
 import {
   LOOKBOOKS as DEFAULT_LOOKBOOKS,
   LOOKS as DEFAULT_LOOKS,
@@ -61,6 +63,9 @@ interface CharacterImage {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuth(request, env);
+
   const url = new URL(request.url);
 
   // Backward compat: redirect ?verse= to ?lookbook=
@@ -154,7 +159,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? lookParam
       : currentLookbookLooks[0]?.id || lookList[0]?.id || "00_01";
 
-    return {
+    return data({
       lookbooks: lookbookList,
       looks: lookList,
       currentLookbookId: lookbookParam,
@@ -165,7 +170,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       storiesCount,
       skillVideos,
       skillImages,
-    };
+    }, { headers: authHeaders });
   } catch {
     const fallbackLookbooks = SYNCED_LOOKBOOKS.length > 0 ? SYNCED_LOOKBOOKS : DEFAULT_LOOKBOOKS;
     const fallbackLooks = SYNCED_LOOKS.length > 0 ? SYNCED_LOOKS : DEFAULT_LOOKS;
@@ -176,7 +181,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? lookParam
       : currentLookbookLooks[0]?.id || fallbackLooks[0]?.id || "00_01";
 
-    return {
+    return data({
       lookbooks: fallbackLookbooks,
       looks: fallbackLooks,
       currentLookbookId: lookbookParam,
@@ -187,7 +192,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       storiesCount: SYNCED_GENERATIONS.filter((g) => g.status === "completed").length,
       skillVideos: SYNCED_SKILL_VIDEOS,
       skillImages: SYNCED_SKILL_IMAGES,
-    };
+    }, { headers: authHeaders });
   }
 }
 
@@ -479,6 +484,9 @@ export default function Home() {
           <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Moodboard</span>
           <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Launch</span>
           <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Playground</span>
+          <Form method="post" action="/api/logout">
+            <button type="submit" className="font-semibold text-black/40 cursor-pointer hover:text-black transition-colors">Logout</button>
+          </Form>
         </div>
       </header>
 

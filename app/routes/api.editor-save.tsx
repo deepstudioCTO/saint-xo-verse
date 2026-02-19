@@ -1,10 +1,14 @@
 import type { Route } from "./+types/api.editor-save";
 import { getDb, editorProjects } from "~/lib/db.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "PUT") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const body = await request.json();

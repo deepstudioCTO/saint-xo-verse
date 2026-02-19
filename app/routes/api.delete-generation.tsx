@@ -2,11 +2,15 @@ import type { Route } from "./+types/api.delete-generation";
 import { getDb, generations } from "~/lib/db.server";
 import { eq } from "drizzle-orm";
 import { deleteGeneratedVideo } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const { id } = await request.json();

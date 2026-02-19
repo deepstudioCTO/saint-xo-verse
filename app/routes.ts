@@ -2,6 +2,8 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
 
 export default [
   index("routes/_index.tsx"),
+  route("login", "routes/login.tsx"),
+  route("api/logout", "routes/api.logout.tsx"),
   route("api/generate", "routes/api.generate.tsx"),
   route("api/download", "routes/api.download.tsx"),
   route("api/upload-motion", "routes/api.upload-motion.tsx"),

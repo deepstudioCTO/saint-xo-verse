@@ -1,11 +1,15 @@
 import type { Route } from "./+types/api.update-character";
 import { getDb, characters } from "~/lib/db.server";
 import { eq } from "drizzle-orm";
+import { requireAuthApi } from "~/lib/auth.server";
 
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const { id, name, description } = await request.json();

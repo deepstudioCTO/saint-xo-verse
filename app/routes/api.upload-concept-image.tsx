@@ -2,12 +2,16 @@ import type { Route } from "./+types/api.upload-concept-image";
 import { getDb } from "~/lib/db.server";
 import { conceptImages } from "../../drizzle/schema";
 import { uploadConceptImage } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 // POST /api/upload-concept-image — 컨셉 이미지 업로드
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const formData = await request.formData();

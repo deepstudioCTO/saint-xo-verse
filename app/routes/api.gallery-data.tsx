@@ -6,8 +6,12 @@ import {
   SYNCED_GENERATIONS, SYNCED_SKILL_VIDEOS, SYNCED_SKILL_IMAGES,
   SYNCED_PERSONAS, buildPersonaMap,
 } from "~/lib/data";
+import { requireAuthApi } from "~/lib/auth.server";
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
+
   try {
     const db = getDb(context.cloudflare as { env: Record<string, string> });
 

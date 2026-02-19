@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.upscale";
 import { getDb, generations } from "~/lib/db.server";
 import { uploadUpscaledVideo } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 // Model versions
 const MODELS = {
@@ -24,6 +25,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const formData = await request.formData();
@@ -121,6 +125,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 // GET /api/upscale?id=xxx - Poll upscale status
 export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
+
   const TOKEN = context.cloudflare.env.REPLICATE_TOKEN;
   const url = new URL(request.url);
   const id = url.searchParams.get("id");

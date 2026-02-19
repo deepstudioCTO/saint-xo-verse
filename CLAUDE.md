@@ -56,6 +56,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 
 - React Router v7 (Cloudflare Workers, SSR)
 - Drizzle ORM + PostgreSQL (Supabase)
+- Supabase Auth (`@supabase/ssr` — 쿠키 기반 서버 인증)
 - Tailwind CSS v4 + Radix UI (Select)
 - Motion (Framer Motion 후속)
 - @dnd-kit/core (드래그 앤 드롭 — SkillPanel → Persona)
@@ -63,6 +64,15 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - ffmpeg.wasm (브라우저 영상 트리밍 + 음악 합성, SharedArrayBuffer 필요)
 - Replicate API (kling-video, nano-banana-pro, real-esrgan, topaz)
 - 폰트: Orbitron (영문) + Pretendard (한글)
+
+## 인증 (Supabase Auth)
+
+- 모든 라우트 보호: 미인증 시 페이지는 `/login`으로 리다이렉트, API는 401 응답
+- 회원가입 UI 없음 — Supabase Dashboard (Authentication > Users > Add User)에서 관리자가 직접 생성
+- 쿠키 기반 세션: `@supabase/ssr`의 `createServerClient` 사용, 토큰 갱신 시 Set-Cookie 자동 발행
+- **새 라우트 추가 시**: 페이지 → `requireAuth`, API → `requireAuthApi` (둘 다 `auth.server.ts`에서 import)
+- **주의**: `requireAuthApi`를 try/catch 안에 넣으면 catch가 401 throw를 삼킴 → 반드시 try 밖에서 호출
+- 페이지 라우트는 `data()` 래퍼로 authHeaders 전달 필수 (토큰 갱신 쿠키 반영)
 
 ## Supabase Storage
 
@@ -120,7 +130,9 @@ export default [
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
 | 우측 썸네일 vs 하단 바 | 별도 absolute 컨테이너 분리 | 같은 컨테이너면 패널 열릴 때 썸네일이 위로 밀림 |
-| 하단 레이아웃 3분할 | 트랙 정보(left) / 재생 컨트롤+프로그래스바(center) / 패널 버튼(right) | 음악 플레이어 UX 표준 배치 |
+| 하단 레이아웃 | 뮤직 위젯(우하단, 드래그 이동) + 패널 버튼(center). 위젯 = `MusicPlayerWidget`(썸네일+제목+컨트롤 통합, Motion `drag`) | 음악 플레이어 일체감 + 자유 배치 |
+| 뮤직 컴포넌트 모듈화 | `TrackInfo`, `MusicControls` 별도 컴포넌트로 추출, 위젯에서 조합 | 기존 UI 재사용 가능하게 보존 |
+| 위젯 드래그 vs 컨트롤 | 컨트롤 영역에 `onPointerDownCapture` + `stopPropagation()` | 프로그래스바 seek/버튼 클릭이 드래그로 잡히는 것 방지 |
 | 프로그래스바 seek | document-level `pointerup` 리스너 | `setPointerCapture`는 range input 네이티브 클릭 방해 |
 | 프로그래스바 채움 | CSS `--progress` 변수 + `linear-gradient` (webkit) / `::-moz-range-progress` (FF) | JS에서 % 계산 → CSS 변수로 전달 |
 | Skill 드래그 드롭 감지 | `useDroppable` 미사용, 수동 `getBoundingClientRect()` 히트테스트 | @dnd-kit의 rect 측정이 CSS `scale()` transform에서 고장 |
@@ -134,6 +146,8 @@ export default [
 | 영상 비율 보정 | WebGL 셰이더에서 `u_videoAspect` uniform으로 cover-crop UV 보정 (zoom punch/글리치 앞단에서 적용) | look별 영상 비율이 다름 (00_01: 1:2, 00_02~04: 9:16). 컨테이너 `aspect-[1/2]`는 고정, 셰이더가 자동 crop |
 | 내비게이션 트랜지션 | `_index.tsx`에 단일 `transition` 상태(`{ type: "lookbook"\|"look", direction }`)로 통합, 훅들은 `onTransition` 콜백만 호출 | 훅별 분리 direction 상태는 리셋되지 않아 스테일 버그 유발, 이벤트 시그널을 상위에서 단일 관리 |
 | 포스터 프리로드 | `usePreloadPosters`로 전체 persona poster 즉시 로드 + WebGLGlitchVideo·FallbackVideo에 `background-image: poster` 적용 | idle 콜백은 WebGL+비디오 초기화로 지연됨, canvas `opacity:0` 동안 poster가 보이도록 다층 배경 |
+| 인증 | `@supabase/ssr` 쿠키 기반, `getUser()` 서버 검증 (JWT 검증). `getSession()` 미사용 | `getSession()`은 JWT를 검증하지 않아 변조 가능, `getUser()`는 Supabase에 실제 확인 |
+| Auth 가드 패턴 | `requireAuth` (페이지, redirect) / `requireAuthApi` (API, 401 throw) 분리 | 페이지는 로그인 폼으로 안내, API는 JSON 에러 응답 |
 
 ## 노드 에디터 (`/editor`)
 
@@ -212,6 +226,8 @@ app/
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
 │   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등
 ├── lib/
+│   ├── auth.server.ts         # requireAuth, requireAuthApi 가드
+│   ├── supabase-auth.server.ts # 쿠키 기반 Supabase 클라이언트 팩토리
 │   ├── data.ts          # CHARACTERS, TRACKS, LOOKBOOKS, LOOKS, PERSONAS 폴백 데이터 + 타입 + 룩업 맵
 │   ├── db.server.ts     # Drizzle DB 연결 + 모든 schema 테이블 export
 │   └── supabase.server.ts  # Storage 헬퍼
@@ -227,7 +243,9 @@ app/
 │   └── usePreloadPosters.ts   # 전체 persona poster 즉시 프리로드
 ├── routes/
 │   ├── _index.tsx       # 홈 (캐릭터 선택, verse 전환)
+│   ├── login.tsx        # 로그인 페이지
 │   ├── editor.tsx       # 노드 기반 영상 편집 에디터
+│   ├── api.logout.tsx   # 로그아웃 액션
 │   └── api.*.tsx        # REST API 엔드포인트들
 ├── routes.ts            # ⚠️ 라우트 수동 등록 필수
 scripts/                 # 시드, 버킷 생성, 이미지 업로드

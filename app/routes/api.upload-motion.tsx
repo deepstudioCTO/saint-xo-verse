@@ -4,11 +4,15 @@ import {
   uploadMotionVideo,
   uploadThumbnail,
 } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const formData = await request.formData();

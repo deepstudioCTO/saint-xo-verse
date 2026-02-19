@@ -3,12 +3,16 @@ import type { Route } from "./+types/api.delete-concept-image";
 import { getDb } from "~/lib/db.server";
 import { conceptImages, generations } from "../../drizzle/schema";
 import { deleteConceptImage } from "~/lib/supabase.server";
+import { requireAuthApi } from "~/lib/auth.server";
 
 // POST /api/delete-concept-image — 컨셉 이미지 삭제
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
+
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
     const { id } = await request.json();
