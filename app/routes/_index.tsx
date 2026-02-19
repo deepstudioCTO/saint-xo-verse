@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams, useLoaderData, useRevalidator, Link, Form, isRouteErrorResponse } from "react-router";
+import { useSearchParams, useLoaderData, useRevalidator, Link, Form, isRouteErrorResponse, type ShouldRevalidateFunctionArgs } from "react-router";
 import { data } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { DndContext, DragOverlay, type Modifier } from "@dnd-kit/core";
@@ -54,6 +54,17 @@ export const meta: Route.MetaFunction = () => [
   { title: "HitOS" },
   { name: "description", content: "Fan-made short-form video creation platform" },
 ];
+
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  formMethod,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") return defaultShouldRevalidate;
+  if (currentUrl.pathname === nextUrl.pathname) return false;
+  return defaultShouldRevalidate;
+}
 
 interface CharacterImage {
   id: string;
@@ -450,7 +461,7 @@ export default function Home() {
                 ref={isSelected ? (node: HTMLDivElement | null) => {
                   skill.personaRef.current = node;
                 } : undefined}
-                className="absolute cursor-pointer transition-[transform,opacity] duration-500 ease-out"
+                className="absolute cursor-pointer transition-[transform,opacity] duration-300 ease-out"
                 style={{
                   transform: isSelecting
                     ? `translateX(${x}vw) scale(${scale})`

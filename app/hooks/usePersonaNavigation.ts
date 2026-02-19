@@ -109,7 +109,7 @@ export function usePersonaNavigation({
         if (distX > 60) {
           gestureActive.current = true;
           navigatePersona(dx > 0 ? "next" : "prev");
-          setTimeout(() => { gestureActive.current = false; }, 400);
+          setTimeout(() => { gestureActive.current = false; }, 250);
         }
       },
     },
