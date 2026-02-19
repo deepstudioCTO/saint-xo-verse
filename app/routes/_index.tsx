@@ -226,7 +226,10 @@ export default function Home() {
 
   // Current lookbook ID from URL (with fallback)
   const activeLookbookId = searchParams.get("lookbook") || currentLookbookId;
-  const activeLookId = searchParams.get("look") || loaderLookId;
+  const lookParam = searchParams.get("look");
+  const activeLookId = (lookParam && allLooks.some(l => l.id === lookParam && l.lookbookId === activeLookbookId))
+    ? lookParam
+    : allLooks.find(l => l.lookbookId === activeLookbookId)?.id || loaderLookId;
 
   // Looks for current lookbook
   const currentLookbookLooks = useMemo(
@@ -611,6 +614,16 @@ export default function Home() {
                       <span className="text-[7px] tracking-[0.15em] font-medium text-white/50 uppercase">
                         Generating
                       </span>
+                      <button
+                        className="mt-1 px-1.5 py-[1px] rounded-[1px] bg-white/90 text-[5px] tracking-[0.1em] font-medium text-black/70 uppercase hover:bg-white transition-colors cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          skill.dismissThreeCard();
+                          setActivePanel("gallery-expanded");
+                        }}
+                      >
+                        View Library
+                      </button>
                     </>
                   ) : (
                     <span className="text-[7px] tracking-[0.15em] font-medium text-white uppercase">
@@ -625,7 +638,7 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Layer 2: Header */}
-      <header className="absolute top-0 left-0 right-0 z-[45] flex items-center justify-between px-6 py-4">
+      <header className="absolute top-0 left-0 right-0 z-[45] flex items-center justify-between px-6 py-4 pointer-events-none [&_button]:pointer-events-auto [&_a]:pointer-events-auto [&_form]:pointer-events-auto">
         <div className="flex items-center gap-3">
           <div className="flex flex-col">
             <Link to="/" className="text-lg font-black italic tracking-wider text-black cursor-pointer hover:opacity-70 transition-opacity" style={{ fontWeight: 900 }}>HitOS</Link>

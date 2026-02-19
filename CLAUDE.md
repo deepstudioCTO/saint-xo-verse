@@ -134,6 +134,7 @@ export default [
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
 | Horizontal 패널 리빌 | RevealPanel 미사용, 가로 clip-path (`inset(0 50% 0 50%)` → `inset(0 0% 0 0%)`), 3개 패널 동일 패턴 | RevealPanel은 세로 clip이라 가로 리스트에 부적절, 중앙→좌우 확장이 하단 바 center 정렬과 일치 |
+| 오버레이 레이어 클릭 투과 | `pointer-events-none` + `[&_button]:pointer-events-auto` 등 자식 선택자. Header·Title 등 높은 z-index 레이어에 공통 적용 | backdrop보다 z-index가 높은 레이어가 click-outside를 가로채는 것 방지, 닫기 로직은 backdrop 한 곳에만 유지 |
 | 우측 썸네일 vs 하단 바 | 별도 absolute 컨테이너 분리 | 같은 컨테이너면 패널 열릴 때 썸네일이 위로 밀림 |
 | 하단 레이아웃 | 뮤직 위젯(우하단, 드래그 이동) + 패널 버튼(center). 위젯 = `MusicPlayerWidget`(썸네일+제목+컨트롤 통합, Motion `drag`) | 음악 플레이어 일체감 + 자유 배치 |
 | 뮤직 컴포넌트 모듈화 | `TrackInfo`, `MusicControls` 별도 컴포넌트로 추출, 위젯에서 조합 | 기존 UI 재사용 가능하게 보존 |
@@ -144,6 +145,7 @@ export default [
 | Skill Teaching 생성 | 3카드 모드: 페르소나(-18vw) × 스킬(0vw) = Generate(+18vw). DnD 경로도 보조로 유지 | 시각적 수식 레이아웃으로 직관적 생성 플로우 |
 | 3카드 모드 수명 | `threeCardActive` 명시적 상태 (`useSkillTeaching`), 스킬 선택 시 ON, click-outside/Escape/캐릭터 변경 시 `dismissThreeCard()`로 OFF. `activePanel`에서 파생하지 않음 | 파생 조건(`activePanel === null`)은 dismiss 불가 버그 유발, 명시적 상태로 전환 |
 | Generate glow 유지 | `generateClicked` 상태 → `isGenerating`으로 expose. fetcher 수명과 무관하게 유지, `dismissThreeCard` 시 리셋 | fetcher 기반 `isGenerating`은 API 응답 즉시 false → glow 사라짐 |
+| Generate → Library 이동 | generating 상태에서 "View Library" 버튼 표시, 클릭 시 `dismissThreeCard()` + `setActivePanel("gallery-expanded")` | 생성 대기 중 결과 확인 동선 단축 |
 | Generate 카드 z-index | `z-[30]` (click-outside backdrop `z-[25]` 위) | backdrop가 Layer 1 카드 클릭을 가로막는 문제 해결 |
 | handleProduce 시그니처 | `(item: SkillDragItem, prompt?)` — 아이템을 파라미터로 받음. DnD 경로: `confirmDialog` 전달, Generate 경로: 선택된 스킬로 구성 | 두 진입점(Generate 클릭, DnD 확인) 모두 지원 |
 | 생성 시 갤러리 큐 표시 | optimistic update (`addOptimisticGeneration`) → fetcher 완료 후 `refetch()` | 생성 API(Replicate)가 느려서 갤러리 fetch와 race condition 발생 |
@@ -152,6 +154,7 @@ export default [
 | 에셋 파일명 → DB 매핑 | 2단계 파싱: `{lookId}_{charId}` 먼저, 실패 시 `{lookbookId}_{charId}` → lookId=`{id}_01` | 레거시(`00_sumin`) + 신규(`00_02_sumin`) 네이밍 공존 |
 | 영상 비율 보정 | WebGL 셰이더에서 `u_videoAspect` uniform으로 cover-crop UV 보정 (zoom punch/글리치 앞단에서 적용) | look별 영상 비율이 다름 (00_01: 1:2, 00_02~04: 9:16). 컨테이너 `aspect-[1/2]`는 고정, 셰이더가 자동 crop |
 | 내비게이션 트랜지션 | `_index.tsx`에 단일 `transition` 상태(`{ type: "lookbook"\|"look", direction }`)로 통합, 훅들은 `onTransition` 콜백만 호출 | 훅별 분리 direction 상태는 리셋되지 않아 스테일 버그 유발, 이벤트 시그널을 상위에서 단일 관리 |
+| 내비게이션 revalidation | `shouldRevalidate`로 searchParams 변경 시 loader 스킵, `activeLookId`는 클라이언트에서 `allLooks` 기반으로 해석 | loader 재실행(7 DB 쿼리)이 UI 블로킹 → 즉시 응답으로 개선. `loaderLookId` 폴백은 stale 위험 |
 | 포스터 프리로드 | `usePreloadPosters`로 전체 persona poster 즉시 로드 + WebGLGlitchVideo·FallbackVideo에 `background-image: poster` 적용 | idle 콜백은 WebGL+비디오 초기화로 지연됨, canvas `opacity:0` 동안 poster가 보이도록 다층 배경 |
 | 인증 | `@supabase/ssr` 쿠키 기반, `getUser()` 서버 검증 (JWT 검증). `getSession()` 미사용 | `getSession()`은 JWT를 검증하지 않아 변조 가능, `getUser()`는 Supabase에 실제 확인 |
 | Auth 가드 패턴 | `requireAuth` (페이지, redirect) / `requireAuthApi` (API, 401 throw) 분리 | 페이지는 로그인 폼으로 안내, API는 JSON 에러 응답 |
