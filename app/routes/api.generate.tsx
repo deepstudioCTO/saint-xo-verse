@@ -47,7 +47,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         const err = await imgRes.text();
         return Response.json(
           { error: `이미지 업로드 실패: ${err.slice(0, 200)}` },
-          { status: 500 }
+          { status: 500, headers: authHeaders }
         );
       }
       const imgData = await imgRes.json();
@@ -66,7 +66,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         const err = await vidRes.text();
         return Response.json(
           { error: `영상 업로드 실패: ${err.slice(0, 200)}` },
-          { status: 500 }
+          { status: 500, headers: authHeaders }
         );
       }
       const vidData = await vidRes.json();
@@ -76,7 +76,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!imageUrl || !videoUrl) {
       return Response.json(
         { error: "image와 video URL 또는 파일이 필요합니다" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -103,7 +103,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       const err = await predRes.text();
       return Response.json(
         { error: `생성 요청 실패: ${err.slice(0, 200)}` },
-        { status: 500 }
+        { status: 500, headers: authHeaders }
       );
     }
 
@@ -131,9 +131,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       success: true,
       id: prediction.id,
       generationId: generation.id,
-    });
+    }, { headers: authHeaders });
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }
 
@@ -147,7 +147,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const id = url.searchParams.get("id");
 
   if (!id) {
-    return Response.json({ error: "id 파라미터 필요" }, { status: 400 });
+    return Response.json({ error: "id 파라미터 필요" }, { status: 400, headers: authHeaders });
   }
 
   try {
@@ -160,7 +160,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       .limit(1);
 
     if (!generation) {
-      return Response.json({ error: "Generation not found" }, { status: 404 });
+      return Response.json({ error: "Generation not found" }, { status: 404, headers: authHeaders });
     }
 
     // Replicate API에서 상태 조회
@@ -200,7 +200,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             output: videoUrl,
             error: null,
             predictionStatus: data.status,
-          });
+          }, { headers: authHeaders });
         } catch (uploadError) {
           console.error("Failed to persist video to Supabase:", uploadError);
           // 폴백: Replicate CDN URL 사용 (임시)
@@ -229,15 +229,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         output: videoUrl,
         error: errorMessage,
         predictionStatus: data.status,
-      });
+      }, { headers: authHeaders });
     }
 
     return Response.json({
       status: generation.status,
       output: generation.videoUrl,
       error: generation.errorMessage,
-    });
+    }, { headers: authHeaders });
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }

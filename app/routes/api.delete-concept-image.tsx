@@ -18,7 +18,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id } = await request.json();
 
     if (!id) {
-      return Response.json({ error: "id 필요" }, { status: 400 });
+      return Response.json({ error: "id 필요" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -33,7 +33,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!conceptImage) {
       return Response.json(
         { error: "컨셉 이미지를 찾을 수 없습니다" },
-        { status: 404 }
+        { status: 404, headers: authHeaders }
       );
     }
 
@@ -57,9 +57,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     // DB에서 삭제
     await db.delete(conceptImages).where(eq(conceptImages.id, id));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (err) {
     console.error("Delete concept image error:", err);
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }

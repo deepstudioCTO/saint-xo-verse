@@ -15,7 +15,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { generationId, motionVideoId } = await request.json();
 
     if (!generationId) {
-      return Response.json({ error: "generationId is required" }, { status: 400 });
+      return Response.json({ error: "generationId is required" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -26,12 +26,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       .set({ motionVideoId: motionVideoId || null })
       .where(eq(generations.id, generationId));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to update generation motion:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

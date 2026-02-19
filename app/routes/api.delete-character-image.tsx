@@ -18,7 +18,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id } = await request.json();
 
     if (!id) {
-      return Response.json({ error: "id is required" }, { status: 400 });
+      return Response.json({ error: "id is required" }, { status: 400, headers: authHeaders });
     }
 
     // Get the image record
@@ -28,7 +28,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       .where(eq(characterImages.id, id));
 
     if (!image) {
-      return Response.json({ error: "Image not found" }, { status: 404 });
+      return Response.json({ error: "Image not found" }, { status: 404, headers: authHeaders });
     }
 
     // Check if this is the last image for this character
@@ -40,7 +40,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (remainingImages.length <= 1) {
       return Response.json(
         { error: "Cannot delete the last image for a character" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -55,12 +55,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     // Delete from DB
     await db.delete(characterImages).where(eq(characterImages.id, id));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Delete character image error:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Delete failed" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

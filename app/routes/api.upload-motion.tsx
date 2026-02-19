@@ -22,11 +22,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const name = (formData.get("name") as string) || videoFile?.name || "Untitled";
 
     if (!videoFile) {
-      return Response.json({ error: "Video file is required" }, { status: 400 });
+      return Response.json({ error: "Video file is required" }, { status: 400, headers: authHeaders });
     }
 
     if (isNaN(duration) || duration <= 0) {
-      return Response.json({ error: "Invalid duration" }, { status: 400 });
+      return Response.json({ error: "Invalid duration" }, { status: 400, headers: authHeaders });
     }
 
     // Supabase Storage에 영상 업로드
@@ -70,14 +70,14 @@ export async function action({ request, context }: ActionFunctionArgs) {
           ? `${context.cloudflare.env.SUPABASE_URL}/storage/v1/object/public/motion-videos/${thumbnailPath}`
           : null,
       },
-    });
+    }, { headers: authHeaders });
   } catch (error) {
     console.error("Upload error:", error);
     return Response.json(
       {
         error: error instanceof Error ? error.message : "Upload failed",
       },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

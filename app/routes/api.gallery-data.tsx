@@ -67,21 +67,21 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       personaMap[p.lookId][p.characterId] = { name: p.name };
     }
 
-    return {
+    return Response.json({
       generations: generationsWithNames,
       motionVideos: allMotionVideos,
       conceptImages: allConceptImages,
       characters: characterList,
       personaMap,
-    };
+    }, { headers: authHeaders });
   } catch {
     // Offline fallback
-    return {
+    return Response.json({
       generations: SYNCED_GENERATIONS,
       motionVideos: SYNCED_SKILL_VIDEOS.map((v) => ({ id: v.id, name: v.name })),
       conceptImages: SYNCED_SKILL_IMAGES.map((i) => ({ id: i.id, name: i.name })),
       characters: CHARACTERS,
       personaMap: buildPersonaMap(SYNCED_PERSONAS),
-    };
+    }, { headers: authHeaders });
   }
 }

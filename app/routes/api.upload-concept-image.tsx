@@ -19,14 +19,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     const name = formData.get("name") as string | null;
 
     if (!file || file.size === 0) {
-      return Response.json({ error: "파일이 필요합니다" }, { status: 400 });
+      return Response.json({ error: "파일이 필요합니다" }, { status: 400, headers: authHeaders });
     }
 
     // 이미지 타입 검증
     if (!file.type.startsWith("image/")) {
       return Response.json(
         { error: "이미지 파일만 업로드 가능합니다" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -51,9 +51,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     return Response.json({
       success: true,
       conceptImage,
-    });
+    }, { headers: authHeaders });
   } catch (err) {
     console.error("Upload concept image error:", err);
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }

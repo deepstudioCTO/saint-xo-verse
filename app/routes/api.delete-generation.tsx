@@ -16,7 +16,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id } = await request.json();
 
     if (!id) {
-      return Response.json({ error: "ID is required" }, { status: 400 });
+      return Response.json({ error: "ID is required" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -29,7 +29,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       .limit(1);
 
     if (!generation) {
-      return Response.json({ error: "Generation not found" }, { status: 404 });
+      return Response.json({ error: "Generation not found" }, { status: 404, headers: authHeaders });
     }
 
     // Supabase Storage에서 삭제
@@ -51,12 +51,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       .where(eq(generations.id, id))
       .returning({ id: generations.id });
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to delete generation:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

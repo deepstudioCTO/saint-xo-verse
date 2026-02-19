@@ -10,26 +10,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const targetUrl = url.searchParams.get("url");
 
   if (!targetUrl) {
-    return new Response("url 파라미터 필요", { status: 400 });
+    return new Response("url 파라미터 필요", { status: 400, headers: authHeaders });
   }
 
   try {
     const res = await fetch(targetUrl);
     if (!res.ok) {
-      return new Response(`원본 fetch 실패: ${res.status}`, { status: res.status });
+      return new Response(`원본 fetch 실패: ${res.status}`, { status: res.status, headers: authHeaders });
     }
 
     const contentType = res.headers.get("content-type") ?? "video/mp4";
     const buffer = await res.arrayBuffer();
 
-    return new Response(buffer, {
-      headers: {
-        "Content-Type": contentType,
-        "Content-Disposition": 'attachment; filename="generated.mp4"',
-        "Content-Length": String(buffer.byteLength),
-      },
-    });
+    const responseHeaders = new Headers(authHeaders);
+    responseHeaders.set("Content-Type", contentType);
+    responseHeaders.set("Content-Disposition", 'attachment; filename="generated.mp4"');
+    responseHeaders.set("Content-Length", String(buffer.byteLength));
+
+    return new Response(buffer, { headers: responseHeaders });
   } catch (err) {
-    return new Response(`프록시 오류: ${String(err)}`, { status: 500 });
+    return new Response(`프록시 오류: ${String(err)}`, { status: 500, headers: authHeaders });
   }
 }

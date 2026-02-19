@@ -15,11 +15,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id, name } = await request.json();
 
     if (!id) {
-      return Response.json({ error: "id is required" }, { status: 400 });
+      return Response.json({ error: "id is required" }, { status: 400, headers: authHeaders });
     }
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
-      return Response.json({ error: "name is required" }, { status: 400 });
+      return Response.json({ error: "name is required" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -30,12 +30,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       .set({ name: name.trim() })
       .where(eq(motionVideos.id, id));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to update motion:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

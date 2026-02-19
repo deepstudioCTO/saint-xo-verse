@@ -16,7 +16,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id } = await request.json();
 
     if (!id) {
-      return Response.json({ error: "ID is required" }, { status: 400 });
+      return Response.json({ error: "ID is required" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -29,7 +29,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       .limit(1);
 
     if (!video) {
-      return Response.json({ error: "Video not found" }, { status: 404 });
+      return Response.json({ error: "Video not found" }, { status: 404, headers: authHeaders });
     }
 
     // 2. generations 테이블에서 motionVideoId를 NULL로 업데이트 (참조 해제)
@@ -48,12 +48,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     // 4. motion_videos 테이블에서 레코드 삭제
     await db.delete(motionVideos).where(eq(motionVideos.id, id));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to delete motion video:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

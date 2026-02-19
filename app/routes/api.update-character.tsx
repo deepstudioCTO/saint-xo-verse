@@ -15,14 +15,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id, name, description } = await request.json();
 
     if (!id) {
-      return Response.json({ error: "id is required" }, { status: 400 });
+      return Response.json({ error: "id is required" }, { status: 400, headers: authHeaders });
     }
 
     // At least one of name or description must be provided
     if (!name && !description) {
       return Response.json(
         { error: "name or description is required" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -40,7 +40,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.keys(updateData).length === 0) {
       return Response.json(
         { error: "No valid fields to update" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -50,12 +50,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       .set(updateData)
       .where(eq(characters.id, id));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to update character:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

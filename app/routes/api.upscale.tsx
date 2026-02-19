@@ -36,11 +36,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     const resolution = (formData.get("resolution") as string) || "FHD";
 
     if (!generationId) {
-      return Response.json({ error: "generationId is required" }, { status: 400 });
+      return Response.json({ error: "generationId is required" }, { status: 400, headers: authHeaders });
     }
 
     if (!MODELS[model]) {
-      return Response.json({ error: "Invalid model" }, { status: 400 });
+      return Response.json({ error: "Invalid model" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -53,11 +53,11 @@ export async function action({ request, context }: Route.ActionArgs) {
       .limit(1);
 
     if (!generation) {
-      return Response.json({ error: "Generation not found" }, { status: 404 });
+      return Response.json({ error: "Generation not found" }, { status: 404, headers: authHeaders });
     }
 
     if (!generation.videoUrl) {
-      return Response.json({ error: "No video to upscale" }, { status: 400 });
+      return Response.json({ error: "No video to upscale" }, { status: 400, headers: authHeaders });
     }
 
     // Build input based on model
@@ -94,7 +94,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       const err = await predRes.text();
       return Response.json(
         { error: `Upscale request failed: ${err.slice(0, 200)}` },
-        { status: 500 }
+        { status: 500, headers: authHeaders }
       );
     }
 
@@ -117,9 +117,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       success: true,
       predictionId: prediction.id,
       model,
-    });
+    }, { headers: authHeaders });
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }
 
@@ -133,7 +133,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const id = url.searchParams.get("id");
 
   if (!id) {
-    return Response.json({ error: "id parameter required" }, { status: 400 });
+    return Response.json({ error: "id parameter required" }, { status: 400, headers: authHeaders });
   }
 
   try {
@@ -146,7 +146,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       .limit(1);
 
     if (!generation) {
-      return Response.json({ error: "Generation not found" }, { status: 404 });
+      return Response.json({ error: "Generation not found" }, { status: 404, headers: authHeaders });
     }
 
     // If no upscale in progress
@@ -154,7 +154,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       return Response.json({
         upscaleStatus: generation.upscaleStatus,
         upscaledVideoUrl: generation.upscaledVideoUrl,
-      });
+      }, { headers: authHeaders });
     }
 
     // Poll Replicate
@@ -216,8 +216,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       upscaleModel: generation.upscaleModel,
       error: errorMessage,
       predictionStatus: data.status,
-    });
+    }, { headers: authHeaders });
   } catch (err) {
-    return Response.json({ error: String(err) }, { status: 500 });
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }

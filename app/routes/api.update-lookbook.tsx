@@ -16,14 +16,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { lookbookId, name, description } = body;
 
     if (!lookbookId) {
-      return Response.json({ error: "lookbookId is required" }, { status: 400 });
+      return Response.json({ error: "lookbookId is required" }, { status: 400, headers: authHeaders });
     }
 
     const hasDescription = "description" in body;
     if (!name && !hasDescription) {
       return Response.json(
         { error: "name or description is required" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -41,7 +41,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.keys(updateData).length === 0) {
       return Response.json(
         { error: "No valid fields to update" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -50,12 +50,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       .set(updateData)
       .where(eq(lookbooks.id, lookbookId));
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to update lookbook:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

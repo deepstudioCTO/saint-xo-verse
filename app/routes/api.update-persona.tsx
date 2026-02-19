@@ -18,14 +18,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     const hasDefaultInput = "defaultInput" in body;
 
     if (!lookId || !characterId) {
-      return Response.json({ error: "lookId and characterId are required" }, { status: 400 });
+      return Response.json({ error: "lookId and characterId are required" }, { status: 400, headers: authHeaders });
     }
 
     // At least one field must be provided
     if (!name && !description && !hasDefaultInput) {
       return Response.json(
         { error: "name, description, or defaultInput is required" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -46,7 +46,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (Object.keys(updateData).length === 0) {
       return Response.json(
         { error: "No valid fields to update" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -61,12 +61,12 @@ export async function action({ request, context }: Route.ActionArgs) {
         )
       );
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to update persona:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

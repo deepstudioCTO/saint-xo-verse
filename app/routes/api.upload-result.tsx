@@ -26,11 +26,11 @@ export async function action({ request, context }: ActionFunctionArgs) {
     let characterImageUrl = formData.get("imageUrl") as string | null;
 
     if (!memberId) {
-      return Response.json({ error: "Character selection is required" }, { status: 400 });
+      return Response.json({ error: "Character selection is required" }, { status: 400, headers: authHeaders });
     }
 
     if (!CHARACTERS_BY_ID[memberId]) {
-      return Response.json({ error: "Invalid character" }, { status: 400 });
+      return Response.json({ error: "Invalid character" }, { status: 400, headers: authHeaders });
     }
 
     // If no characterImageUrl provided, get default image from DB
@@ -49,20 +49,20 @@ export async function action({ request, context }: ActionFunctionArgs) {
     // Handle video upload
     if (mediaType === "video" || videoFile) {
       if (!videoFile) {
-        return Response.json({ error: "Video file is required" }, { status: 400 });
+        return Response.json({ error: "Video file is required" }, { status: 400, headers: authHeaders });
       }
 
       if (isNaN(duration) || duration <= 0) {
-        return Response.json({ error: "Invalid duration" }, { status: 400 });
+        return Response.json({ error: "Invalid duration" }, { status: 400, headers: authHeaders });
       }
 
       if (duration > 10) {
-        return Response.json({ error: "Video must be 10 seconds or less" }, { status: 400 });
+        return Response.json({ error: "Video must be 10 seconds or less" }, { status: 400, headers: authHeaders });
       }
 
       const validTypes = ["video/mp4", "video/quicktime"];
       if (!validTypes.includes(videoFile.type)) {
-        return Response.json({ error: "Only MP4 and MOV files are allowed" }, { status: 400 });
+        return Response.json({ error: "Only MP4 and MOV files are allowed" }, { status: 400, headers: authHeaders });
       }
 
       const [inserted] = await db
@@ -121,18 +121,18 @@ export async function action({ request, context }: ActionFunctionArgs) {
           upscaleModel: null,
           upscaledVideoUrl: null,
         },
-      });
+      }, { headers: authHeaders });
     }
 
     // Handle image upload
     if (mediaType === "image" || imageFile) {
       if (!imageFile) {
-        return Response.json({ error: "Image file is required" }, { status: 400 });
+        return Response.json({ error: "Image file is required" }, { status: 400, headers: authHeaders });
       }
 
       const validImageTypes = ["image/jpeg", "image/png", "image/webp"];
       if (!validImageTypes.includes(imageFile.type)) {
-        return Response.json({ error: "Only JPG, PNG, and WebP images are allowed" }, { status: 400 });
+        return Response.json({ error: "Only JPG, PNG, and WebP images are allowed" }, { status: 400, headers: authHeaders });
       }
 
       const [inserted] = await db
@@ -190,17 +190,17 @@ export async function action({ request, context }: ActionFunctionArgs) {
           upscaleModel: null,
           upscaledVideoUrl: null,
         },
-      });
+      }, { headers: authHeaders });
     }
 
-    return Response.json({ error: "No file provided" }, { status: 400 });
+    return Response.json({ error: "No file provided" }, { status: 400, headers: authHeaders });
   } catch (error) {
     console.error("Upload result error:", error);
     return Response.json(
       {
         error: error instanceof Error ? error.message : "Upload failed",
       },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

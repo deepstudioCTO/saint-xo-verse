@@ -15,7 +15,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const { id, nodes, edges, viewport, sourceGenerationId } = body;
 
     if (!id || typeof nodes !== "string" || typeof edges !== "string") {
-      return Response.json({ error: "id, nodes, edges are required" }, { status: 400 });
+      return Response.json({ error: "id, nodes, edges are required" }, { status: 400, headers: authHeaders });
     }
 
     const db = getDb(context.cloudflare as { env: Record<string, string> });
@@ -39,12 +39,12 @@ export async function action({ request, context }: Route.ActionArgs) {
         },
       });
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: authHeaders });
   } catch (error) {
     console.error("Failed to save editor project:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Unknown error" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }

@@ -22,14 +22,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!image || !characterId) {
       return Response.json(
         { error: "image and characterId are required" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
     if (!image.type.startsWith("image/")) {
       return Response.json(
         { error: "File must be an image" },
-        { status: 400 }
+        { status: 400, headers: authHeaders }
       );
     }
 
@@ -79,12 +79,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     return Response.json({
       success: true,
       image: newImage,
-    });
+    }, { headers: authHeaders });
   } catch (error) {
     console.error("Upload character image error:", error);
     return Response.json(
       { error: error instanceof Error ? error.message : "Upload failed" },
-      { status: 500 }
+      { status: 500, headers: authHeaders }
     );
   }
 }
