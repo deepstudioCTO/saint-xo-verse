@@ -259,3 +259,18 @@ body {
   animation: rotate-glow 2.5s linear infinite;
   filter: blur(1.5px);
 }
+
+.generate-glow {
+  background: conic-gradient(
+    from var(--glow-angle),
+    transparent 10%,
+    rgba(100, 255, 180, 0.4) 25%,
+    rgba(80, 200, 255, 0.6) 40%,
+    rgba(180, 140, 255, 0.6) 50%,
+    rgba(80, 200, 255, 0.6) 60%,
+    rgba(100, 255, 180, 0.4) 75%,
+    transparent 90%
+  );
+  animation: rotate-glow 1.5s linear infinite;
+  filter: blur(2px);
+}

@@ -90,9 +90,9 @@ function VideoSkillItem({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isDragging ? 0.4 : 1 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: isDragging ? 0.4 : 1, x: 0 }}
+      transition={{ duration: 0.25, delay: index * 0.03 }}
       onClick={onClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -177,9 +177,9 @@ function ImageSkillItem({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isDragging ? 0.4 : 1 }}
-      transition={{ duration: 0.3, delay: index * 0.05 }}
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: isDragging ? 0.4 : 1, x: 0 }}
+      transition={{ duration: 0.25, delay: index * 0.03 }}
       onClick={onClick}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
@@ -296,6 +296,75 @@ const CollapseIcon = (
     <line x1="3" y1="21" x2="10" y2="14" />
   </svg>
 );
+
+/* ── Horizontal Panel (single-row bar) ────────────────────── */
+
+function SkillHorizontalRow({
+  contentReady,
+  ...props
+}: SkillContentProps & { contentReady: boolean }) {
+  const { videos, images, tab, selectedVideoId, selectedImageId, onSelectVideo, onSelectImage } = props;
+
+  if (!contentReady) return null;
+
+  if (tab === "video") {
+    return videos.length === 0 ? (
+      <p className="text-center text-neutral-400 text-sm py-4 whitespace-nowrap">No motion videos</p>
+    ) : (
+      <div className="grid grid-flow-col auto-cols-[75px] gap-2">
+        {videos.map((video, i) => (
+          <VideoSkillItem
+            key={video.id}
+            video={video}
+            index={i}
+            selected={selectedVideoId === video.id}
+            onClick={() => onSelectVideo(selectedVideoId === video.id ? null : video.id)}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return images.length === 0 ? (
+    <p className="text-center text-neutral-400 text-sm py-4 whitespace-nowrap">No concept images</p>
+  ) : (
+    <div className="grid grid-flow-col auto-cols-[75px] gap-2">
+      {images.map((image, i) => (
+        <ImageSkillItem
+          key={image.id}
+          image={image}
+          index={i}
+          selected={selectedImageId === image.id}
+          onClick={() => onSelectImage(selectedImageId === image.id ? null : image.id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+export function SkillHorizontalPanel({
+  open,
+  onExpand,
+  ...contentProps
+}: SkillContentProps & { open: boolean; onExpand?: () => void }) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ clipPath: "inset(0 50% 0 50% round 0.125rem)" }}
+          animate={{ clipPath: "inset(0 0% 0 0% round 0.125rem)" }}
+          exit={{ clipPath: "inset(0 50% 0 50% round 0.125rem)" }}
+          transition={{ duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
+          className="w-full glass flex flex-col overflow-hidden h-[136px]"
+        >
+          <div className="overflow-x-auto flex-1 min-h-0 p-4">
+            <SkillHorizontalRow contentReady {...contentProps} />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
 
 /* ── Compact Panel ─────────────────────────────────────────── */
 

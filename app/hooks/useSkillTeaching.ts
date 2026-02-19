@@ -57,6 +57,8 @@ export function useSkillTeaching({
   const [skillTab, setSkillTab] = useState<"video" | "image">("video");
   const [selectedSkillVideoId, setSelectedSkillVideoId] = useState<string | null>(null);
   const [selectedSkillImageId, setSelectedSkillImageId] = useState<string | null>(null);
+  const [threeCardActive, setThreeCardActive] = useState(false);
+  const [generateClicked, setGenerateClicked] = useState(false);
 
   const handleSkillTabChange = useCallback((t: "video" | "image") => {
     setSkillTab(t);
@@ -65,12 +67,33 @@ export function useSkillTeaching({
   }, []);
   const handleSkillSelectVideo = useCallback((id: string | null) => {
     setSelectedSkillVideoId(id);
-    if (id) setActivePanel(null);
-  }, [setActivePanel]);
+    if (id) {
+      setThreeCardActive(true);
+      setGenerateClicked(false);
+    }
+  }, []);
   const handleSkillSelectImage = useCallback((id: string | null) => {
     setSelectedSkillImageId(id);
-    if (id) setActivePanel(null);
-  }, [setActivePanel]);
+    if (id) {
+      setThreeCardActive(true);
+      setGenerateClicked(false);
+    }
+  }, []);
+
+  // Auto-select first skill when panel opens
+  useEffect(() => {
+    if (activePanel === "skill-horizontal" && !selectedSkillVideoId && !selectedSkillImageId) {
+      if (skillTab === "video" && skillVideos.length > 0) {
+        setSelectedSkillVideoId(skillVideos[0].id);
+        setThreeCardActive(true);
+        setGenerateClicked(false);
+      } else if (skillTab === "image" && skillImages.length > 0) {
+        setSelectedSkillImageId(skillImages[0].id);
+        setThreeCardActive(true);
+        setGenerateClicked(false);
+      }
+    }
+  }, [activePanel, skillTab, skillVideos, skillImages, selectedSkillVideoId, selectedSkillImageId]);
 
   // Resolved selected objects
   const selectedSkillVideo = useMemo(
@@ -98,7 +121,7 @@ export function useSkillTeaching({
   );
 
   const fetcher = useFetcher();
-  const isGenerating = fetcher.state !== "idle";
+  const isGenerating = generateClicked;
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveDragItem(event.active.data.current as SkillDragItem);
@@ -129,28 +152,36 @@ export function useSkillTeaching({
     dragStartPos.current = null;
   }, []);
 
-  const handleProduce = useCallback((prompt?: string) => {
-    if (!confirmDialog || !currentCharacter) return;
+  const dismissThreeCard = useCallback(() => {
+    setThreeCardActive(false);
+    setGenerateClicked(false);
+    setSelectedSkillVideoId(null);
+    setSelectedSkillImageId(null);
+    setActivePanel(null);
+  }, [setActivePanel]);
+
+  const handleProduce = useCallback((item: SkillDragItem, prompt?: string) => {
+    if (!item || !currentCharacter) return;
 
     const personaRect = personaRef.current?.getBoundingClientRect();
     const startX = personaRect ? personaRect.left + personaRect.width / 2 - 30 : window.innerWidth / 2;
     const startY = personaRect ? personaRect.top + personaRect.height * 0.3 : window.innerHeight / 2;
-    const thumbnailUrl = confirmDialog.thumbnailUrl;
+    const thumbnailUrl = item.thumbnailUrl;
 
     const formData = new FormData();
-    if (confirmDialog.type === "video") {
+    if (item.type === "video") {
       formData.append("imageUrl", selectedImgUrl);
-      formData.append("videoUrl", confirmDialog.videoUrl || "");
+      formData.append("videoUrl", item.videoUrl || "");
       formData.append("memberId", currentCharacter.characterId);
-      formData.append("motionVideoId", confirmDialog.id);
+      formData.append("motionVideoId", item.id);
       formData.append("lookbookId", currentLookbookId);
       formData.append("lookId", currentLookId);
       if (prompt) formData.append("prompt", prompt);
       fetcher.submit(formData, { method: "post", action: "/api/generate" });
     } else {
       formData.append("characterImageUrl", selectedImgUrl);
-      formData.append("conceptImageUrl", confirmDialog.publicUrl || "");
-      formData.append("conceptImageId", confirmDialog.id);
+      formData.append("conceptImageUrl", item.publicUrl || "");
+      formData.append("conceptImageId", item.id);
       formData.append("prompt", prompt || "");
       formData.append("memberId", currentCharacter.characterId);
       formData.append("lookbookId", currentLookbookId);
@@ -162,19 +193,19 @@ export function useSkillTeaching({
     setFlyingCardTargetId(optimisticId);
     galleryState.addOptimisticGeneration({
       id: optimisticId,
-      type: confirmDialog.type,
+      type: item.type,
       memberId: currentCharacter.characterId,
       musicId: null,
-      motionVideoId: confirmDialog.type === "video" ? confirmDialog.id : null,
-      conceptImageId: confirmDialog.type === "image" ? confirmDialog.id : null,
+      motionVideoId: item.type === "video" ? item.id : null,
+      conceptImageId: item.type === "image" ? item.id : null,
       lookbookId: currentLookbookId,
       lookId: currentLookId,
       videoUrl: null,
       outputUrl: null,
       status: "pending",
       createdAt: new Date().toISOString(),
-      motionName: confirmDialog.type === "video" ? confirmDialog.name : null,
-      conceptImageName: confirmDialog.type === "image" ? confirmDialog.name : null,
+      motionName: item.type === "video" ? item.name : null,
+      conceptImageName: item.type === "image" ? item.name : null,
       errorMessage: null,
       prompt: prompt || null,
       upscaleStatus: null,
@@ -182,23 +213,33 @@ export function useSkillTeaching({
       upscaledVideoUrl: null,
     });
 
-    setActivePanel("gallery-compact");
-    setConfirmDialog(null);
-
-    const pollForGrid = () => {
-      const gridEl = galleryGridRef.current;
-      if (gridEl) {
-        const rect = gridEl.getBoundingClientRect();
-        const cellW = (rect.width - 16) / 3;
-        const endX = rect.left + cellW / 2 - 30;
-        const endY = rect.top + cellW - 40;
-        setFlyingCard({ thumbnailUrl, startX, startY, endX, endY });
-      } else {
-        requestAnimationFrame(pollForGrid);
-      }
-    };
-    requestAnimationFrame(pollForGrid);
+    setGenerateClicked(true);
+    setActivePanel(null);
+    if (confirmDialog) setConfirmDialog(null);
   }, [confirmDialog, currentCharacter, selectedImgUrl, currentLookbookId, currentLookId, fetcher, galleryState, setActivePanel]);
+
+  const handleGenerateClick = useCallback((prompt?: string) => {
+    let item: SkillDragItem | null = null;
+    if (selectedSkillVideo) {
+      item = {
+        type: "video",
+        id: selectedSkillVideo.id,
+        thumbnailUrl: selectedSkillVideo.thumbnailUrl || "",
+        name: selectedSkillVideo.name,
+        videoUrl: selectedSkillVideo.videoUrl,
+        duration: selectedSkillVideo.duration,
+      };
+    } else if (selectedSkillImage) {
+      item = {
+        type: "image",
+        id: selectedSkillImage.id,
+        thumbnailUrl: selectedSkillImage.publicUrl,
+        name: selectedSkillImage.name || "",
+        publicUrl: selectedSkillImage.publicUrl,
+      };
+    }
+    if (item) handleProduce(item, prompt);
+  }, [selectedSkillVideo, selectedSkillImage, handleProduce]);
 
   // Refetch gallery when fetcher completes
   useEffect(() => {
@@ -211,17 +252,29 @@ export function useSkillTeaching({
   useEffect(() => {
     setSelectedSkillVideoId(null);
     setSelectedSkillImageId(null);
+    setThreeCardActive(false);
+    setGenerateClicked(false);
   }, [selectedId]);
 
-  // Close compact panels on Escape
+  // Close compact panels / 3-card mode on Escape
   useEffect(() => {
-    if (!activePanel || activePanel === "gallery-expanded" || activePanel === "skill-expanded") return;
+    if (!activePanel && !threeCardActive) return;
+    if (activePanel === "gallery-expanded" || activePanel === "skill-expanded") return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActivePanel(null);
+      if (e.key !== "Escape") return;
+      if (threeCardActive) {
+        setThreeCardActive(false);
+        setGenerateClicked(false);
+        setSelectedSkillVideoId(null);
+        setSelectedSkillImageId(null);
+        setActivePanel(null);
+      } else if (activePanel) {
+        setActivePanel(null);
+      }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [activePanel, setActivePanel]);
+  }, [activePanel, setActivePanel, threeCardActive]);
 
   return {
     // Skill selection
@@ -245,11 +298,15 @@ export function useSkillTeaching({
     confirmDialog,
     setConfirmDialog,
     handleProduce,
+    handleGenerateClick,
     isGenerating,
     flyingCard,
     flyingCardTargetId,
     setFlyingCard,
     setFlyingCardTargetId,
+    // Three-card mode
+    threeCardActive,
+    dismissThreeCard,
     // Refs
     personaRef,
     galleryGridRef,

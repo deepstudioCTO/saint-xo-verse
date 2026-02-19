@@ -122,13 +122,18 @@ export default [
 |------|------|------|
 | 캐릭터 이미지 (생성 입력) | `defaultInput ?? poster` 폴백 | 캐릭터별 다른 인풋 이미지 지정, poster는 기본값 |
 | 캐릭터 이미지 (DB) | per-character (verse 무관) | 같은 인물이므로 AI 생성에 구분 불필요 |
-| 하단 패널 상호 배제 | `activePanel` 단일 상태 (`_index.tsx`), 타입은 `HomeFloatingBar`에서 export. Skill·Gallery 모두 `*-compact` / `*-expanded` 쌍 | 상태 1개로 모든 패널 토글 관리 |
+| 하단 패널 상호 배제 | `activePanel` 단일 상태 (`_index.tsx`), 타입은 `HomeFloatingBar`에서 export. Skill·Gallery 모두 `*-horizontal` / `*-compact` / `*-expanded` 3단 | 상태 1개로 모든 패널 토글 관리 |
+| 하단 3버튼 패널 | DEMO·SKILLS·LIBRARY 모두 동일한 가로 clip-path 패널(`*-horizontal`). Music은 `MusicHorizontalPanel`, Gallery는 `GalleryHorizontalPanel`, Skill은 `SkillHorizontalPanel` | 하단 버튼 → 가로 패널, 헤더 버튼 → compact/expanded (진입점별 다른 뷰) |
+| 하단 버튼 ↔ 패널 시퀀싱 | `showButtons` + `pendingPanelRef` + `AnimatePresence onExitComplete`로 조율. 열기: 버튼 exit 완료 → 패널 open. 닫기: `anyHorizontalOpen` false 후 300ms 지연 → 버튼 show | 버튼과 패널이 동시에 보이는 것 방지 |
 | Compact↔Expanded 패턴 | 공용 콘텐츠 props 타입 + 공유 서브컴포넌트(TabBar/Grid), 패널별 셸만 다름. `_index.tsx`에서 콜백은 `useCallback`으로 1회 정의 후 양쪽 전달 | DRY — 그리드·탭·콜백 중복 방지 |
-| 패널 항목 선택 시 자동 닫힘 | 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 |
+| 음악 패널 선택 시 닫힘 안 함 | `MusicHorizontalPanel`에서 트랙 클릭 = `selectTrack`만, `onClose` 없음 | 음악은 비교 시청하며 고르는 패턴, 배경클릭/Escape로만 닫힘 |
+| 음악 패널 내 재생 컨트롤 | `MusicHorizontalPanel` 하단에 `MusicControls` 재사용 | Horizontal 패널 열림 시 `MusicPlayerWidget`이 숨겨지므로 패널 자체에 재생 제어 필요 |
+| 패널 항목 선택 시 자동 닫힘 | Skill: 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 (Music은 예외) |
 | 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, Supabase Storage에서 서빙 (`preload="auto"`) | Range 요청 지원으로 seek 정상 동작, Cloudflare Workers Static Assets는 Range 미지원 |
 | 글로벌 스페이스바 | `registerGlobalSpacebar()` → root.tsx 1회 등록 | input/button 위에서는 스킵 |
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
+| Horizontal 패널 리빌 | RevealPanel 미사용, 가로 clip-path (`inset(0 50% 0 50%)` → `inset(0 0% 0 0%)`), 3개 패널 동일 패턴 | RevealPanel은 세로 clip이라 가로 리스트에 부적절, 중앙→좌우 확장이 하단 바 center 정렬과 일치 |
 | 우측 썸네일 vs 하단 바 | 별도 absolute 컨테이너 분리 | 같은 컨테이너면 패널 열릴 때 썸네일이 위로 밀림 |
 | 하단 레이아웃 | 뮤직 위젯(우하단, 드래그 이동) + 패널 버튼(center). 위젯 = `MusicPlayerWidget`(썸네일+제목+컨트롤 통합, Motion `drag`) | 음악 플레이어 일체감 + 자유 배치 |
 | 뮤직 컴포넌트 모듈화 | `TrackInfo`, `MusicControls` 별도 컴포넌트로 추출, 위젯에서 조합 | 기존 UI 재사용 가능하게 보존 |
@@ -136,9 +141,11 @@ export default [
 | 프로그래스바 seek | document-level `pointerup` 리스너 | `setPointerCapture`는 range input 네이티브 클릭 방해 |
 | 프로그래스바 채움 | CSS `--progress` 변수 + `linear-gradient` (webkit) / `::-moz-range-progress` (FF) | JS에서 % 계산 → CSS 변수로 전달 |
 | Skill 드래그 드롭 감지 | `useDroppable` 미사용, 수동 `getBoundingClientRect()` 히트테스트 | @dnd-kit의 rect 측정이 CSS `scale()` transform에서 고장 |
-| Skill Teaching 생성 | `_index.tsx`에서 `useFetcher`로 API 호출, 드롭 → 확인 다이얼로그 → 생성 + 갤러리 열림 | HomeFloatingBar가 아닌 페이지 레벨에서 생성 관리 |
-| Flying card 타겟 위치 | FLIP: `galleryGridRef` → rAF polling → `getBoundingClientRect()` 측정 | magic number 대신 DOM 측정 = 레이아웃 변경에 안전 |
-| Flying card → 셀 핸드오프 | `flyingCardTargetId` 상태로 조율: 비행 중 셀 숨김(opacity 0) → 카드 도착 시 셀 reveal(scale 0.85→1) + persona-glow | 카드가 큐에 "들어가는" 시각적 인과관계 형성 |
+| Skill Teaching 생성 | 3카드 모드: 페르소나(-18vw) × 스킬(0vw) = Generate(+18vw). DnD 경로도 보조로 유지 | 시각적 수식 레이아웃으로 직관적 생성 플로우 |
+| 3카드 모드 수명 | `threeCardActive` 명시적 상태 (`useSkillTeaching`), 스킬 선택 시 ON, click-outside/Escape/캐릭터 변경 시 `dismissThreeCard()`로 OFF. `activePanel`에서 파생하지 않음 | 파생 조건(`activePanel === null`)은 dismiss 불가 버그 유발, 명시적 상태로 전환 |
+| Generate glow 유지 | `generateClicked` 상태 → `isGenerating`으로 expose. fetcher 수명과 무관하게 유지, `dismissThreeCard` 시 리셋 | fetcher 기반 `isGenerating`은 API 응답 즉시 false → glow 사라짐 |
+| Generate 카드 z-index | `z-[30]` (click-outside backdrop `z-[25]` 위) | backdrop가 Layer 1 카드 클릭을 가로막는 문제 해결 |
+| handleProduce 시그니처 | `(item: SkillDragItem, prompt?)` — 아이템을 파라미터로 받음. DnD 경로: `confirmDialog` 전달, Generate 경로: 선택된 스킬로 구성 | 두 진입점(Generate 클릭, DnD 확인) 모두 지원 |
 | 생성 시 갤러리 큐 표시 | optimistic update (`addOptimisticGeneration`) → fetcher 완료 후 `refetch()` | 생성 API(Replicate)가 느려서 갤러리 fetch와 race condition 발생 |
 | 버튼 레이블 ↔ 패널 타입 | DEMO→`music-*`, SKILLS→`skill-*`, LIBRARY→`gallery-*`. 상단 우측 4버튼(AudioVisual Lab, Moodboard, Launch, Playground)은 placeholder | 표시 레이블 리브랜딩, 내부 패널 타입명은 유지 |
 | 캐릭터 영상/포스터 서빙 | Supabase Storage (`characters` 버킷), DB에 절대 URL 저장 | Cloudflare Workers Static Assets 배포 사이즈 제한 회피, music과 동일 패턴 |
@@ -219,9 +226,9 @@ app/
 ├── components/
 │   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel, SkillConfirmDialog, CharacterInfoPanel, LookbookInfoPanel
 │   ├── layout/          # HomeFloatingBar
-│   ├── music/           # MusicPanel (트랙 선택 패널)
-│   ├── skill/           # SkillPanel (캐릭터 재탭 시 인라인 생성 패널)
-│   ├── gallery/         # GalleryPanel(compact/expanded), GalleryGrid, GalleryModals, VideoDetailModal, ImageDetailModal
+│   ├── music/           # MusicHorizontalPanel (가로 트랙 선택), MusicPanel (세로, 미사용), MusicPlayerWidget
+│   ├── skill/           # SkillPanel (horizontal/compact/expanded)
+│   ├── gallery/         # GalleryPanel(horizontal/compact/expanded), GalleryGrid, GalleryModals, VideoDetailModal, ImageDetailModal
 │   ├── editor/          # 노드 에디터 (EditorCanvas, MediaBrowser, nodes/)
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
 │   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등

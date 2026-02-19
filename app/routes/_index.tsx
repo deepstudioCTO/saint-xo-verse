@@ -24,9 +24,10 @@ import { getDb, characterImages, lookbooks, looks, personas, motionVideos, conce
 import { getPublicUrl } from "~/lib/supabase.server";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { VideoCanvas } from "~/components/effects/VideoCanvas";
-import { SkillCompactPanel, SkillExpandedPanel } from "~/components/skill/SkillPanel";
+import { SkillHorizontalPanel, SkillExpandedPanel } from "~/components/skill/SkillPanel";
 import { HomeFloatingBar, type ActivePanel } from "~/components/layout/HomeFloatingBar";
-import { GalleryCompactPanel, GalleryExpandedPanel, GalleryModals } from "~/components/gallery";
+import { GalleryCompactPanel, GalleryExpandedPanel, GalleryHorizontalPanel, GalleryModals } from "~/components/gallery";
+import { MusicHorizontalPanel } from "~/components/music/MusicHorizontalPanel";
 import { useGalleryState } from "~/hooks/useGalleryState";
 import { InputImagePanel } from "~/components/common/InputImagePanel";
 import { SkillConfirmDialog } from "~/components/common/SkillConfirmDialog";
@@ -266,7 +267,7 @@ export default function Home() {
 
   // Panel state (shared across skill/gallery/music)
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
-  const galleryOpen = activePanel === "gallery-compact" || activePanel === "gallery-expanded";
+  const galleryOpen = activePanel === "gallery-horizontal" || activePanel === "gallery-compact" || activePanel === "gallery-expanded";
   const galleryState = useGalleryState(galleryOpen);
 
   // Unified transition state (replaces separate slideDirection / lookSlideDirection)
@@ -338,6 +339,11 @@ export default function Home() {
     charImages.setInputPanelOpen(false);
   }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reset generate prompt when skill selection changes
+  useEffect(() => {
+    setGeneratePrompt("");
+  }, [skill.selectedSkillVideoId, skill.selectedSkillImageId]);
+
   // Optimistic persona update callback
   const handleCharacterUpdate = useCallback((characterId: string, updates: Partial<Persona>) => {
     setPersonaList((prev) =>
@@ -356,10 +362,20 @@ export default function Home() {
   }, []);
 
   // Derived panel booleans
-  const skillCompactOpen = activePanel === "skill-compact";
+  const skillHorizontalOpen = activePanel === "skill-horizontal";
   const skillExpandedOpen = activePanel === "skill-expanded";
+  const musicHorizontalOpen = activePanel === "music-horizontal";
+  const galleryHorizontalOpen = activePanel === "gallery-horizontal";
   const galleryCompactOpen = activePanel === "gallery-compact";
   const galleryExpandedOpen = activePanel === "gallery-expanded";
+
+  // Three-card layout: character left + skill center + generate right
+  const hasSkillSelected = !!(skill.selectedSkillVideo || skill.selectedSkillImage);
+  const threeCardMode = isSelecting && hasSkillSelected && skill.threeCardActive;
+  const baseScale = 3.5;
+
+  // Prompt state for image skill generation
+  const [generatePrompt, setGeneratePrompt] = useState("");
 
   // Animation key combines lookbook + look for both vertical and horizontal transitions
   const animationKey = `${activeLookbookId}_${activeLookId}`;
@@ -397,13 +413,21 @@ export default function Home() {
 
             const homeX = (index - centerIndex) * 165;
             const selectX = diff * 22;
-            const x = isSelecting ? selectX : homeX;
+            const threeCardX = isSelected ? -18 : diff * 22;
+            const x = threeCardMode ? threeCardX : isSelecting ? selectX : homeX;
 
-            const baseScale = 3.5;
             let scale = 1;
             let opacity = 1;
 
-            if (isSelecting) {
+            if (threeCardMode) {
+              if (isSelected) {
+                scale = 2.5;
+                opacity = 1;
+              } else {
+                scale = baseScale * 0.3;
+                opacity = 0;
+              }
+            } else if (isSelecting) {
               if (isSelected) {
                 scale = baseScale;
                 opacity = 1;
@@ -435,15 +459,20 @@ export default function Home() {
                   zIndex: isSelected ? 10 : 5 - absDiff,
                 }}
                 onClick={() => {
-                  if (isSelecting && character.characterId === selectedId) return;
+                  if (isSelecting && character.characterId === selectedId) {
+                    if (threeCardMode) {
+                      skill.dismissThreeCard();
+                    }
+                    return;
+                  }
                   setSearchParams({ selected: character.characterId, lookbook: activeLookbookId, look: activeLookId });
                 }}
                 onMouseEnter={() => !isSelecting && charNav.setHoveredCharacterId(character.characterId)}
                 onMouseLeave={() => !isSelecting && charNav.setHoveredCharacterId(null)}
               >
-                {isSelected && skill.isDragging && (
+                {isSelected && (threeCardMode || skill.isDragging) && (
                   <div
-                    className={`absolute -inset-[3px] rounded-sm ${skill.isOverPersona ? "persona-glow-intense" : "persona-glow"} transition-opacity duration-300`}
+                    className={`absolute -inset-[5px] rounded-sm ${skill.isOverPersona && skill.isDragging ? "persona-glow-intense" : threeCardMode ? "bg-white/5" : "persona-glow"} transition-opacity duration-300`}
                     style={{ zIndex: -1 }}
                   />
                 )}
@@ -453,6 +482,7 @@ export default function Home() {
                     backgroundImage: character.poster ? `url(${character.poster})` : undefined,
                     backgroundSize: "cover",
                     backgroundPosition: "center center",
+                    ...(threeCardMode ? { boxShadow: "0 0 8px 2px rgba(140,160,200,0.2)" } : {}),
                   }}
                 >
                   <VideoCanvas
@@ -465,6 +495,121 @@ export default function Home() {
               </div>
             );
           })}
+
+          {/* Skill card — center in three-card mode */}
+          <AnimatePresence>
+            {threeCardMode && (skill.selectedSkillVideo || skill.selectedSkillImage) && (
+              <motion.div
+                key={`skill-card-${skill.selectedSkillVideoId || skill.selectedSkillImageId}`}
+                className="absolute"
+                style={{
+                  transform: `translateX(0vw) scale(2.5)`,
+                  zIndex: 10,
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className={`absolute -inset-[5px] rounded-sm ${skill.isGenerating ? "bg-white/5" : "persona-glow"} transition-opacity duration-300`} style={{ zIndex: -1 }} />
+                <div
+                  className="w-[5.5vw] min-w-[80px] max-w-[150px] aspect-[1/2] overflow-hidden rounded-sm"
+                  style={{ boxShadow: "0 0 8px 2px rgba(140,160,200,0.2)" }}
+                >
+                  {skill.selectedSkillVideo ? (
+                    <video
+                      key={skill.selectedSkillVideoId}
+                      src={skill.selectedSkillVideo.videoUrl}
+                      poster={skill.selectedSkillVideo.thumbnailUrl ?? undefined}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      className="w-full h-full object-cover"
+                    />
+                  ) : skill.selectedSkillImage ? (
+                    <img
+                      src={skill.selectedSkillImage.publicUrl}
+                      alt=""
+                      className="w-full h-full object-cover"
+                    />
+                  ) : null}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Equation symbols in three-card mode */}
+          <AnimatePresence>
+            {threeCardMode && (
+              <>
+                <motion.span
+                  key="multiply-symbol"
+                  className="absolute text-black font-extralight pointer-events-none select-none"
+                  style={{ transform: "translateX(-9vw)", fontSize: "3rem", zIndex: 10 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                >
+                  &times;
+                </motion.span>
+                <motion.span
+                  key="equals-symbol"
+                  className="absolute text-black font-extralight pointer-events-none select-none"
+                  style={{ transform: "translateX(9vw)", fontSize: "3rem", zIndex: 10 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                >
+                  =
+                </motion.span>
+              </>
+            )}
+          </AnimatePresence>
+
+          {/* Generate card — right side in three-card mode */}
+          <AnimatePresence>
+            {threeCardMode && (
+              <motion.div
+                key="generate-card"
+                className="absolute cursor-pointer z-[30]"
+                style={{ transform: `translateX(18vw) scale(2.5)` }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                onClick={() => {
+                  if (skill.isGenerating) return;
+                  skill.handleGenerateClick(
+                    skill.selectedSkillImage ? generatePrompt || undefined : undefined
+                  );
+                }}
+              >
+                {skill.isGenerating && (
+                  <div
+                    className="absolute -inset-[5px] rounded-sm generate-glow transition-opacity duration-300"
+                    style={{ zIndex: -1 }}
+                  />
+                )}
+                <div className="w-[5.5vw] min-w-[80px] max-w-[150px] aspect-[1/2] overflow-hidden rounded-sm bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                  {skill.isGenerating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                      <span className="text-[7px] tracking-[0.15em] font-medium text-white/50 uppercase">
+                        Generating
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[7px] tracking-[0.15em] font-medium text-white uppercase">
+                      Generate
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       </AnimatePresence>
 
@@ -539,9 +684,18 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      {/* Click-outside backdrop for compact panels */}
-      {activePanel && activePanel !== "gallery-expanded" && activePanel !== "skill-expanded" && (
-        <div className="fixed inset-0 z-[25]" onClick={() => setActivePanel(null)} />
+      {/* Click-outside backdrop for compact panels + three-card mode */}
+      {((activePanel && activePanel !== "gallery-expanded" && activePanel !== "skill-expanded") || (threeCardMode && !activePanel)) && (
+        <div
+          className="fixed inset-0 z-[25]"
+          onClick={() => {
+            if (threeCardMode) {
+              skill.dismissThreeCard();
+            } else {
+              setActivePanel(null);
+            }
+          }}
+        />
       )}
 
       <HomeFloatingBar
@@ -553,9 +707,10 @@ export default function Home() {
         selectedVideo={skill.selectedSkillVideo}
         selectedImage={skill.selectedSkillImage}
       >
+        <MusicHorizontalPanel open={musicHorizontalOpen} />
         {isSelecting && currentCharacter && (
-          <SkillCompactPanel
-            open={skillCompactOpen}
+          <SkillHorizontalPanel
+            open={skillHorizontalOpen}
             videos={skillVideos}
             images={skillImages}
             tab={skill.skillTab}
@@ -567,6 +722,12 @@ export default function Home() {
             onExpand={() => setActivePanel("skill-expanded")}
           />
         )}
+        <GalleryHorizontalPanel
+          open={galleryHorizontalOpen}
+          galleryState={galleryState}
+          gridRef={skill.galleryGridRef}
+          flyingCardTargetId={skill.flyingCardTargetId}
+        />
         <GalleryCompactPanel
           open={galleryCompactOpen}
           onExpand={() => setActivePanel("gallery-expanded")}
@@ -580,7 +741,7 @@ export default function Home() {
         <SkillExpandedPanel
           open={skillExpandedOpen}
           onClose={() => setActivePanel(null)}
-          onCollapse={() => setActivePanel("skill-compact")}
+          onCollapse={() => setActivePanel("skill-horizontal")}
           videos={skillVideos}
           images={skillImages}
           tab={skill.skillTab}
@@ -616,7 +777,7 @@ export default function Home() {
       open={skill.confirmDialog !== null}
       item={skill.confirmDialog}
       onCancel={() => skill.setConfirmDialog(null)}
-      onProduce={skill.handleProduce}
+      onProduce={(prompt) => { if (skill.confirmDialog) skill.handleProduce(skill.confirmDialog, prompt); }}
       isProducing={skill.isGenerating}
     />
 
