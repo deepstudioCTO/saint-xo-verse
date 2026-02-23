@@ -28,15 +28,25 @@ type SkillImage = {
   publicUrl: string;
 };
 
+type SkillTemplate = {
+  id: string;
+  name: string;
+  category: string | null;
+  thumbnailUrl: string | null;
+};
+
 interface SkillContentProps {
   videos: SkillVideo[];
   images: SkillImage[];
+  templates: SkillTemplate[];
   tab: "video" | "image";
   selectedVideoId: string | null;
   selectedImageId: string | null;
+  selectedTemplateId: string | null;
   onTabChange: (tab: "video" | "image") => void;
   onSelectVideo: (id: string | null) => void;
   onSelectImage: (id: string | null) => void;
+  onSelectTemplate: (id: string | null) => void;
 }
 
 function formatDuration(seconds: number) {
@@ -202,6 +212,58 @@ function ImageSkillItem({
   );
 }
 
+function TemplateSkillItem({
+  template,
+  index,
+  selected,
+  onClick,
+}: {
+  template: SkillTemplate;
+  index: number;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const [isHovering, setIsHovering] = useState(false);
+  const isActive = selected || isHovering;
+
+  return (
+    <motion.button
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.25, delay: index * 0.03 }}
+      onClick={onClick}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
+      className="relative aspect-[3/4] rounded-sm overflow-hidden cursor-pointer"
+    >
+      {template.thumbnailUrl ? (
+        <img
+          src={template.thumbnailUrl}
+          alt={template.name}
+          loading="lazy"
+          className={`absolute inset-0 w-full h-full object-cover transition-all duration-200 ${
+            isActive ? "grayscale-0" : "grayscale"
+          }`}
+        />
+      ) : (
+        <div className={`absolute inset-0 w-full h-full flex items-center justify-center transition-all duration-200 ${
+          isActive ? "bg-neutral-200" : "bg-neutral-100"
+        }`}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-400">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M9 3v18" />
+            <path d="M3 9h6" />
+            <path d="M3 15h6" />
+          </svg>
+        </div>
+      )}
+      <span className="absolute bottom-1 left-1 text-[10px] text-white truncate max-w-[calc(100%-0.5rem)] drop-shadow">
+        {template.name}
+      </span>
+    </motion.button>
+  );
+}
+
 /* ── Shared sub-components ──────────────────────────────────── */
 
 function SkillTabBar({
@@ -240,20 +302,32 @@ function SkillGrid({
   gridClassName,
   ...props
 }: SkillContentProps & { contentReady: boolean; gridClassName: string }) {
-  const { videos, images, tab, selectedVideoId, selectedImageId, onSelectVideo, onSelectImage } = props;
+  const { videos, images, templates, tab, selectedVideoId, selectedImageId, selectedTemplateId, onSelectVideo, onSelectImage, onSelectTemplate } = props;
+  const videoTemplates = templates.filter((t) => t.category !== "image");
+  const imageTemplates = templates.filter((t) => t.category === "image");
 
   if (!contentReady) return null;
 
   if (tab === "video") {
-    return videos.length === 0 ? (
+    const hasItems = videoTemplates.length > 0 || videos.length > 0;
+    return !hasItems ? (
       <p className="text-center text-neutral-400 text-sm py-8">No motion videos</p>
     ) : (
       <div className={gridClassName}>
+        {videoTemplates.map((tmpl, i) => (
+          <TemplateSkillItem
+            key={tmpl.id}
+            template={tmpl}
+            index={i}
+            selected={selectedTemplateId === tmpl.id}
+            onClick={() => onSelectTemplate(selectedTemplateId === tmpl.id ? null : tmpl.id)}
+          />
+        ))}
         {videos.map((video, i) => (
           <VideoSkillItem
             key={video.id}
             video={video}
-            index={i}
+            index={videoTemplates.length + i}
             selected={selectedVideoId === video.id}
             onClick={() => onSelectVideo(selectedVideoId === video.id ? null : video.id)}
           />
@@ -262,15 +336,25 @@ function SkillGrid({
     );
   }
 
-  return images.length === 0 ? (
+  const hasImageItems = imageTemplates.length > 0 || images.length > 0;
+  return !hasImageItems ? (
     <p className="text-center text-neutral-400 text-sm py-8">No concept images</p>
   ) : (
     <div className={gridClassName}>
+      {imageTemplates.map((tmpl, i) => (
+        <TemplateSkillItem
+          key={tmpl.id}
+          template={tmpl}
+          index={i}
+          selected={selectedTemplateId === tmpl.id}
+          onClick={() => onSelectTemplate(selectedTemplateId === tmpl.id ? null : tmpl.id)}
+        />
+      ))}
       {images.map((image, i) => (
         <ImageSkillItem
           key={image.id}
           image={image}
-          index={i}
+          index={imageTemplates.length + i}
           selected={selectedImageId === image.id}
           onClick={() => onSelectImage(selectedImageId === image.id ? null : image.id)}
         />
@@ -303,20 +387,32 @@ function SkillHorizontalRow({
   contentReady,
   ...props
 }: SkillContentProps & { contentReady: boolean }) {
-  const { videos, images, tab, selectedVideoId, selectedImageId, onSelectVideo, onSelectImage } = props;
+  const { videos, images, templates, tab, selectedVideoId, selectedImageId, selectedTemplateId, onSelectVideo, onSelectImage, onSelectTemplate } = props;
+  const videoTemplates = templates.filter((t) => t.category !== "image");
+  const imageTemplates = templates.filter((t) => t.category === "image");
 
   if (!contentReady) return null;
 
   if (tab === "video") {
-    return videos.length === 0 ? (
+    const hasItems = videoTemplates.length > 0 || videos.length > 0;
+    return !hasItems ? (
       <p className="text-center text-neutral-400 text-sm py-4 whitespace-nowrap">No motion videos</p>
     ) : (
       <div className="grid grid-flow-col auto-cols-[75px] gap-2">
+        {videoTemplates.map((tmpl, i) => (
+          <TemplateSkillItem
+            key={tmpl.id}
+            template={tmpl}
+            index={i}
+            selected={selectedTemplateId === tmpl.id}
+            onClick={() => onSelectTemplate(selectedTemplateId === tmpl.id ? null : tmpl.id)}
+          />
+        ))}
         {videos.map((video, i) => (
           <VideoSkillItem
             key={video.id}
             video={video}
-            index={i}
+            index={videoTemplates.length + i}
             selected={selectedVideoId === video.id}
             onClick={() => onSelectVideo(selectedVideoId === video.id ? null : video.id)}
           />
@@ -325,15 +421,25 @@ function SkillHorizontalRow({
     );
   }
 
-  return images.length === 0 ? (
+  const hasImageItems = imageTemplates.length > 0 || images.length > 0;
+  return !hasImageItems ? (
     <p className="text-center text-neutral-400 text-sm py-4 whitespace-nowrap">No concept images</p>
   ) : (
     <div className="grid grid-flow-col auto-cols-[75px] gap-2">
+      {imageTemplates.map((tmpl, i) => (
+        <TemplateSkillItem
+          key={tmpl.id}
+          template={tmpl}
+          index={i}
+          selected={selectedTemplateId === tmpl.id}
+          onClick={() => onSelectTemplate(selectedTemplateId === tmpl.id ? null : tmpl.id)}
+        />
+      ))}
       {images.map((image, i) => (
         <ImageSkillItem
           key={image.id}
           image={image}
-          index={i}
+          index={imageTemplates.length + i}
           selected={selectedImageId === image.id}
           onClick={() => onSelectImage(selectedImageId === image.id ? null : image.id)}
         />

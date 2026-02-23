@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgTable,
   real,
@@ -138,4 +139,53 @@ export const personas = pgTable("personas", {
     .defaultNow()
     .notNull()
     .$onUpdate(() => sql`now()`),
+});
+
+// ── Workflow System ──────────────────────────────────────────
+
+export const workflowTemplates = pgTable("workflow_templates", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  category: text("category"), // "video" | "image"
+  nodes: text("nodes").notNull().default("[]"),
+  edges: text("edges").notNull().default("[]"),
+  viewport: text("viewport").default('{"x":0,"y":0,"zoom":1}'),
+  thumbnailUrl: text("thumbnail_url"),
+  currentVersion: integer("current_version").notNull().default(1),
+  isPublished: boolean("is_published").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => sql`now()`),
+});
+
+export const workflowRuns = pgTable("workflow_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  templateId: uuid("template_id"), // FK → workflow_templates (nullable for ad-hoc runs)
+  templateVersion: integer("template_version"),
+  templateSnapshot: text("template_snapshot").notNull(), // 실행 시점 전체 nodes+edges JSON
+  inputs: text("inputs").notNull(), // JSON — 인풋 값
+  outputs: text("outputs"), // JSON — 최종 결과물
+  status: text("status").notNull().default("pending"), // pending/running/completed/failed
+  error: text("error"),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+});
+
+export const nodeRuns = pgTable("node_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  runId: uuid("run_id").notNull(), // FK → workflow_runs
+  nodeId: text("node_id").notNull(), // React Flow 노드 ID
+  nodeType: text("node_type").notNull(), // "generate" | "upscale" | "ffmpeg" | ...
+  inputs: text("inputs").notNull(), // JSON — 노드 인풋
+  outputs: text("outputs"), // JSON — 노드 아웃풋
+  status: text("status").notNull().default("pending"), // pending/running/completed/failed
+  error: text("error"),
+  externalId: text("external_id"), // Replicate predictionId 등
+  externalProvider: text("external_provider"), // "replicate" | "ffmpeg" 등
+  legacyGenerationId: uuid("legacy_generation_id"), // 전환기: 기존 generations 행 매핑
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
 });

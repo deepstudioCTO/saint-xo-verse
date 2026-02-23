@@ -20,6 +20,13 @@ interface SkillImage {
   publicUrl: string;
 }
 
+interface SkillTemplate {
+  id: string;
+  name: string;
+  category: string | null;
+  thumbnailUrl: string | null;
+}
+
 export interface FlyingCardState {
   thumbnailUrl: string;
   startX: number;
@@ -35,6 +42,7 @@ interface UseSkillTeachingParams {
   selectedImgUrl: string;
   skillVideos: SkillVideo[];
   skillImages: SkillImage[];
+  skillTemplates: SkillTemplate[];
   galleryState: UseGalleryStateReturn;
   activePanel: ActivePanel;
   setActivePanel: (p: ActivePanel) => void;
@@ -48,6 +56,7 @@ export function useSkillTeaching({
   selectedImgUrl,
   skillVideos,
   skillImages,
+  skillTemplates,
   galleryState,
   activePanel,
   setActivePanel,
@@ -57,16 +66,18 @@ export function useSkillTeaching({
   const [skillTab, setSkillTab] = useState<"video" | "image">("video");
   const [selectedSkillVideoId, setSelectedSkillVideoId] = useState<string | null>(null);
   const [selectedSkillImageId, setSelectedSkillImageId] = useState<string | null>(null);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [threeCardActive, setThreeCardActive] = useState(false);
   const [generateClicked, setGenerateClicked] = useState(false);
 
   const handleSkillTabChange = useCallback((t: "video" | "image") => {
     setSkillTab(t);
     if (t === "video") setSelectedSkillImageId(null);
-    else setSelectedSkillVideoId(null);
+    else { setSelectedSkillVideoId(null); setSelectedTemplateId(null); }
   }, []);
   const handleSkillSelectVideo = useCallback((id: string | null) => {
     setSelectedSkillVideoId(id);
+    setSelectedTemplateId(null); // deselect template when selecting legacy video
     if (id) {
       setThreeCardActive(true);
       setGenerateClicked(false);
@@ -74,6 +85,15 @@ export function useSkillTeaching({
   }, []);
   const handleSkillSelectImage = useCallback((id: string | null) => {
     setSelectedSkillImageId(id);
+    if (id) {
+      setThreeCardActive(true);
+      setGenerateClicked(false);
+    }
+  }, []);
+  const handleSelectTemplate = useCallback((id: string | null) => {
+    setSelectedTemplateId(id);
+    setSelectedSkillVideoId(null); // deselect legacy video when selecting template
+    setSelectedSkillImageId(null);
     if (id) {
       setThreeCardActive(true);
       setGenerateClicked(false);
@@ -103,6 +123,10 @@ export function useSkillTeaching({
   const selectedSkillImage = useMemo(
     () => (selectedSkillImageId ? skillImages.find((img) => img.id === selectedSkillImageId) ?? null : null),
     [selectedSkillImageId, skillImages]
+  );
+  const selectedTemplate = useMemo(
+    () => (selectedTemplateId ? skillTemplates.find((t) => t.id === selectedTemplateId) ?? null : null),
+    [selectedTemplateId, skillTemplates]
   );
 
   // DnD state
@@ -157,6 +181,7 @@ export function useSkillTeaching({
     setGenerateClicked(false);
     setSelectedSkillVideoId(null);
     setSelectedSkillImageId(null);
+    setSelectedTemplateId(null);
     setActivePanel(null);
   }, [setActivePanel]);
 
@@ -219,6 +244,52 @@ export function useSkillTeaching({
   }, [confirmDialog, currentCharacter, selectedImgUrl, currentLookbookId, currentLookId, fetcher, galleryState, setActivePanel]);
 
   const handleGenerateClick = useCallback((prompt?: string) => {
+    // Template-based generation via /api/workflow-execute
+    if (selectedTemplate && currentCharacter) {
+      const isImageTemplate = selectedTemplate.category === "image";
+      fetcher.submit(
+        JSON.stringify({
+          templateId: selectedTemplate.id,
+          inputs: {
+            characterId: currentCharacter.characterId,
+            imageUrl: selectedImgUrl,
+            prompt: prompt || (isImageTemplate ? "" : undefined),
+            lookbookId: currentLookbookId,
+            lookId: currentLookId,
+          },
+        }),
+        { method: "post", action: "/api/workflow-execute", encType: "application/json" }
+      );
+
+      const optimisticId = `optimistic-${Date.now()}`;
+      setFlyingCardTargetId(optimisticId);
+      galleryState.addOptimisticGeneration({
+        id: optimisticId,
+        type: isImageTemplate ? "image" : "video",
+        memberId: currentCharacter.characterId,
+        musicId: null,
+        motionVideoId: null,
+        conceptImageId: null,
+        lookbookId: currentLookbookId,
+        lookId: currentLookId,
+        videoUrl: null,
+        outputUrl: null,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+        motionName: selectedTemplate.name,
+        conceptImageName: null,
+        errorMessage: null,
+        prompt: prompt || null,
+        upscaleStatus: null,
+        upscaleModel: null,
+        upscaledVideoUrl: null,
+      });
+      setGenerateClicked(true);
+      setActivePanel(null);
+      return;
+    }
+
+    // Legacy motionVideo / conceptImage generation
     let item: SkillDragItem | null = null;
     if (selectedSkillVideo) {
       item = {
@@ -239,7 +310,7 @@ export function useSkillTeaching({
       };
     }
     if (item) handleProduce(item, prompt);
-  }, [selectedSkillVideo, selectedSkillImage, handleProduce]);
+  }, [selectedTemplate, selectedSkillVideo, selectedSkillImage, currentCharacter, selectedImgUrl, currentLookbookId, currentLookId, fetcher, galleryState, setActivePanel, handleProduce]);
 
   // Refetch gallery when fetcher completes
   useEffect(() => {
@@ -252,6 +323,7 @@ export function useSkillTeaching({
   useEffect(() => {
     setSelectedSkillVideoId(null);
     setSelectedSkillImageId(null);
+    setSelectedTemplateId(null);
     setThreeCardActive(false);
     setGenerateClicked(false);
   }, [selectedId]);
@@ -267,6 +339,7 @@ export function useSkillTeaching({
         setGenerateClicked(false);
         setSelectedSkillVideoId(null);
         setSelectedSkillImageId(null);
+        setSelectedTemplateId(null);
         setActivePanel(null);
       } else if (activePanel) {
         setActivePanel(null);
@@ -281,11 +354,14 @@ export function useSkillTeaching({
     skillTab,
     selectedSkillVideo,
     selectedSkillImage,
+    selectedTemplate,
     selectedSkillVideoId,
     selectedSkillImageId,
+    selectedTemplateId,
     handleSkillTabChange,
     handleSkillSelectVideo,
     handleSkillSelectImage,
+    handleSelectTemplate,
     // DnD
     sensors,
     activeDragItem,

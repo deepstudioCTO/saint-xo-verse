@@ -4,6 +4,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Panel,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -18,14 +19,17 @@ import { useFetcher } from "react-router";
 import { SourceNode } from "./nodes/SourceNode";
 import { SubtitleNode } from "./nodes/SubtitleNode";
 import { PreviewNode } from "./nodes/PreviewNode";
+import { GenerateNode } from "./nodes/GenerateNode";
 import { MediaBrowser } from "./MediaBrowser";
-import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, EditorProject } from "./editorTypes";
+import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, GenerateNodeData, EditorProject, WorkflowData } from "./editorTypes";
 
 // Module-scope nodeTypes to avoid remounting on every render
 const nodeTypes: NodeTypes = {
   source: SourceNode,
   subtitle: SubtitleNode,
   preview: PreviewNode,
+  generate: GenerateNode,
+  "generate-image": GenerateNode,
 };
 
 const defaultEdgeOptions = {
@@ -75,6 +79,7 @@ interface EditorCanvasProps {
   savedProject?: EditorProject | null;
   initialMedia?: { type: "video" | "image"; url: string; name: string } | null;
   sourceGenerationId?: string;
+  workflowData?: WorkflowData | null;
 }
 
 interface AutoSaveProps {
@@ -132,8 +137,155 @@ function AutoSave({ nodes, edges, sourceGenerationId }: AutoSaveProps) {
   return null;
 }
 
-export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId }: EditorCanvasProps) {
+// ── Save as Skill Dialog ─────────────────────────────────────
+
+interface SaveAsSkillDialogProps {
+  open: boolean;
+  onClose: () => void;
+  nodes: Node[];
+  edges: Edge[];
+  templateId?: string; // 기존 템플릿 업데이트 시
+}
+
+function SaveAsSkillDialog({ open, onClose, nodes, edges, templateId }: SaveAsSkillDialogProps) {
+  const { getViewport } = useReactFlow();
+  const fetcher = useFetcher();
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<"video" | "image">("video");
+  const prevState = useRef(fetcher.state);
+
+  // Close on successful save
+  useEffect(() => {
+    if (prevState.current === "loading" && fetcher.state === "idle" && fetcher.data) {
+      const data = fetcher.data as { success?: boolean };
+      if (data.success) {
+        setName("");
+        onClose();
+      }
+    }
+    prevState.current = fetcher.state;
+  }, [fetcher.state, fetcher.data, onClose]);
+
+  if (!open) return null;
+
+  const handleSave = () => {
+    if (!name.trim()) return;
+    fetcher.submit(
+      {
+        id: templateId || "",
+        name: name.trim(),
+        category,
+        nodes: JSON.stringify(nodes),
+        edges: JSON.stringify(edges),
+        viewport: JSON.stringify(getViewport()),
+      },
+      { method: "POST", action: "/api/workflow-templates", encType: "application/json" }
+    );
+  };
+
+  const isSaving = fetcher.state !== "idle";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div
+        className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-80 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-white text-sm font-semibold mb-4">Save as Skill</h3>
+
+        <label className="block text-white/50 text-xs mb-1">Name</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="My Workflow"
+          autoFocus
+          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-white/30 mb-3"
+          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
+        />
+
+        <label className="block text-white/50 text-xs mb-1">Category</label>
+        <div className="flex gap-2 mb-4">
+          {(["video", "image"] as const).map((c) => (
+            <button
+              key={c}
+              onClick={() => setCategory(c)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                category === c
+                  ? "bg-white/15 text-white border border-white/20"
+                  : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10"
+              }`}
+            >
+              {c === "video" ? "Video" : "Image"}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 transition-colors cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!name.trim() || isSaving}
+            className="px-4 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer"
+          >
+            {isSaving ? "Saving..." : templateId ? "Update" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Editor Toolbar ───────────────────────────────────────────
+
+function EditorToolbar({ onSaveAsSkill }: { onSaveAsSkill: () => void }) {
+  return (
+    <div className="flex gap-2">
+      <button
+        onClick={onSaveAsSkill}
+        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/8 text-white/70 border border-white/10 hover:bg-white/15 hover:text-white transition-colors cursor-pointer"
+      >
+        Save as Skill
+      </button>
+      <a
+        href="/"
+        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/8 text-white/70 border border-white/10 hover:bg-white/15 hover:text-white transition-colors"
+      >
+        Home
+      </a>
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────
+
+export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId, workflowData }: EditorCanvasProps) {
   const { startNodes, startEdges, startViewport } = useMemo(() => {
+    // workflowData > savedProject > initialMedia > empty
+    // workflowData = user clicked Edit/template link → load into scratch
+    if (workflowData) {
+      try {
+        const nodes = JSON.parse(workflowData.nodes) as Node[];
+        const edges = JSON.parse(workflowData.edges) as Edge[];
+        const viewport = workflowData.viewport ? JSON.parse(workflowData.viewport) as Viewport : undefined;
+        // Ensure nodes have positions (workflow snapshots from 3-card may not have them)
+        const nodesWithPositions = nodes.map((n, i) => ({
+          ...n,
+          position: n.position || { x: i * 280, y: 100 },
+        }));
+        if (nodesWithPositions.length > 0) {
+          return { startNodes: nodesWithPositions, startEdges: edges, startViewport: viewport };
+        }
+      } catch {
+        // Fall through to savedProject
+      }
+    }
+
     // savedProject > initialMedia > empty
     // URL params are stripped after first save, so on refresh initialMedia is null
     if (savedProject) {
@@ -166,6 +318,9 @@ export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId }:
 
   // Media browser state
   const [mediaBrowserNodeId, setMediaBrowserNodeId] = useState<string | null>(null);
+
+  // Save as Skill dialog state
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   const onConnect: OnConnect = useCallback(
     (connection) => setEdges((eds) => addEdge({ ...connection, ...defaultEdgeOptions }, eds)),
@@ -221,6 +376,9 @@ export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId }:
           maskColor="rgba(13,13,13,0.75)"
           className="!bg-[#1a1a1a] !border-white/[0.08]"
         />
+        <Panel position="top-right">
+          <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
+        </Panel>
         <AutoSave nodes={nodes} edges={edges} sourceGenerationId={sourceGenerationId} />
       </ReactFlow>
 
@@ -228,6 +386,14 @@ export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId }:
         open={mediaBrowserNodeId !== null}
         onClose={() => setMediaBrowserNodeId(null)}
         onSelect={handleMediaSelect}
+      />
+
+      <SaveAsSkillDialog
+        open={saveDialogOpen}
+        onClose={() => setSaveDialogOpen(false)}
+        nodes={nodes}
+        edges={edges}
+        templateId={workflowData?.source === "template" ? workflowData.templateId : undefined}
       />
     </>
   );

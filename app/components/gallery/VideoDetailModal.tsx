@@ -601,9 +601,7 @@ export function VideoDetailModal({
               <>
                 {/* Edit in editor */}
                 <Link
-                  to={`/editor?media=${encodeURIComponent(
-                    showUpscaledVideo && upscaledVideoUrl ? upscaledVideoUrl : generation.videoUrl || ""
-                  )}&type=video&name=${encodeURIComponent(motionName)}&generationId=${generation.id}`}
+                  to={`/editor?generationId=${generation.id}`}
                   onClick={onClose}
                   className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
                 >

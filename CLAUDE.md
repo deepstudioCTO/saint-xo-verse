@@ -21,6 +21,11 @@
 
 **원칙:** 코드에서 직접 확인할 수 있는 내용은 문서화하지 않는다. 문서는 "코드만으로는 알 수 없는 것"을 담는다.
 
+**이 파일의 크기 제한: 500줄 이하 유지** (현재 ~263줄)
+- 새 내용 추가 시 기존 항목 중 코드에서 확인 가능해진 것은 삭제하여 총량 관리
+- 500줄 초과 시 `vault/specs/` 디렉토리로 분리: 큰 시스템(패널, 에디터 등)의 설계 결정 테이블을 개별 `vault/specs/{system-name}.md`로 이동하고, 이 파일에는 한 줄 인덱스만 남김
+- `specs/` 전환 시 규칙: 인덱스에 없는 spec은 존재하지 않는 것과 같음, 해당 시스템 수정 전 반드시 Read
+
 **기능 구현 후 문서 업데이트 룰:**
 - 설계 결정 테이블: 새 패턴/규칙이 있을 때만 한 줄 추가 (컴포넌트 내부 구현은 기록하지 않음)
 - 파일 구조: 새 디렉토리가 생겼을 때만 한 줄 추가
@@ -188,6 +193,28 @@ export default [
 - `public/character/`에 로컬 사본 유지 (dev용), `.assetsignore`로 mp4는 배포 제외
 - 업로드: `upload-character-videos.ts` / `upload-posters.ts` (파일명 → lookId+characterId 파싱 후 DB 업데이트)
 
+## 워크플로우 시스템
+
+3계층 모델: `workflow_templates` (스킬 정의) → `workflow_runs` (실행 기록) → `node_runs` (개별 노드 실행)
+
+| 항목 | 결정 | 이유 |
+|------|------|------|
+| 전환 전략 | dual write — generations + workflow_runs/node_runs 동시 기록 | 기존 갤러리/폴링 코드 변경 없이 점진 전환 |
+| dual write 에러 처리 | fire-and-forget (try/catch 독립) | generation 응답이 workflow 실패에 영향받으면 안 됨 |
+| 폴링 시 workflow 동기화 | `syncWorkflowStatus()` 헬퍼 (fire-and-forget) | generations 상태 변경 시 node_runs/workflow_runs도 갱신 |
+| 레거시 generation 연결 | `node_runs.legacyGenerationId` + lazy backfill | Edit 클릭 시 linked node_run 없으면 on-the-fly 생성 |
+| 에디터 로드 우선순위 | `workflowData > savedProject > initialMedia > empty` | workflow params 있으면 scratch에 복사 로드 |
+| 에디터 라우팅 | `?run=`, `?generationId=`, `?template=` | 각 진입점에서 워크플로우 스냅샷 → scratch 복사 |
+| templateSnapshot | 실행 시점 nodes+edges 전체 JSON | 템플릿 변경돼도 실행 기록은 자기완결적 |
+| editor_projects | 유지 (scratch 작업 공간) | Figma/ComfyUI 패턴 — 에디터는 항상 scratch에서 작동 |
+| 템플릿 CRUD | `POST/GET/DELETE /api/workflow-templates`, id 있으면 update + version++ | 단일 엔드포인트로 생성/수정/삭제/목록 |
+| Save as Skill | EditorCanvas 내 `SaveAsSkillDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
+| motionVideos 마이그레이션 | `scripts/migrate-skills-to-templates.ts` — motionVideo → 최소 노드 그래프 template | Source + MotionRef + Generate 3노드 구성 |
+| 스킬 패널 템플릿 통합 | `SkillContentProps`에 templates/selectedTemplateId/onSelectTemplate 추가 | 레거시 motionVideo와 템플릿 동시 표시, 카테고리별 탭 분류 |
+| 템플릿 기반 실행 | `/api/workflow-execute` POST (JSON body) + 3카드 모드에서 `handleGenerateClick` 분기 | 템플릿 선택 시 workflow-execute, 레거시 선택 시 기존 generate API |
+| GenerateNode | 에디터 내 생성 노드, upstream SourceNode에서 이미지/비디오 자동 탐색, 5초 폴링 | 에디터 캔버스에서 직접 생성 실행 + 결과 확인 |
+| 워크플로우 폴링 API | `GET /api/workflow-execute?runId=` — Replicate 상태 체크 + Storage 업로드 + 양방향 동기화 | GenerateNode와 독립적 폴링 클라이언트를 위한 범용 엔드포인트 |
+
 ## Slack MCP
 
 설정: `.claude/settings.local.json` (이 프로젝트 전용)
@@ -240,6 +267,7 @@ app/
 │   ├── supabase-auth.server.ts # 쿠키 기반 Supabase 클라이언트 팩토리
 │   ├── data.ts          # CHARACTERS, TRACKS, LOOKBOOKS, LOOKS, PERSONAS 폴백 데이터 + 타입 + 룩업 맵
 │   ├── db.server.ts     # Drizzle DB 연결 + 모든 schema 테이블 export
+│   ├── workflow-sync.server.ts # 폴링 시 workflow_runs/node_runs 상태 동기화
 │   └── supabase.server.ts  # Storage 헬퍼
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅
@@ -260,4 +288,5 @@ app/
 ├── routes.ts            # ⚠️ 라우트 수동 등록 필수
 scripts/                 # 시드, 버킷 생성, 이미지 업로드
 drizzle/schema.ts        # DB 스키마 (Drizzle)
+vault/                   # Obsidian vault (gitignore, CLAUDE.md·MEMORY.md 심링크)
 ```
