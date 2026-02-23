@@ -193,7 +193,7 @@ export default [
 - `public/character/`에 로컬 사본 유지 (dev용), `.assetsignore`로 mp4는 배포 제외
 - 업로드: `upload-character-videos.ts` / `upload-posters.ts` (파일명 → lookId+characterId 파싱 후 DB 업데이트)
 
-## 워크플로우 시스템 (Phase 1)
+## 워크플로우 시스템 (Phase 1~2)
 
 3계층 모델: `workflow_templates` (스킬 정의) → `workflow_runs` (실행 기록) → `node_runs` (개별 노드 실행)
 
@@ -207,6 +207,9 @@ export default [
 | 에디터 라우팅 | `?run=`, `?generationId=`, `?template=` | 각 진입점에서 워크플로우 스냅샷 → scratch 복사 |
 | templateSnapshot | 실행 시점 nodes+edges 전체 JSON | 템플릿 변경돼도 실행 기록은 자기완결적 |
 | editor_projects | 유지 (scratch 작업 공간) | Figma/ComfyUI 패턴 — 에디터는 항상 scratch에서 작동 |
+| 템플릿 CRUD | `POST/GET/DELETE /api/workflow-templates`, id 있으면 update + version++ | 단일 엔드포인트로 생성/수정/삭제/목록 |
+| Save as Skill | EditorCanvas 내 `SaveAsSkillDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
+| motionVideos 마이그레이션 | `scripts/migrate-skills-to-templates.ts` — motionVideo → 최소 노드 그래프 template | Source + MotionRef + Generate 3노드 구성 |
 
 ## Slack MCP
 
