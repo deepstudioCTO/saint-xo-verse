@@ -27,5 +27,6 @@ export default [
   route("api/gallery-data", "routes/api.gallery-data.tsx"),
   route("api/editor-save", "routes/api.editor-save.tsx"),
   route("api/workflow-templates", "routes/api.workflow-templates.tsx"),
+  route("api/workflow-execute", "routes/api.workflow-execute.tsx"),
   route("editor", "routes/editor.tsx"),
 ] satisfies RouteConfig;
