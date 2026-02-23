@@ -19,7 +19,7 @@ import { SourceNode } from "./nodes/SourceNode";
 import { SubtitleNode } from "./nodes/SubtitleNode";
 import { PreviewNode } from "./nodes/PreviewNode";
 import { MediaBrowser } from "./MediaBrowser";
-import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, EditorProject } from "./editorTypes";
+import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, EditorProject, WorkflowData } from "./editorTypes";
 
 // Module-scope nodeTypes to avoid remounting on every render
 const nodeTypes: NodeTypes = {
@@ -75,6 +75,7 @@ interface EditorCanvasProps {
   savedProject?: EditorProject | null;
   initialMedia?: { type: "video" | "image"; url: string; name: string } | null;
   sourceGenerationId?: string;
+  workflowData?: WorkflowData | null;
 }
 
 interface AutoSaveProps {
@@ -132,8 +133,28 @@ function AutoSave({ nodes, edges, sourceGenerationId }: AutoSaveProps) {
   return null;
 }
 
-export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId }: EditorCanvasProps) {
+export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId, workflowData }: EditorCanvasProps) {
   const { startNodes, startEdges, startViewport } = useMemo(() => {
+    // workflowData > savedProject > initialMedia > empty
+    // workflowData = user clicked Edit/template link → load into scratch
+    if (workflowData) {
+      try {
+        const nodes = JSON.parse(workflowData.nodes) as Node[];
+        const edges = JSON.parse(workflowData.edges) as Edge[];
+        const viewport = workflowData.viewport ? JSON.parse(workflowData.viewport) as Viewport : undefined;
+        // Ensure nodes have positions (workflow snapshots from 3-card may not have them)
+        const nodesWithPositions = nodes.map((n, i) => ({
+          ...n,
+          position: n.position || { x: i * 280, y: 100 },
+        }));
+        if (nodesWithPositions.length > 0) {
+          return { startNodes: nodesWithPositions, startEdges: edges, startViewport: viewport };
+        }
+      } catch {
+        // Fall through to savedProject
+      }
+    }
+
     // savedProject > initialMedia > empty
     // URL params are stripped after first save, so on refresh initialMedia is null
     if (savedProject) {

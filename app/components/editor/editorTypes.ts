@@ -37,3 +37,60 @@ export interface EditorProject {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// ── Workflow System Types ──────────────────────────────────
+
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  nodes: string;
+  edges: string;
+  viewport: string | null;
+  thumbnailUrl: string | null;
+  currentVersion: number;
+  isPublished: boolean | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface WorkflowRun {
+  id: string;
+  templateId: string | null;
+  templateVersion: number | null;
+  templateSnapshot: string;
+  inputs: string;
+  outputs: string | null;
+  status: string;
+  error: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+}
+
+export interface NodeRun {
+  id: string;
+  runId: string;
+  nodeId: string;
+  nodeType: string;
+  inputs: string;
+  outputs: string | null;
+  status: string;
+  error: string | null;
+  externalId: string | null;
+  externalProvider: string | null;
+  legacyGenerationId: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+}
+
+/** Loader → EditorCanvas로 전달되는 워크플로우 데이터 */
+export interface WorkflowData {
+  source: "run" | "generation" | "template";
+  nodes: string;
+  edges: string;
+  viewport?: string;
+  runId?: string;
+  templateId?: string;
+  generationId?: string;
+}

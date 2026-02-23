@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { generations, motionVideos, characterImages, conceptImages, characters, lookbooks, looks, personas, editorProjects } from "../../drizzle/schema";
+import { generations, motionVideos, characterImages, conceptImages, characters, lookbooks, looks, personas, editorProjects, workflowTemplates, workflowRuns, nodeRuns } from "../../drizzle/schema";
 
 export function getDb(context: { env: Record<string, string> }) {
   const databaseUrl = context.env.DATABASE_URL;
@@ -14,4 +14,4 @@ export function getDb(context: { env: Record<string, string> }) {
   return drizzle(client);
 }
 
-export { generations, motionVideos, characterImages, conceptImages, characters, lookbooks, looks, personas, editorProjects };
+export { generations, motionVideos, characterImages, conceptImages, characters, lookbooks, looks, personas, editorProjects, workflowTemplates, workflowRuns, nodeRuns };

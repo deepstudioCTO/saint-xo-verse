@@ -1,8 +1,9 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.generate-image";
-import { getDb, generations } from "~/lib/db.server";
+import { getDb, generations, workflowRuns, nodeRuns } from "~/lib/db.server";
 import { uploadGeneratedImage } from "~/lib/supabase.server";
 import { requireAuthApi } from "~/lib/auth.server";
+import { syncWorkflowStatus } from "~/lib/workflow-sync.server";
 
 const MODEL_VERSION =
   "0785fb14f5aaa30eddf06fd49b6cbdaac4541b8854eb314211666e23a29087e3";
@@ -112,10 +113,54 @@ export async function action({ request, context }: Route.ActionArgs) {
       })
       .returning();
 
+    // Dual write: workflow_runs + node_runs (전환기, fire-and-forget)
+    let runId: string | undefined;
+    try {
+      const snapshot = JSON.stringify({
+        nodes: [
+          { id: "source-1", type: "source", data: { label: "Source", media: { type: "image", url: characterImageUrl } } },
+          { id: "generate-1", type: "generate-image", data: { label: "Generate Image" } },
+        ],
+        edges: [{ id: "e-source-generate", source: "source-1", target: "generate-1" }],
+      });
+      const wfInputs = JSON.stringify({
+        characterId: memberId,
+        imageUrl: characterImageUrl,
+        conceptImageUrl,
+        conceptImageId,
+        prompt,
+        resolution,
+        aspectRatio,
+        referenceType,
+        lookbookId,
+        lookId,
+      });
+
+      const [workflowRun] = await db
+        .insert(workflowRuns)
+        .values({ templateSnapshot: snapshot, inputs: wfInputs, status: "pending" })
+        .returning();
+
+      await db.insert(nodeRuns).values({
+        runId: workflowRun.id,
+        nodeId: "generate-1",
+        nodeType: "generate-image",
+        inputs: JSON.stringify({ image: characterImageUrl, prompt, conceptImageUrl }),
+        status: "pending",
+        externalId: prediction.id,
+        externalProvider: "replicate",
+        legacyGenerationId: generation.id,
+      });
+      runId = workflowRun.id;
+    } catch (dualWriteErr) {
+      console.error("Dual write failed (non-fatal):", dualWriteErr);
+    }
+
     return Response.json({
       success: true,
       id: prediction.id,
       generationId: generation.id,
+      runId,
     }, { headers: authHeaders });
   } catch (err) {
     console.error("Generate image error:", err);
@@ -192,6 +237,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             })
             .where(eq(generations.id, id));
 
+          // Sync workflow status (fire-and-forget)
+          syncWorkflowStatus(db, id, newStatus, { url: outputUrl!, type: "image" });
+
           return Response.json({
             status: newStatus,
             output: outputUrl,
@@ -220,6 +268,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             errorMessage,
           })
           .where(eq(generations.id, id));
+
+        // Sync workflow status (fire-and-forget)
+        syncWorkflowStatus(db, id, newStatus, outputUrl ? { url: outputUrl, type: "image" } : null);
       }
 
       return Response.json({

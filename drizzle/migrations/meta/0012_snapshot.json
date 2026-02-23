@@ -1,0 +1,946 @@
+{
+  "id": "1b8410eb-93d2-4dba-9fee-5233e2e9d6c0",
+  "prevId": "62a0b47a-ba83-4924-9f1e-bd8c0a90344f",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.character_images": {
+      "name": "character_images",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "character_id": {
+          "name": "character_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "variant_id": {
+          "name": "variant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_url": {
+          "name": "public_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.characters": {
+      "name": "characters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "video": {
+          "name": "video",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poster": {
+          "name": "poster",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.concept_images": {
+      "name": "concept_images",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "public_url": {
+          "name": "public_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.editor_projects": {
+      "name": "editor_projects",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'Untitled Project'"
+        },
+        "nodes": {
+          "name": "nodes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
+        },
+        "edges": {
+          "name": "edges",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
+        },
+        "viewport": {
+          "name": "viewport",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{\"x\":0,\"y\":0,\"zoom\":1}'"
+        },
+        "source_generation_id": {
+          "name": "source_generation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.generations": {
+      "name": "generations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "prediction_id": {
+          "name": "prediction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'replicate'"
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'video'"
+        },
+        "member_id": {
+          "name": "member_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "music_id": {
+          "name": "music_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motion_video_id": {
+          "name": "motion_video_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "concept_image_id": {
+          "name": "concept_image_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "lookbook_id": {
+          "name": "lookbook_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "look_id": {
+          "name": "look_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "prompt": {
+          "name": "prompt",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "resolution": {
+          "name": "resolution",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motion_video_url": {
+          "name": "motion_video_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "motion_preset_id": {
+          "name": "motion_preset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "video_url": {
+          "name": "video_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "output_url": {
+          "name": "output_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "output_storage_path": {
+          "name": "output_storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration": {
+          "name": "duration",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "error_message": {
+          "name": "error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upscale_status": {
+          "name": "upscale_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upscale_model": {
+          "name": "upscale_model",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upscale_prediction_id": {
+          "name": "upscale_prediction_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upscaled_video_url": {
+          "name": "upscaled_video_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upscaled_storage_path": {
+          "name": "upscaled_storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "upscale_error_message": {
+          "name": "upscale_error_message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lookbooks": {
+      "name": "lookbooks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.looks": {
+      "name": "looks",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "lookbook_id": {
+          "name": "lookbook_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.motion_videos": {
+      "name": "motion_videos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "storage_path": {
+          "name": "storage_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "thumbnail_path": {
+          "name": "thumbnail_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "duration": {
+          "name": "duration",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.node_runs": {
+      "name": "node_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "node_id": {
+          "name": "node_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "node_type": {
+          "name": "node_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inputs": {
+          "name": "inputs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outputs": {
+          "name": "outputs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "external_provider": {
+          "name": "external_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "legacy_generation_id": {
+          "name": "legacy_generation_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.personas": {
+      "name": "personas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "look_id": {
+          "name": "look_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "character_id": {
+          "name": "character_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "video": {
+          "name": "video",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "poster": {
+          "name": "poster",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "default_input": {
+          "name": "default_input",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_order": {
+          "name": "display_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.workflow_runs": {
+      "name": "workflow_runs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "template_id": {
+          "name": "template_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "template_version": {
+          "name": "template_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "template_snapshot": {
+          "name": "template_snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inputs": {
+          "name": "inputs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outputs": {
+          "name": "outputs",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "error": {
+          "name": "error",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.workflow_templates": {
+      "name": "workflow_templates",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "category": {
+          "name": "category",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nodes": {
+          "name": "nodes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
+        },
+        "edges": {
+          "name": "edges",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'[]'"
+        },
+        "viewport": {
+          "name": "viewport",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "'{\"x\":0,\"y\":0,\"zoom\":1}'"
+        },
+        "thumbnail_url": {
+          "name": "thumbnail_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_version": {
+          "name": "current_version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "is_published": {
+          "name": "is_published",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": false,
+          "default": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
