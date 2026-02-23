@@ -193,7 +193,7 @@ export default [
 - `public/character/`에 로컬 사본 유지 (dev용), `.assetsignore`로 mp4는 배포 제외
 - 업로드: `upload-character-videos.ts` / `upload-posters.ts` (파일명 → lookId+characterId 파싱 후 DB 업데이트)
 
-## 워크플로우 시스템 (Phase 1~2)
+## 워크플로우 시스템
 
 3계층 모델: `workflow_templates` (스킬 정의) → `workflow_runs` (실행 기록) → `node_runs` (개별 노드 실행)
 
@@ -210,6 +210,10 @@ export default [
 | 템플릿 CRUD | `POST/GET/DELETE /api/workflow-templates`, id 있으면 update + version++ | 단일 엔드포인트로 생성/수정/삭제/목록 |
 | Save as Skill | EditorCanvas 내 `SaveAsSkillDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
 | motionVideos 마이그레이션 | `scripts/migrate-skills-to-templates.ts` — motionVideo → 최소 노드 그래프 template | Source + MotionRef + Generate 3노드 구성 |
+| 스킬 패널 템플릿 통합 | `SkillContentProps`에 templates/selectedTemplateId/onSelectTemplate 추가 | 레거시 motionVideo와 템플릿 동시 표시, 카테고리별 탭 분류 |
+| 템플릿 기반 실행 | `/api/workflow-execute` POST (JSON body) + 3카드 모드에서 `handleGenerateClick` 분기 | 템플릿 선택 시 workflow-execute, 레거시 선택 시 기존 generate API |
+| GenerateNode | 에디터 내 생성 노드, upstream SourceNode에서 이미지/비디오 자동 탐색, 5초 폴링 | 에디터 캔버스에서 직접 생성 실행 + 결과 확인 |
+| 워크플로우 폴링 API | `GET /api/workflow-execute?runId=` — Replicate 상태 체크 + Storage 업로드 + 양방향 동기화 | GenerateNode와 독립적 폴링 클라이언트를 위한 범용 엔드포인트 |
 
 ## Slack MCP
 
