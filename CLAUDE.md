@@ -21,7 +21,7 @@
 
 **원칙:** 코드에서 직접 확인할 수 있는 내용은 문서화하지 않는다. 문서는 "코드만으로는 알 수 없는 것"을 담는다.
 
-**이 파일의 크기 제한: 500줄 이하 유지** (현재 ~263줄)
+**이 파일의 크기 제한: 500줄 이하 유지** (현재 ~293줄)
 - 새 내용 추가 시 기존 항목 중 코드에서 확인 가능해진 것은 삭제하여 총량 관리
 - 500줄 초과 시 `vault/specs/` 디렉토리로 분리: 큰 시스템(패널, 에디터 등)의 설계 결정 테이블을 개별 `vault/specs/{system-name}.md`로 이동하고, 이 파일에는 한 줄 인덱스만 남김
 - `specs/` 전환 시 규칙: 인덱스에 없는 spec은 존재하지 않는 것과 같음, 해당 시스템 수정 전 반드시 Read
@@ -169,7 +169,7 @@ export default [
 ### 핵심 설계 결정
 | 항목 | 결정 | 이유 |
 |------|------|------|
-| nodeTypes 위치 | 모듈 스코프 정의 (`EditorCanvas.tsx` 상단) | 인라인 정의 시 매 렌더마다 노드 리마운트 |
+| nodeTypes 위치 | 모듈 스코프 정의 (`EditorCanvas.tsx` 상단): source, subtitle, preview, generate, generate-image | 인라인 정의 시 매 렌더마다 노드 리마운트. generate와 generate-image는 같은 `GenerateNode` 컴포넌트 |
 | 자막 입력 영역 | `className="nodrag nopan nowheel"` | React Flow 이벤트가 input 포커스/스크롤 가로채기 방지 |
 | 프리뷰 업스트림 데이터 | `useHandleConnections` + `useNodesData` | React Flow v12 권장 패턴, 엣지 연결 기반 데이터 흐름 |
 | CSS import | `base.css` (not `style.css`) | `style.css`는 Tailwind와 충돌 가능 |
@@ -178,7 +178,7 @@ export default [
 | 미디어 표시 | `MediaDisplay` 공용 컴포넌트 (SourceNode·PreviewNode 공유), play 버튼 `stopPropagation` | DRY + SourceNode는 onNodeClick→MediaBrowser 열림과 play 클릭을 분리해야 함 |
 | SourceNode 래퍼 | `<div>` (not `<button>`) | MediaDisplay 내부 play `<button>`과 중첩 시 hydration mismatch → React 트리 리마운트 |
 | AutoSave URL 정리 | 첫 저장 성공 후 `replaceState("/editor")` | URL params는 초기 진입 힌트일 뿐, 저장 후엔 DB가 진실의 원천. 새로고침 시 savedProject에서 복원 |
-| AutoSave 초기화 우선순위 | `savedProject > initialMedia > empty` | savedProject 있으면 자막·위치 등 전체 상태 복원. initialMedia는 savedProject 없을 때만 사용 |
+| AutoSave 초기화 우선순위 | `workflowData > savedProject > initialMedia > empty` | workflow params 있으면 scratch에 복사 로드. savedProject 있으면 전체 상태 복원 |
 | AutoSave sourceGenerationId | ref로 관리 (`sourceGenIdRef`) | useEffect deps는 `[nodes, edges]`만, setTimeout 내부에서 stale closure 방지 |
 
 ### 구성
