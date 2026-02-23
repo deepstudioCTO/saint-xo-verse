@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.workflow-execute";
 import { getDb, generations, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
+import { uploadGeneratedVideo, uploadGeneratedImage } from "~/lib/supabase.server";
 
 const VIDEO_MODEL_VERSION =
   "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896";
@@ -197,6 +198,157 @@ export async function action({ request, context }: Route.ActionArgs) {
     }, { headers: authHeaders });
   } catch (err) {
     console.error("workflow-execute error:", err);
+    return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
+  }
+}
+
+/**
+ * GET /api/workflow-execute?runId=xxx — 워크플로우 실행 상태 폴링
+ *
+ * Returns: { status, nodeRuns: [{ nodeId, nodeType, status, outputs, error }], error }
+ */
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const env = (context.cloudflare as { env: Record<string, string> }).env;
+  const { headers: authHeaders } = await requireAuthApi(request, env);
+
+  const TOKEN = context.cloudflare.env.REPLICATE_TOKEN;
+  const url = new URL(request.url);
+  const runId = url.searchParams.get("runId");
+
+  if (!runId) {
+    return Response.json({ error: "runId parameter required" }, { status: 400, headers: authHeaders });
+  }
+
+  try {
+    const db = getDb(env);
+
+    const [run] = await db
+      .select()
+      .from(workflowRuns)
+      .where(eq(workflowRuns.id, runId))
+      .limit(1);
+
+    if (!run) {
+      return Response.json({ error: "Workflow run not found" }, { status: 404, headers: authHeaders });
+    }
+
+    // Fetch all node_runs for this workflow
+    const nodes = await db
+      .select()
+      .from(nodeRuns)
+      .where(eq(nodeRuns.runId, runId));
+
+    // Poll Replicate for any pending/processing node_runs
+    let anyUpdated = false;
+    for (const node of nodes) {
+      if ((node.status === "pending" || node.status === "processing") && node.externalId && node.externalProvider === "replicate") {
+        const res = await fetch(
+          `https://api.replicate.com/v1/predictions/${node.externalId}`,
+          { headers: { Authorization: `Bearer ${TOKEN}` } }
+        );
+        if (!res.ok) continue;
+        const pred = await res.json();
+
+        let newStatus = node.status;
+        let outputs = node.outputs;
+        let error = node.error;
+
+        if (pred.status === "succeeded") {
+          newStatus = "completed";
+          const isImage = node.nodeType === "generate-image";
+
+          // Upload to Supabase Storage for persistence
+          try {
+            const outputUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
+            if (isImage) {
+              const { publicUrl } = await uploadGeneratedImage(env, outputUrl, node.id);
+              outputs = JSON.stringify({ url: publicUrl, type: "image" });
+            } else {
+              const { publicUrl } = await uploadGeneratedVideo(env, outputUrl, node.id);
+              outputs = JSON.stringify({ url: publicUrl, type: "video" });
+            }
+          } catch (uploadErr) {
+            console.error("Upload failed, using CDN URL:", uploadErr);
+            const outputUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
+            outputs = JSON.stringify({ url: outputUrl, type: isImage ? "image" : "video" });
+          }
+        } else if (pred.status === "failed") {
+          newStatus = "failed";
+          error = pred.error || "Generation failed";
+        } else if (pred.status === "processing") {
+          newStatus = "processing";
+        }
+
+        if (newStatus !== node.status) {
+          anyUpdated = true;
+          const now = (newStatus === "completed" || newStatus === "failed") ? new Date() : undefined;
+          await db.update(nodeRuns)
+            .set({ status: newStatus, outputs, error, completedAt: now })
+            .where(eq(nodeRuns.id, node.id));
+
+          // Sync legacy generation if linked
+          if (node.legacyGenerationId) {
+            try {
+              const parsedOutputs = outputs ? JSON.parse(outputs) : null;
+              if (newStatus === "completed" && parsedOutputs) {
+                const isImage = parsedOutputs.type === "image";
+                await db.update(generations).set({
+                  status: "completed",
+                  ...(isImage ? { outputUrl: parsedOutputs.url } : { videoUrl: parsedOutputs.url }),
+                }).where(eq(generations.id, node.legacyGenerationId));
+              } else if (newStatus === "failed") {
+                await db.update(generations).set({
+                  status: "failed",
+                  errorMessage: error,
+                }).where(eq(generations.id, node.legacyGenerationId));
+              } else {
+                await db.update(generations).set({ status: newStatus })
+                  .where(eq(generations.id, node.legacyGenerationId));
+              }
+            } catch (syncErr) {
+              console.error("Legacy sync failed (non-fatal):", syncErr);
+            }
+          }
+
+          // Update node in-memory for response
+          node.status = newStatus;
+          node.outputs = outputs;
+          node.error = error;
+        }
+      }
+    }
+
+    // Update workflow_run status based on node_runs
+    if (anyUpdated) {
+      const allCompleted = nodes.every((n) => n.status === "completed");
+      const anyFailed = nodes.some((n) => n.status === "failed");
+      const newRunStatus = allCompleted ? "completed" : anyFailed ? "failed" : "running";
+      const runOutputs = allCompleted
+        ? JSON.stringify(nodes.map((n) => ({ nodeId: n.nodeId, outputs: n.outputs ? JSON.parse(n.outputs) : null })))
+        : undefined;
+      const completedAt = (newRunStatus === "completed" || newRunStatus === "failed") ? new Date() : undefined;
+
+      await db.update(workflowRuns).set({
+        status: newRunStatus,
+        outputs: runOutputs,
+        completedAt,
+        ...(anyFailed ? { error: nodes.find((n) => n.status === "failed")?.error } : {}),
+      }).where(eq(workflowRuns.id, runId));
+    }
+
+    return Response.json({
+      status: run.status === "pending" && nodes.some((n) => n.status !== "pending") ? "running" : (anyUpdated ? (nodes.every((n) => n.status === "completed") ? "completed" : nodes.some((n) => n.status === "failed") ? "failed" : "running") : run.status),
+      nodeRuns: nodes.map((n) => ({
+        nodeId: n.nodeId,
+        nodeType: n.nodeType,
+        status: n.status,
+        outputs: n.outputs ? JSON.parse(n.outputs) : null,
+        error: n.error,
+      })),
+      error: run.error,
+    }, { headers: authHeaders });
+  } catch (err) {
+    console.error("workflow-execute poll error:", err);
     return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }

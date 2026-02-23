@@ -19,14 +19,17 @@ import { useFetcher } from "react-router";
 import { SourceNode } from "./nodes/SourceNode";
 import { SubtitleNode } from "./nodes/SubtitleNode";
 import { PreviewNode } from "./nodes/PreviewNode";
+import { GenerateNode } from "./nodes/GenerateNode";
 import { MediaBrowser } from "./MediaBrowser";
-import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, EditorProject, WorkflowData } from "./editorTypes";
+import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, GenerateNodeData, EditorProject, WorkflowData } from "./editorTypes";
 
 // Module-scope nodeTypes to avoid remounting on every render
 const nodeTypes: NodeTypes = {
   source: SourceNode,
   subtitle: SubtitleNode,
   preview: PreviewNode,
+  generate: GenerateNode,
+  "generate-image": GenerateNode,
 };
 
 const defaultEdgeOptions = {

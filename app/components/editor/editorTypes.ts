@@ -27,6 +27,23 @@ export interface PreviewNodeData {
   label: string;
 }
 
+export interface GenerateNodeData {
+  [key: string]: unknown;
+  label: string;
+  /** "generate" for video, "generate-image" for image */
+  generateType: "generate" | "generate-image";
+  /** Active workflow run ID (set after triggering generation) */
+  runId?: string;
+  /** Current generation status */
+  status?: "idle" | "pending" | "processing" | "completed" | "failed";
+  /** Output media after completion */
+  output?: { url: string; type: "video" | "image" } | null;
+  /** Error message on failure */
+  error?: string | null;
+  /** Prompt for image generation */
+  prompt?: string;
+}
+
 export interface EditorProject {
   id: string;
   name: string;
