@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Background,
   Controls,
   MiniMap,
@@ -264,7 +265,15 @@ function EditorToolbar({ onSaveAsSkill }: { onSaveAsSkill: () => void }) {
 
 // ── Main Component ───────────────────────────────────────────
 
-export function EditorCanvas({ savedProject, initialMedia, sourceGenerationId, workflowData }: EditorCanvasProps) {
+export function EditorCanvas(props: EditorCanvasProps) {
+  return (
+    <ReactFlowProvider>
+      <EditorCanvasInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function EditorCanvasInner({ savedProject, initialMedia, sourceGenerationId, workflowData }: EditorCanvasProps) {
   const { startNodes, startEdges, startViewport } = useMemo(() => {
     // workflowData > savedProject > initialMedia > empty
     // workflowData = user clicked Edit/template link → load into scratch

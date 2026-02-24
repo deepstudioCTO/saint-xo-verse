@@ -169,6 +169,7 @@ export default [
 ### 핵심 설계 결정
 | 항목 | 결정 | 이유 |
 |------|------|------|
+| ReactFlowProvider | `EditorCanvas`(wrapper) → `ReactFlowProvider` → `EditorCanvasInner`. ReactFlow 형제인 SaveAsSkillDialog·MediaBrowser도 context 접근 가능 | `<ReactFlow>`는 내부 Provider를 만들지만 형제 컴포넌트는 접근 불가 → useReactFlow() throw |
 | nodeTypes 위치 | 모듈 스코프 정의 (`EditorCanvas.tsx` 상단): source, subtitle, preview, generate, generate-image | 인라인 정의 시 매 렌더마다 노드 리마운트. generate와 generate-image는 같은 `GenerateNode` 컴포넌트 |
 | 자막 입력 영역 | `className="nodrag nopan nowheel"` | React Flow 이벤트가 input 포커스/스크롤 가로채기 방지 |
 | 프리뷰 업스트림 데이터 | `useHandleConnections` + `useNodesData` | React Flow v12 권장 패턴, 엣지 연결 기반 데이터 흐름 |

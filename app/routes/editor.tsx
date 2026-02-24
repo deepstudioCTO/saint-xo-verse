@@ -37,7 +37,7 @@ async function backfillGenerationToRun(
       {
         id: "generate-1",
         type: nodeType,
-        data: { label: isImage ? "Generate Image" : "Generate" },
+        data: { label: isImage ? "Generate Image" : "Generate", generateType: nodeType },
       },
     ],
     edges: [{ id: "e-source-generate", source: "source-1", target: "generate-1" }],

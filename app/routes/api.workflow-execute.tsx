@@ -61,7 +61,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       : JSON.stringify({
           nodes: [
             { id: "source-1", type: "source", data: { label: "Source", media: { type: "image", url: inputs.imageUrl } } },
-            { id: "generate-1", type: category === "image" ? "generate-image" : "generate", data: { label: "Generate" } },
+            { id: "generate-1", type: category === "image" ? "generate-image" : "generate", data: { label: "Generate", generateType: category === "image" ? "generate-image" : "generate" } },
           ],
           edges: [{ id: "e-source-generate", source: "source-1", target: "generate-1" }],
         });

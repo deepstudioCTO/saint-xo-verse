@@ -75,7 +75,7 @@ async function migrate() {
         id: "generate-1",
         type: "generate",
         position: { x: 400, y: 180 },
-        data: { label: "Generate Video" },
+        data: { label: "Generate Video", generateType: "generate" },
       },
     ]);
 
