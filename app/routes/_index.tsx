@@ -39,6 +39,8 @@ import { usePersonaNavigation } from "~/hooks/usePersonaNavigation";
 import { useSkillTeaching } from "~/hooks/useSkillTeaching";
 import { useCharacterImages } from "~/hooks/useCharacterImages";
 import { usePreloadPosters } from "~/hooks/usePreloadPosters";
+import { WorkflowPanel } from "~/components/workflow/WorkflowPanel";
+import { RunsPanel } from "~/components/workflow/RunsPanel";
 
 const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform }) => {
   if (!activatorEvent || !activeNodeRect) return transform;
@@ -175,7 +177,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       thumbnailUrl: t.thumbnailUrl,
     }));
 
-    const skillsCount = dbVideos.length + dbTemplates.length;
+    const skillsCount = dbVideos.length;
     const storiesCount = Number(storiesResult[0]?.count || 0);
 
     // Resolve current look
@@ -331,7 +333,6 @@ export default function Home() {
     selectedImgUrl,
     skillVideos,
     skillImages,
-    skillTemplates,
     galleryState,
     activePanel,
     setActivePanel,
@@ -373,7 +374,7 @@ export default function Home() {
   // Reset generate prompt when skill selection changes
   useEffect(() => {
     setGeneratePrompt("");
-  }, [skill.selectedSkillVideoId, skill.selectedSkillImageId, skill.selectedTemplateId]);
+  }, [skill.selectedSkillVideoId, skill.selectedSkillImageId]);
 
   // Optimistic persona update callback
   const handleCharacterUpdate = useCallback((characterId: string, updates: Partial<Persona>) => {
@@ -399,9 +400,27 @@ export default function Home() {
   const galleryHorizontalOpen = activePanel === "gallery-horizontal";
   const galleryCompactOpen = activePanel === "gallery-compact";
   const galleryExpandedOpen = activePanel === "gallery-expanded";
+  const workflowExpandedOpen = activePanel === "workflow-expanded";
+  const runsExpandedOpen = activePanel === "runs-expanded";
+
+  // W key → toggle workflow panel, R key → toggle runs panel
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.key === "w" || e.key === "W") {
+        setActivePanel((prev) => prev === "workflow-expanded" ? null : "workflow-expanded");
+      }
+      if (e.key === "r" || e.key === "R") {
+        setActivePanel((prev) => prev === "runs-expanded" ? null : "runs-expanded");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   // Three-card layout: character left + skill center + generate right
-  const hasSkillSelected = !!(skill.selectedSkillVideo || skill.selectedSkillImage || skill.selectedTemplate);
+  const hasSkillSelected = !!(skill.selectedSkillVideo || skill.selectedSkillImage);
   const threeCardMode = isSelecting && hasSkillSelected && skill.threeCardActive;
   const baseScale = 3.5;
 
@@ -531,7 +550,7 @@ export default function Home() {
           <AnimatePresence>
             {threeCardMode && hasSkillSelected && (
               <motion.div
-                key={`skill-card-${skill.selectedSkillVideoId || skill.selectedSkillImageId || skill.selectedTemplateId}`}
+                key={`skill-card-${skill.selectedSkillVideoId || skill.selectedSkillImageId}`}
                 className="absolute"
                 style={{
                   transform: `translateX(0vw) scale(2.5)`,
@@ -564,23 +583,6 @@ export default function Home() {
                       alt=""
                       className="w-full h-full object-cover"
                     />
-                  ) : skill.selectedTemplate ? (
-                    skill.selectedTemplate.thumbnailUrl ? (
-                      <img
-                        src={skill.selectedTemplate.thumbnailUrl}
-                        alt={skill.selectedTemplate.name}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full bg-neutral-200 flex items-center justify-center">
-                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-neutral-400">
-                          <rect x="3" y="3" width="18" height="18" rx="2" />
-                          <path d="M9 3v18" />
-                          <path d="M3 9h6" />
-                          <path d="M3 15h6" />
-                        </svg>
-                      </div>
-                    )
                   ) : null}
                 </div>
               </motion.div>
@@ -630,7 +632,7 @@ export default function Home() {
                 transition={{ duration: 0.3 }}
                 onClick={() => {
                   if (skill.isGenerating) return;
-                  const needsPrompt = skill.selectedSkillImage || (skill.selectedTemplate?.category === "image");
+                  const needsPrompt = !!skill.selectedSkillImage;
                   skill.handleGenerateClick(
                     needsPrompt ? generatePrompt || undefined : undefined
                   );
@@ -772,15 +774,12 @@ export default function Home() {
             open={skillHorizontalOpen}
             videos={skillVideos}
             images={skillImages}
-            templates={skillTemplates}
             tab={skill.skillTab}
             selectedVideoId={skill.selectedSkillVideoId}
             selectedImageId={skill.selectedSkillImageId}
-            selectedTemplateId={skill.selectedTemplateId}
             onTabChange={skill.handleSkillTabChange}
             onSelectVideo={skill.handleSkillSelectVideo}
             onSelectImage={skill.handleSkillSelectImage}
-            onSelectTemplate={skill.handleSelectTemplate}
             onExpand={() => setActivePanel("skill-expanded")}
           />
         )}
@@ -806,15 +805,12 @@ export default function Home() {
           onCollapse={() => setActivePanel("skill-horizontal")}
           videos={skillVideos}
           images={skillImages}
-          templates={skillTemplates}
           tab={skill.skillTab}
           selectedVideoId={skill.selectedSkillVideoId}
           selectedImageId={skill.selectedSkillImageId}
-          selectedTemplateId={skill.selectedTemplateId}
           onTabChange={skill.handleSkillTabChange}
           onSelectVideo={skill.handleSkillSelectVideo}
           onSelectImage={skill.handleSkillSelectImage}
-          onSelectTemplate={skill.handleSelectTemplate}
         />
       )}
 
@@ -824,6 +820,17 @@ export default function Home() {
         onCollapse={() => setActivePanel("gallery-compact")}
         galleryState={galleryState}
         lookbookId={activeLookbookId}
+      />
+
+      <WorkflowPanel
+        open={workflowExpandedOpen}
+        onClose={() => setActivePanel(null)}
+        templates={skillTemplates}
+      />
+
+      <RunsPanel
+        open={runsExpandedOpen}
+        onClose={() => setActivePanel(null)}
       />
 
       <GalleryModals galleryState={galleryState} />

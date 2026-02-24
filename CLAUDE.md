@@ -200,10 +200,8 @@ export default [
 
 | 항목 | 결정 | 이유 |
 |------|------|------|
-| 전환 전략 | dual write — generations + workflow_runs/node_runs 동시 기록 | 기존 갤러리/폴링 코드 변경 없이 점진 전환 |
-| dual write 에러 처리 | fire-and-forget (try/catch 독립) | generation 응답이 workflow 실패에 영향받으면 안 됨 |
-| 폴링 시 workflow 동기화 | `syncWorkflowStatus()` 헬퍼 (fire-and-forget) | generations 상태 변경 시 node_runs/workflow_runs도 갱신 |
-| 레거시 generation 연결 | `node_runs.legacyGenerationId` + lazy backfill | Edit 클릭 시 linked node_run 없으면 on-the-fly 생성 |
+| 데이터 분리 | Library = `generations` 전용, Runs = `workflow_runs` 전용, dual-write 제거 | 각 테이블이 독립적으로 자기 영역만 담당 |
+| Runs 패널 | `RunsPanel` (runs-expanded, R키 토글), `/api/runs-data` 엔드포인트, expanded-only | Library(레거시 생성)와 Runs(워크플로우 실행) 분리 표시 |
 | 에디터 로드 우선순위 | `workflowData > savedProject > initialMedia > empty` | workflow params 있으면 scratch에 복사 로드 |
 | 에디터 라우팅 | `?run=`, `?generationId=`, `?template=` | 각 진입점에서 워크플로우 스냅샷 → scratch 복사 |
 | templateSnapshot | 실행 시점 nodes+edges 전체 JSON | 템플릿 변경돼도 실행 기록은 자기완결적 |
@@ -211,10 +209,10 @@ export default [
 | 템플릿 CRUD | `POST/GET/DELETE /api/workflow-templates`, id 있으면 update + version++ | 단일 엔드포인트로 생성/수정/삭제/목록 |
 | Save as Skill | EditorCanvas 내 `SaveAsSkillDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
 | motionVideos 마이그레이션 | `scripts/migrate-skills-to-templates.ts` — motionVideo → 최소 노드 그래프 template | Source + MotionRef + Generate 3노드 구성 |
-| 스킬 패널 템플릿 통합 | `SkillContentProps`에 templates/selectedTemplateId/onSelectTemplate 추가 | 레거시 motionVideo와 템플릿 동시 표시, 카테고리별 탭 분류 |
-| 템플릿 기반 실행 | `/api/workflow-execute` POST (JSON body) + 3카드 모드에서 `handleGenerateClick` 분기 | 템플릿 선택 시 workflow-execute, 레거시 선택 시 기존 generate API |
+| 워크플로우 패널 분리 | `WorkflowPanel` (workflow-expanded) — 스킬 패널에서 템플릿 제거, W키 토글 전용 패널. 클릭 시 `/editor?template=<id>` 이동 | 레거시 스킬(motionVideo/conceptImage)과 워크플로우 템플릿은 용도가 다름 — 스킬은 3카드 즉시 생성, 템플릿은 에디터에서 편집 |
+| 템플릿 기반 실행 | `/api/workflow-execute` POST (JSON body), 에디터 GenerateNode에서만 실행 | 홈 3카드 모드는 레거시 전용, 워크플로우 실행은 에디터 경유 |
 | GenerateNode | 에디터 내 생성 노드, upstream SourceNode에서 이미지/비디오 자동 탐색, 5초 폴링 | 에디터 캔버스에서 직접 생성 실행 + 결과 확인 |
-| 워크플로우 폴링 API | `GET /api/workflow-execute?runId=` — Replicate 상태 체크 + Storage 업로드 + 양방향 동기화 | GenerateNode와 독립적 폴링 클라이언트를 위한 범용 엔드포인트 |
+| 워크플로우 폴링 API | `GET /api/workflow-execute?runId=` — Replicate 상태 체크 + Storage 업로드 | GenerateNode와 독립적 폴링 클라이언트를 위한 범용 엔드포인트 |
 
 ## Slack MCP
 
@@ -260,6 +258,7 @@ app/
 │   ├── music/           # MusicHorizontalPanel (가로 트랙 선택), MusicPanel (세로, 미사용), MusicPlayerWidget
 │   ├── skill/           # SkillPanel (horizontal/compact/expanded)
 │   ├── gallery/         # GalleryPanel(horizontal/compact/expanded), GalleryGrid, GalleryModals, VideoDetailModal, ImageDetailModal
+│   ├── workflow/        # WorkflowPanel (워크플로우 템플릿 전용 expanded 패널)
 │   ├── editor/          # 노드 에디터 (EditorCanvas, MediaBrowser, nodes/)
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
 │   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등

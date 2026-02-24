@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.workflow-execute";
-import { getDb, generations, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { getDb, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
 import { uploadGeneratedVideo, uploadGeneratedImage } from "~/lib/supabase.server";
 
@@ -143,7 +143,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     // Create node_run
-    const [nodeRun] = await db
+    await db
       .insert(nodeRuns)
       .values({
         runId: workflowRun.id,
@@ -153,47 +153,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         status: "pending",
         externalId: prediction.id,
         externalProvider: "replicate",
-      })
-      .returning();
-
-    // Dual write: generations (갤러리 호환)
-    let generationId: string | undefined;
-    try {
-      const [generation] = await db
-        .insert(generations)
-        .values({
-          predictionId: prediction.id,
-          provider: "replicate",
-          type: category,
-          memberId: inputs.characterId,
-          musicId: inputs.musicId || null,
-          motionVideoId: inputs.motionVideoId || null,
-          conceptImageId: inputs.conceptImageId || null,
-          lookbookId: inputs.lookbookId || null,
-          lookId: inputs.lookId || null,
-          prompt: inputs.prompt || null,
-          resolution: inputs.resolution || null,
-          imageUrl: inputs.imageUrl,
-          motionVideoUrl: inputs.motionVideoUrl || null,
-          status: "pending",
-        })
-        .returning();
-
-      generationId = generation.id;
-
-      // Link node_run → generation
-      await db
-        .update(nodeRuns)
-        .set({ legacyGenerationId: generation.id })
-        .where(eq(nodeRuns.id, nodeRun.id));
-    } catch (dualWriteErr) {
-      console.error("Generation dual write failed (non-fatal):", dualWriteErr);
-    }
+      });
 
     return Response.json({
       success: true,
       runId: workflowRun.id,
-      generationId,
       predictionId: prediction.id,
     }, { headers: authHeaders });
   } catch (err) {
@@ -285,30 +249,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
           await db.update(nodeRuns)
             .set({ status: newStatus, outputs, error, completedAt: now })
             .where(eq(nodeRuns.id, node.id));
-
-          // Sync legacy generation if linked
-          if (node.legacyGenerationId) {
-            try {
-              const parsedOutputs = outputs ? JSON.parse(outputs) : null;
-              if (newStatus === "completed" && parsedOutputs) {
-                const isImage = parsedOutputs.type === "image";
-                await db.update(generations).set({
-                  status: "completed",
-                  ...(isImage ? { outputUrl: parsedOutputs.url } : { videoUrl: parsedOutputs.url }),
-                }).where(eq(generations.id, node.legacyGenerationId));
-              } else if (newStatus === "failed") {
-                await db.update(generations).set({
-                  status: "failed",
-                  errorMessage: error,
-                }).where(eq(generations.id, node.legacyGenerationId));
-              } else {
-                await db.update(generations).set({ status: newStatus })
-                  .where(eq(generations.id, node.legacyGenerationId));
-              }
-            } catch (syncErr) {
-              console.error("Legacy sync failed (non-fatal):", syncErr);
-            }
-          }
 
           // Update node in-memory for response
           node.status = newStatus;

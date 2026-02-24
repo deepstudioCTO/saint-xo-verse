@@ -1,9 +1,8 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.generate";
-import { getDb, generations, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { getDb, generations } from "~/lib/db.server";
 import { uploadGeneratedVideo } from "~/lib/supabase.server";
 import { requireAuthApi } from "~/lib/auth.server";
-import { syncWorkflowStatus } from "~/lib/workflow-sync.server";
 
 const MODEL_VERSION =
   "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896";
@@ -128,51 +127,10 @@ export async function action({ request, context }: Route.ActionArgs) {
       })
       .returning();
 
-    // Dual write: workflow_runs + node_runs (전환기, fire-and-forget)
-    let runId: string | undefined;
-    try {
-      const snapshot = JSON.stringify({
-        nodes: [
-          { id: "source-1", type: "source", data: { label: "Source", media: { type: "image", url: imageUrl } } },
-          { id: "generate-1", type: "generate", data: { label: "Generate" } },
-        ],
-        edges: [{ id: "e-source-generate", source: "source-1", target: "generate-1" }],
-      });
-      const wfInputs = JSON.stringify({
-        characterId: memberId,
-        imageUrl,
-        motionVideoUrl: videoUrl,
-        motionVideoId,
-        lookbookId,
-        lookId,
-        musicId,
-      });
-
-      const [workflowRun] = await db
-        .insert(workflowRuns)
-        .values({ templateSnapshot: snapshot, inputs: wfInputs, status: "pending" })
-        .returning();
-
-      await db.insert(nodeRuns).values({
-        runId: workflowRun.id,
-        nodeId: "generate-1",
-        nodeType: "generate",
-        inputs: JSON.stringify({ image: imageUrl, video: videoUrl }),
-        status: "pending",
-        externalId: prediction.id,
-        externalProvider: "replicate",
-        legacyGenerationId: generation.id,
-      });
-      runId = workflowRun.id;
-    } catch (dualWriteErr) {
-      console.error("Dual write failed (non-fatal):", dualWriteErr);
-    }
-
     return Response.json({
       success: true,
       id: prediction.id,
       generationId: generation.id,
-      runId,
     }, { headers: authHeaders });
   } catch (err) {
     return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
@@ -237,9 +195,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             .set({ status: newStatus, videoUrl, storagePath })
             .where(eq(generations.id, id));
 
-          // Sync workflow status (fire-and-forget)
-          syncWorkflowStatus(db, id, newStatus, { url: videoUrl!, type: "video" });
-
           return Response.json({
             status: newStatus,
             output: videoUrl,
@@ -267,9 +222,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
             errorMessage,
           })
           .where(eq(generations.id, id));
-
-        // Sync workflow status (fire-and-forget)
-        syncWorkflowStatus(db, id, newStatus, videoUrl ? { url: videoUrl, type: "video" } : null);
       }
 
       return Response.json({
