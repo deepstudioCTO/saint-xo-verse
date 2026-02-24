@@ -601,7 +601,7 @@ export function VideoDetailModal({
               <>
                 {/* Edit in editor */}
                 <Link
-                  to={`/editor?generationId=${generation.id}`}
+                  to="/editor?template=demo"
                   onClick={onClose}
                   className="text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors"
                 >

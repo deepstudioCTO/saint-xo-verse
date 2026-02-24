@@ -134,7 +134,7 @@ export default [
 | 음악 패널 선택 시 닫힘 안 함 | `MusicHorizontalPanel`에서 트랙 클릭 = `selectTrack`만, `onClose` 없음 | 음악은 비교 시청하며 고르는 패턴, 배경클릭/Escape로만 닫힘 |
 | 음악 패널 내 재생 컨트롤 | `MusicHorizontalPanel` 하단에 `MusicControls` 재사용 | Horizontal 패널 열림 시 `MusicPlayerWidget`이 숨겨지므로 패널 자체에 재생 제어 필요 |
 | 패널 항목 선택 시 자동 닫힘 | Skill: 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 (Music은 예외) |
-| 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, Supabase Storage에서 서빙 (`preload="auto"`) | Range 요청 지원으로 seek 정상 동작, Cloudflare Workers Static Assets는 Range 미지원 |
+| 오디오 플레이어 | 모듈 레벨 싱글톤 + `useSyncExternalStore`, Supabase Storage에서 서빙 (`preload="auto"`). autoPlay useEffect cleanup으로 라우트 이탈 시 자동 정지 | Range 요청 지원으로 seek 정상 동작. autoPlay 컴포넌트(MusicPlayerWidget) 언마운트 → pause, 리마운트 → 재개 |
 | 글로벌 스페이스바 | `registerGlobalSpacebar()` → root.tsx 1회 등록 | input/button 위에서는 스킵 |
 | Video-Audio 동기화 | React `onPlay`/`onPause` props + `useEffect` 명시적 `play()` | `autoPlay` + `addEventListener`는 race condition |
 | RevealPanel exit | exit `duration: 0` | 패널 전환 시 동시 렌더 방지 |
@@ -170,7 +170,11 @@ export default [
 | 항목 | 결정 | 이유 |
 |------|------|------|
 | ReactFlowProvider | `EditorCanvas`(wrapper) → `ReactFlowProvider` → `EditorCanvasInner`. ReactFlow 형제인 SaveAsSkillDialog·MediaBrowser도 context 접근 가능 | `<ReactFlow>`는 내부 Provider를 만들지만 형제 컴포넌트는 접근 불가 → useReactFlow() throw |
-| nodeTypes 위치 | 모듈 스코프 정의 (`EditorCanvas.tsx` 상단): source, subtitle, preview, generate, generate-image | 인라인 정의 시 매 렌더마다 노드 리마운트. generate와 generate-image는 같은 `GenerateNode` 컴포넌트 |
+| 에디터 진입점 (3개) | `?run=` (run snapshot), `?template=<id\|name>` (UUID→ID, 그외→name 조회), 파라미터 없음 (scratch/empty) | `?generationId=`·`?media=` 제거 → Library Edit은 `?template=demo`로 통일 |
+| Loader 분리 | `editor-loaders.server.ts`에 `loadFromRun`/`loadFromTemplate`/`loadSavedProject` 3함수, `editor.tsx` loader는 위임 ~15줄 | 인라인 5개 if/else 제거, JSON parse는 함수 내부 1회만 |
+| EditorEntryData | discriminated union (`mode: "run"\|"template"\|"scratch"\|"empty"` + `GraphData`). `WorkflowData` 삭제 | loader→component 계약이 타입 안전, JSON string 대신 parsed Node[]/Edge[] 전달 |
+| 에디터 컴포넌트 분리 | `editorDefaults.ts` (nodeTypes/상수), `AutoSave.tsx`, `SaveAsSkillDialog.tsx`, `EditorCanvas.tsx` (캔버스+툴바) | 396줄 모놀리스 → 4파일 분리 |
+| nodeTypes 위치 | 모듈 스코프 정의 (`editorDefaults.ts`): source, subtitle, preview, generate, generate-image | 인라인 정의 시 매 렌더마다 노드 리마운트. generate와 generate-image는 같은 `GenerateNode` 컴포넌트 |
 | 자막 입력 영역 | `className="nodrag nopan nowheel"` | React Flow 이벤트가 input 포커스/스크롤 가로채기 방지 |
 | 프리뷰 업스트림 데이터 | `useHandleConnections` + `useNodesData` | React Flow v12 권장 패턴, 엣지 연결 기반 데이터 흐름 |
 | CSS import | `base.css` (not `style.css`) | `style.css`는 Tailwind와 충돌 가능 |
@@ -179,8 +183,8 @@ export default [
 | 미디어 표시 | `MediaDisplay` 공용 컴포넌트 (SourceNode·PreviewNode 공유), play 버튼 `stopPropagation` | DRY + SourceNode는 onNodeClick→MediaBrowser 열림과 play 클릭을 분리해야 함 |
 | SourceNode 래퍼 | `<div>` (not `<button>`) | MediaDisplay 내부 play `<button>`과 중첩 시 hydration mismatch → React 트리 리마운트 |
 | AutoSave URL 정리 | 첫 저장 성공 후 `replaceState("/editor")` | URL params는 초기 진입 힌트일 뿐, 저장 후엔 DB가 진실의 원천. 새로고침 시 savedProject에서 복원 |
-| AutoSave 초기화 우선순위 | `workflowData > savedProject > initialMedia > empty` | workflow params 있으면 scratch에 복사 로드. savedProject 있으면 전체 상태 복원 |
-| AutoSave sourceGenerationId | ref로 관리 (`sourceGenIdRef`) | useEffect deps는 `[nodes, edges]`만, setTimeout 내부에서 stale closure 방지 |
+| AutoSave 초기화 우선순위 | `entryData.graph > savedProject > empty` (loader가 `EditorEntryData`로 해석 완료) | component는 JSON parse 불필요, `mode`로 분기 |
+| 템플릿 수정 모드 | `loadFromTemplate`이 `templateMeta(name,category)` 포함 반환 → `SaveAsSkillDialog`가 프리필 + "Update Skill" 타이틀 | 기존 템플릿 수정 시 이름/카테고리 재입력 불필요 |
 
 ### 구성
 - Lookbook 00 "Showcase": 4 looks
@@ -202,8 +206,8 @@ export default [
 |------|------|------|
 | 데이터 분리 | Library = `generations` 전용, Runs = `workflow_runs` 전용, dual-write 제거 | 각 테이블이 독립적으로 자기 영역만 담당 |
 | Runs 패널 | `RunsPanel` (runs-expanded, R키 토글), `/api/runs-data` 엔드포인트, expanded-only | Library(레거시 생성)와 Runs(워크플로우 실행) 분리 표시 |
-| 에디터 로드 우선순위 | `workflowData > savedProject > initialMedia > empty` | workflow params 있으면 scratch에 복사 로드 |
-| 에디터 라우팅 | `?run=`, `?generationId=`, `?template=` | 각 진입점에서 워크플로우 스냅샷 → scratch 복사 |
+| 에디터 로드 우선순위 | `run > template > savedProject > empty` (`editor-loaders.server.ts` 위임) | loader가 `EditorEntryData` 반환, component는 parse 불필요 |
+| 에디터 라우팅 | `?run=`, `?template=` (2개만). Library Edit → `?template=demo` | `?generationId=`·`?media=` 제거, 진입점 5→3개로 축소 |
 | templateSnapshot | 실행 시점 nodes+edges 전체 JSON | 템플릿 변경돼도 실행 기록은 자기완결적 |
 | editor_projects | 유지 (scratch 작업 공간) | Figma/ComfyUI 패턴 — 에디터는 항상 scratch에서 작동 |
 | 템플릿 CRUD | `POST/GET/DELETE /api/workflow-templates`, id 있으면 update + version++ | 단일 엔드포인트로 생성/수정/삭제/목록 |
@@ -259,7 +263,7 @@ app/
 │   ├── skill/           # SkillPanel (horizontal/compact/expanded)
 │   ├── gallery/         # GalleryPanel(horizontal/compact/expanded), GalleryGrid, GalleryModals, VideoDetailModal, ImageDetailModal
 │   ├── workflow/        # WorkflowPanel (워크플로우 템플릿 전용 expanded 패널)
-│   ├── editor/          # 노드 에디터 (EditorCanvas, MediaBrowser, nodes/)
+│   ├── editor/          # 노드 에디터 (EditorCanvas, AutoSave, SaveAsSkillDialog, editorDefaults, MediaBrowser, nodes/)
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
 │   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등
 ├── lib/
@@ -267,7 +271,7 @@ app/
 │   ├── supabase-auth.server.ts # 쿠키 기반 Supabase 클라이언트 팩토리
 │   ├── data.ts          # CHARACTERS, TRACKS, LOOKBOOKS, LOOKS, PERSONAS 폴백 데이터 + 타입 + 룩업 맵
 │   ├── db.server.ts     # Drizzle DB 연결 + 모든 schema 테이블 export
-│   ├── workflow-sync.server.ts # 폴링 시 workflow_runs/node_runs 상태 동기화
+│   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
 │   └── supabase.server.ts  # Storage 헬퍼
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅

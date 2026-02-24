@@ -213,6 +213,13 @@ export function useAudioPlayer(
         }
       });
     }
+
+    return () => {
+      _autoPlayRequested = false;
+      if (_audio && _isPlaying) {
+        _audio.pause();
+      }
+    };
   }, [autoPlay]);
 
   const nextTrack = useCallback(() => {

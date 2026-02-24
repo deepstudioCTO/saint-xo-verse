@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -8,239 +8,15 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
-  useReactFlow,
   addEdge,
   type Node,
-  type Edge,
   type OnConnect,
-  type NodeTypes,
-  type Viewport,
 } from "@xyflow/react";
-import { useFetcher } from "react-router";
-import { SourceNode } from "./nodes/SourceNode";
-import { SubtitleNode } from "./nodes/SubtitleNode";
-import { PreviewNode } from "./nodes/PreviewNode";
-import { GenerateNode } from "./nodes/GenerateNode";
+import type { SourceNodeData, EditorEntryData } from "./editorTypes";
+import { nodeTypes, defaultEdgeOptions, emptyNodes, emptyEdges } from "./editorDefaults";
+import { AutoSave } from "./AutoSave";
+import { SaveAsSkillDialog } from "./SaveAsSkillDialog";
 import { MediaBrowser } from "./MediaBrowser";
-import type { SourceNodeData, SubtitleNodeData, PreviewNodeData, GenerateNodeData, EditorProject, WorkflowData } from "./editorTypes";
-
-// Module-scope nodeTypes to avoid remounting on every render
-const nodeTypes: NodeTypes = {
-  source: SourceNode,
-  subtitle: SubtitleNode,
-  preview: PreviewNode,
-  generate: GenerateNode,
-  "generate-image": GenerateNode,
-};
-
-const defaultEdgeOptions = {
-  type: "default",
-  style: { stroke: "#444", strokeWidth: 1.5 },
-};
-
-const emptyNodes: Node[] = [
-  {
-    id: "source-1",
-    type: "source",
-    position: { x: 50, y: 100 },
-    data: { label: "Source", media: null } satisfies SourceNodeData,
-  },
-  {
-    id: "subtitle-1",
-    type: "subtitle",
-    position: { x: 330, y: 80 },
-    data: { label: "Subtitles", entries: [] } satisfies SubtitleNodeData,
-  },
-  {
-    id: "preview-1",
-    type: "preview",
-    position: { x: 730, y: 80 },
-    data: { label: "Preview" } satisfies PreviewNodeData,
-  },
-];
-
-const emptyEdges: Edge[] = [
-  {
-    id: "e-source-subtitle",
-    source: "source-1",
-    target: "subtitle-1",
-    type: "default",
-    style: { stroke: "#444", strokeWidth: 1.5 },
-  },
-  {
-    id: "e-subtitle-preview",
-    source: "subtitle-1",
-    target: "preview-1",
-    type: "default",
-    style: { stroke: "#444", strokeWidth: 1.5 },
-  },
-];
-
-interface EditorCanvasProps {
-  savedProject?: EditorProject | null;
-  initialMedia?: { type: "video" | "image"; url: string; name: string } | null;
-  sourceGenerationId?: string;
-  workflowData?: WorkflowData | null;
-}
-
-interface AutoSaveProps {
-  nodes: Node[];
-  edges: Edge[];
-  sourceGenerationId?: string;
-}
-
-function AutoSave({ nodes, edges, sourceGenerationId }: AutoSaveProps) {
-  const { getViewport } = useReactFlow();
-  const fetcher = useFetcher();
-  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const isFirstRender = useRef(true);
-  const hasCleanedUrl = useRef(false);
-  // Ref to avoid stale closure — always reads latest value in setTimeout
-  const sourceGenIdRef = useRef(sourceGenerationId);
-  sourceGenIdRef.current = sourceGenerationId;
-
-  useEffect(() => {
-    // Skip saving on first render (initial load)
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      fetcher.submit(
-        {
-          id: "default",
-          nodes: JSON.stringify(nodes),
-          edges: JSON.stringify(edges),
-          viewport: JSON.stringify(getViewport()),
-          sourceGenerationId: sourceGenIdRef.current || "",
-        },
-        { method: "PUT", action: "/api/editor-save", encType: "application/json" }
-      );
-    }, 2000);
-    return () => clearTimeout(timerRef.current);
-  }, [nodes, edges]);
-
-  // Strip URL params after first successful save (refresh will load from DB)
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data && !hasCleanedUrl.current) {
-      const data = fetcher.data as { success?: boolean; error?: string };
-      if (data.success) {
-        hasCleanedUrl.current = true;
-        window.history.replaceState(null, "", "/editor");
-      } else if (data.error) {
-        console.warn("[AutoSave] Save failed:", data.error);
-      }
-    }
-  }, [fetcher.state, fetcher.data]);
-
-  return null;
-}
-
-// ── Save as Skill Dialog ─────────────────────────────────────
-
-interface SaveAsSkillDialogProps {
-  open: boolean;
-  onClose: () => void;
-  nodes: Node[];
-  edges: Edge[];
-  templateId?: string; // 기존 템플릿 업데이트 시
-}
-
-function SaveAsSkillDialog({ open, onClose, nodes, edges, templateId }: SaveAsSkillDialogProps) {
-  const { getViewport } = useReactFlow();
-  const fetcher = useFetcher();
-  const [name, setName] = useState("");
-  const [category, setCategory] = useState<"video" | "image">("video");
-  const prevState = useRef(fetcher.state);
-
-  // Close on successful save
-  useEffect(() => {
-    if (prevState.current === "loading" && fetcher.state === "idle" && fetcher.data) {
-      const data = fetcher.data as { success?: boolean };
-      if (data.success) {
-        setName("");
-        onClose();
-      }
-    }
-    prevState.current = fetcher.state;
-  }, [fetcher.state, fetcher.data, onClose]);
-
-  if (!open) return null;
-
-  const handleSave = () => {
-    if (!name.trim()) return;
-    fetcher.submit(
-      {
-        id: templateId || "",
-        name: name.trim(),
-        category,
-        nodes: JSON.stringify(nodes),
-        edges: JSON.stringify(edges),
-        viewport: JSON.stringify(getViewport()),
-      },
-      { method: "POST", action: "/api/workflow-templates", encType: "application/json" }
-    );
-  };
-
-  const isSaving = fetcher.state !== "idle";
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div
-        className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-80 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="text-white text-sm font-semibold mb-4">Save as Skill</h3>
-
-        <label className="block text-white/50 text-xs mb-1">Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="My Workflow"
-          autoFocus
-          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-white/30 mb-3"
-          onKeyDown={(e) => { if (e.key === "Enter") handleSave(); }}
-        />
-
-        <label className="block text-white/50 text-xs mb-1">Category</label>
-        <div className="flex gap-2 mb-4">
-          {(["video", "image"] as const).map((c) => (
-            <button
-              key={c}
-              onClick={() => setCategory(c)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                category === c
-                  ? "bg-white/15 text-white border border-white/20"
-                  : "bg-white/5 text-white/40 border border-transparent hover:bg-white/10"
-              }`}
-            >
-              {c === "video" ? "Video" : "Image"}
-            </button>
-          ))}
-        </div>
-
-        <div className="flex gap-2 justify-end">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 rounded-lg text-xs text-white/50 hover:text-white/80 transition-colors cursor-pointer"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!name.trim() || isSaving}
-            className="px-4 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-40 transition-colors cursor-pointer"
-          >
-            {isSaving ? "Saving..." : templateId ? "Update" : "Save"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ── Editor Toolbar ───────────────────────────────────────────
 
@@ -265,61 +41,30 @@ function EditorToolbar({ onSaveAsSkill }: { onSaveAsSkill: () => void }) {
 
 // ── Main Component ───────────────────────────────────────────
 
-export function EditorCanvas(props: EditorCanvasProps) {
+interface EditorCanvasProps {
+  entryData: EditorEntryData;
+}
+
+export function EditorCanvas({ entryData }: EditorCanvasProps) {
   return (
     <ReactFlowProvider>
-      <EditorCanvasInner {...props} />
+      <EditorCanvasInner entryData={entryData} />
     </ReactFlowProvider>
   );
 }
 
-function EditorCanvasInner({ savedProject, initialMedia, sourceGenerationId, workflowData }: EditorCanvasProps) {
-  const { startNodes, startEdges, startViewport } = useMemo(() => {
-    // workflowData > savedProject > initialMedia > empty
-    // workflowData = user clicked Edit/template link → load into scratch
-    if (workflowData) {
-      try {
-        const nodes = JSON.parse(workflowData.nodes) as Node[];
-        const edges = JSON.parse(workflowData.edges) as Edge[];
-        const viewport = workflowData.viewport ? JSON.parse(workflowData.viewport) as Viewport : undefined;
-        // Ensure nodes have positions (workflow snapshots from 3-card may not have them)
-        const nodesWithPositions = nodes.map((n, i) => ({
-          ...n,
-          position: n.position || { x: i * 280, y: 100 },
-        }));
-        if (nodesWithPositions.length > 0) {
-          return { startNodes: nodesWithPositions, startEdges: edges, startViewport: viewport };
-        }
-      } catch {
-        // Fall through to savedProject
-      }
+function EditorCanvasInner({ entryData }: EditorCanvasProps) {
+  const { startNodes, startEdges, startViewport, templateId, templateMeta } = useMemo(() => {
+    if (entryData.mode === "empty") {
+      return { startNodes: emptyNodes, startEdges: emptyEdges, startViewport: undefined, templateId: undefined, templateMeta: undefined };
     }
-
-    // savedProject > initialMedia > empty
-    // URL params are stripped after first save, so on refresh initialMedia is null
-    if (savedProject) {
-      try {
-        const nodes = JSON.parse(savedProject.nodes) as Node[];
-        const edges = JSON.parse(savedProject.edges) as Edge[];
-        const viewport = JSON.parse(savedProject.viewport) as Viewport;
-        if (nodes.length > 0) {
-          return { startNodes: nodes, startEdges: edges, startViewport: viewport };
-        }
-      } catch {
-        // Fall through
-      }
-    }
-
-    if (initialMedia) {
-      const nodes = emptyNodes.map((n) =>
-        n.id === "source-1"
-          ? { ...n, data: { ...n.data, media: initialMedia } }
-          : n
-      );
-      return { startNodes: nodes, startEdges: emptyEdges, startViewport: undefined };
-    }
-
-    return { startNodes: emptyNodes, startEdges: emptyEdges, startViewport: undefined };
+    return {
+      startNodes: entryData.graph.nodes,
+      startEdges: entryData.graph.edges,
+      startViewport: entryData.graph.viewport,
+      templateId: entryData.mode === "template" ? entryData.templateId : undefined,
+      templateMeta: entryData.mode === "template" ? entryData.templateMeta : undefined,
+    };
   }, []);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(startNodes);
@@ -388,7 +133,7 @@ function EditorCanvasInner({ savedProject, initialMedia, sourceGenerationId, wor
         <Panel position="top-right">
           <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
         </Panel>
-        <AutoSave nodes={nodes} edges={edges} sourceGenerationId={sourceGenerationId} />
+        <AutoSave nodes={nodes} edges={edges} />
       </ReactFlow>
 
       <MediaBrowser
@@ -402,7 +147,8 @@ function EditorCanvasInner({ savedProject, initialMedia, sourceGenerationId, wor
         onClose={() => setSaveDialogOpen(false)}
         nodes={nodes}
         edges={edges}
-        templateId={workflowData?.source === "template" ? workflowData.templateId : undefined}
+        templateId={templateId}
+        templateMeta={templateMeta}
       />
     </>
   );

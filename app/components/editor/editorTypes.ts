@@ -1,3 +1,5 @@
+import type { Node, Edge, Viewport } from "@xyflow/react";
+
 export interface SourceNodeData {
   [key: string]: unknown;
   label: string;
@@ -101,13 +103,16 @@ export interface NodeRun {
   completedAt: Date | null;
 }
 
-/** Loader → EditorCanvas로 전달되는 워크플로우 데이터 */
-export interface WorkflowData {
-  source: "run" | "generation" | "template";
-  nodes: string;
-  edges: string;
-  viewport?: string;
-  runId?: string;
-  templateId?: string;
-  generationId?: string;
+// ── Editor Entry Data (discriminated union from loader) ───
+
+export interface GraphData {
+  nodes: Node[];
+  edges: Edge[];
+  viewport?: Viewport;
 }
+
+export type EditorEntryData =
+  | { mode: "run"; graph: GraphData; runId: string }
+  | { mode: "template"; graph: GraphData; templateId: string; templateMeta: { name: string; category: string | null } }
+  | { mode: "scratch"; graph: GraphData }
+  | { mode: "empty" };
