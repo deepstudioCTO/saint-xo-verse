@@ -32,15 +32,26 @@ async function backfillGenerationToRun(
       {
         id: "source-1",
         type: "source",
+        position: { x: 50, y: 100 },
         data: { label: "Source", media: { type: isImage ? "image" : "video", url: gen.imageUrl } },
       },
       {
-        id: "generate-1",
-        type: nodeType,
-        data: { label: isImage ? "Generate Image" : "Generate", generateType: nodeType },
+        id: "subtitle-1",
+        type: "subtitle",
+        position: { x: 330, y: 80 },
+        data: { label: "Subtitles", entries: [] },
+      },
+      {
+        id: "preview-1",
+        type: "preview",
+        position: { x: 730, y: 80 },
+        data: { label: "Preview" },
       },
     ],
-    edges: [{ id: "e-source-generate", source: "source-1", target: "generate-1" }],
+    edges: [
+      { id: "e-source-subtitle", source: "source-1", target: "subtitle-1" },
+      { id: "e-subtitle-preview", source: "subtitle-1", target: "preview-1" },
+    ],
   });
 
   const inputs = JSON.stringify({
