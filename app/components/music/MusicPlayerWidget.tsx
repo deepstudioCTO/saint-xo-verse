@@ -16,7 +16,7 @@ export function MusicPlayerWidget() {
     repeatOne,
     toggleShuffle,
     toggleRepeatOne,
-  } = useAudioPlayer({ autoPlay: true });
+  } = useAudioPlayer();
 
   const constraintRef = useRef<HTMLDivElement>(null);
 
