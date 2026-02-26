@@ -6,16 +6,6 @@ import { DndContext, DragOverlay, type Modifier } from "@dnd-kit/core";
 import type { Route } from "./+types/_index";
 import { requireAuth } from "~/lib/auth.server";
 import {
-  LOOKBOOKS as DEFAULT_LOOKBOOKS,
-  LOOKS as DEFAULT_LOOKS,
-  PERSONAS as DEFAULT_PERSONAS,
-  SYNCED_LOOKBOOKS,
-  SYNCED_LOOKS,
-  SYNCED_PERSONAS,
-  SYNCED_SKILL_VIDEOS,
-  SYNCED_SKILL_IMAGES,
-  SYNCED_CHARACTER_IMAGES,
-  SYNCED_GENERATIONS,
   type Lookbook,
   type Look,
   type Persona,
@@ -93,136 +83,105 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const lookbookParam = url.searchParams.get("lookbook") || "00";
   const lookParam = url.searchParams.get("look"); // nullable — will default to first look
 
-  try {
-    const db = getDb(context.cloudflare as { env: Record<string, string> });
+  const db = getDb(context.cloudflare as { env: Record<string, string> });
 
-    const [dbLookbooks, dbLooks, dbPersonas, images] = await Promise.all([
-      db.select().from(lookbooks).orderBy(asc(lookbooks.displayOrder)),
-      db.select().from(looks).orderBy(asc(looks.displayOrder)),
-      db.select().from(personas).orderBy(asc(personas.displayOrder)),
-      db.select().from(characterImages).orderBy(asc(characterImages.characterId), asc(characterImages.createdAt)),
-    ]);
+  const [dbLookbooks, dbLooks, dbPersonas, images] = await Promise.all([
+    db.select().from(lookbooks).orderBy(asc(lookbooks.displayOrder)),
+    db.select().from(looks).orderBy(asc(looks.displayOrder)),
+    db.select().from(personas).orderBy(asc(personas.displayOrder)),
+    db.select().from(characterImages).orderBy(asc(characterImages.characterId), asc(characterImages.createdAt)),
+  ]);
 
-    const lookbookList: Lookbook[] = dbLookbooks.length > 0
-      ? dbLookbooks.map((v) => ({
-          id: v.id,
-          name: v.name,
-          displayName: v.displayName,
-          description: v.description,
-          displayOrder: v.displayOrder,
-        }))
-      : DEFAULT_LOOKBOOKS;
+  const lookbookList: Lookbook[] = dbLookbooks.map((v) => ({
+    id: v.id,
+    name: v.name,
+    displayName: v.displayName,
+    description: v.description,
+    displayOrder: v.displayOrder,
+  }));
 
-    const lookList: Look[] = dbLooks.length > 0
-      ? dbLooks.map((l) => ({
-          id: l.id,
-          lookbookId: l.lookbookId,
-          displayOrder: l.displayOrder,
-        }))
-      : DEFAULT_LOOKS;
+  const lookList: Look[] = dbLooks.map((l) => ({
+    id: l.id,
+    lookbookId: l.lookbookId,
+    displayOrder: l.displayOrder,
+  }));
 
-    const allPersonas: Persona[] = dbPersonas.length > 0
-      ? dbPersonas.map((p) => ({
-          id: p.id,
-          lookId: p.lookId,
-          characterId: p.characterId,
-          name: p.name,
-          description: p.description,
-          video: p.video,
-          poster: p.poster,
-          defaultInput: p.defaultInput,
-          displayOrder: p.displayOrder,
-        }))
-      : DEFAULT_PERSONAS;
+  const allPersonas: Persona[] = dbPersonas.map((p) => ({
+    id: p.id,
+    lookId: p.lookId,
+    characterId: p.characterId,
+    name: p.name,
+    description: p.description,
+    video: p.video,
+    poster: p.poster,
+    defaultInput: p.defaultInput,
+    displayOrder: p.displayOrder,
+  }));
 
-    const imagesByCharacter: Record<string, CharacterImage[]> = {};
-    for (const img of images) {
-      if (!imagesByCharacter[img.characterId]) {
-        imagesByCharacter[img.characterId] = [];
-      }
-      imagesByCharacter[img.characterId].push(img);
+  const imagesByCharacter: Record<string, CharacterImage[]> = {};
+  for (const img of images) {
+    if (!imagesByCharacter[img.characterId]) {
+      imagesByCharacter[img.characterId] = [];
     }
-
-    const cf = context.cloudflare as { env: Record<string, string> };
-    const [dbVideos, dbConceptImages, storiesResult, dbTemplates] = await Promise.all([
-      db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
-      db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
-      db.select({ count: sql<number>`count(*)` }).from(generations).where(eq(generations.status, "completed")),
-      db.select({
-        id: workflowTemplates.id,
-        name: workflowTemplates.name,
-        category: workflowTemplates.category,
-        thumbnailUrl: workflowTemplates.thumbnailUrl,
-      }).from(workflowTemplates).where(eq(workflowTemplates.isPublished, true)).orderBy(desc(workflowTemplates.updatedAt)),
-    ]);
-
-    const skillVideos = dbVideos.map((v) => ({
-      id: v.id,
-      name: v.name,
-      videoUrl: getPublicUrl(cf, v.storagePath),
-      thumbnailUrl: v.thumbnailPath ? getPublicUrl(cf, v.thumbnailPath) : null,
-      duration: v.duration,
-    }));
-
-    const skillImages = dbConceptImages.map((img) => ({
-      id: img.id,
-      name: img.name,
-      publicUrl: img.publicUrl,
-    }));
-
-    const skillTemplates = dbTemplates.map((t) => ({
-      id: t.id,
-      name: t.name,
-      category: t.category,
-      thumbnailUrl: t.thumbnailUrl,
-    }));
-
-    const skillsCount = dbVideos.length;
-    const storiesCount = Number(storiesResult[0]?.count || 0);
-
-    // Resolve current look
-    const currentLookbookLooks = lookList.filter((l) => l.lookbookId === lookbookParam);
-    const currentLookId = lookParam && currentLookbookLooks.some((l) => l.id === lookParam)
-      ? lookParam
-      : currentLookbookLooks[0]?.id || lookList[0]?.id || "00_01";
-
-    return data({
-      lookbooks: lookbookList,
-      looks: lookList,
-      currentLookbookId: lookbookParam,
-      currentLookId,
-      allPersonas,
-      imagesByCharacter,
-      skillsCount,
-      storiesCount,
-      skillVideos,
-      skillImages,
-      skillTemplates,
-    }, { headers: authHeaders });
-  } catch {
-    const fallbackLookbooks = SYNCED_LOOKBOOKS.length > 0 ? SYNCED_LOOKBOOKS : DEFAULT_LOOKBOOKS;
-    const fallbackLooks = SYNCED_LOOKS.length > 0 ? SYNCED_LOOKS : DEFAULT_LOOKS;
-    const fallbackPersonas = SYNCED_PERSONAS.length > 0 ? SYNCED_PERSONAS : DEFAULT_PERSONAS;
-
-    const currentLookbookLooks = fallbackLooks.filter((l) => l.lookbookId === lookbookParam);
-    const currentLookId = lookParam && currentLookbookLooks.some((l) => l.id === lookParam)
-      ? lookParam
-      : currentLookbookLooks[0]?.id || fallbackLooks[0]?.id || "00_01";
-
-    return data({
-      lookbooks: fallbackLookbooks,
-      looks: fallbackLooks,
-      currentLookbookId: lookbookParam,
-      currentLookId,
-      allPersonas: fallbackPersonas,
-      imagesByCharacter: SYNCED_CHARACTER_IMAGES,
-      skillsCount: SYNCED_SKILL_VIDEOS.length,
-      storiesCount: SYNCED_GENERATIONS.filter((g) => g.status === "completed").length,
-      skillVideos: SYNCED_SKILL_VIDEOS,
-      skillImages: SYNCED_SKILL_IMAGES,
-      skillTemplates: [],
-    }, { headers: authHeaders });
+    imagesByCharacter[img.characterId].push(img);
   }
+
+  const cf = context.cloudflare as { env: Record<string, string> };
+  const [dbVideos, dbConceptImages, storiesResult, dbTemplates] = await Promise.all([
+    db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
+    db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
+    db.select({ count: sql<number>`count(*)` }).from(generations).where(eq(generations.status, "completed")),
+    db.select({
+      id: workflowTemplates.id,
+      name: workflowTemplates.name,
+      category: workflowTemplates.category,
+      thumbnailUrl: workflowTemplates.thumbnailUrl,
+    }).from(workflowTemplates).where(eq(workflowTemplates.isPublished, true)).orderBy(desc(workflowTemplates.updatedAt)),
+  ]);
+
+  const skillVideos = dbVideos.map((v) => ({
+    id: v.id,
+    name: v.name,
+    videoUrl: getPublicUrl(cf, v.storagePath),
+    thumbnailUrl: v.thumbnailPath ? getPublicUrl(cf, v.thumbnailPath) : null,
+    duration: v.duration,
+  }));
+
+  const skillImages = dbConceptImages.map((img) => ({
+    id: img.id,
+    name: img.name,
+    publicUrl: img.publicUrl,
+  }));
+
+  const skillTemplates = dbTemplates.map((t) => ({
+    id: t.id,
+    name: t.name,
+    category: t.category,
+    thumbnailUrl: t.thumbnailUrl,
+  }));
+
+  const skillsCount = dbVideos.length;
+  const storiesCount = Number(storiesResult[0]?.count || 0);
+
+  // Resolve current look
+  const currentLookbookLooks = lookList.filter((l) => l.lookbookId === lookbookParam);
+  const currentLookId = lookParam && currentLookbookLooks.some((l) => l.id === lookParam)
+    ? lookParam
+    : currentLookbookLooks[0]?.id || lookList[0]?.id || "00_01";
+
+  return data({
+    lookbooks: lookbookList,
+    looks: lookList,
+    currentLookbookId: lookbookParam,
+    currentLookId,
+    allPersonas,
+    imagesByCharacter,
+    skillsCount,
+    storiesCount,
+    skillVideos,
+    skillImages,
+    skillTemplates,
+  }, { headers: authHeaders });
 }
 
 export default function Home() {

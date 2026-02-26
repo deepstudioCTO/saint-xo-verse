@@ -195,7 +195,6 @@ export default [
 - Lookbook 01 "Ojos": 1 look
   - Look 01_01: sumin, rumi, geumbi, lei, siori, yui
 - 영상/포스터: Supabase Storage `characters` 버킷에서 서빙 (DB에 절대 URL 저장)
-- `public/character/`에 로컬 사본 유지 (dev용), `.assetsignore`로 mp4는 배포 제외
 - 업로드: `upload-character-videos.ts` / `upload-posters.ts` (파일명 → lookId+characterId 파싱 후 DB 업데이트)
 
 ## 워크플로우 시스템

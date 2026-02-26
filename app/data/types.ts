@@ -78,7 +78,3 @@ export interface Generation {
   upscaleModel: string | null;
   upscaledVideoUrl: string | null;
 }
-
-// Backward compatibility aliases
-export type Verse = Lookbook;
-export type VerseCharacter = Persona & { verseId?: string };
