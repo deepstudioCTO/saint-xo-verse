@@ -131,6 +131,8 @@ export default [
 | 하단 3버튼 패널 | DEMO·SKILLS·LIBRARY 모두 동일한 가로 clip-path 패널(`*-horizontal`). Music은 `MusicHorizontalPanel`, Gallery는 `GalleryHorizontalPanel`, Skill은 `SkillHorizontalPanel` | 하단 버튼 → 가로 패널, 헤더 버튼 → compact/expanded (진입점별 다른 뷰) |
 | 하단 버튼 ↔ 패널 시퀀싱 | `showButtons` + `pendingPanelRef` + `AnimatePresence onExitComplete`로 조율. 열기: 버튼 exit 완료 → 패널 open. 닫기: `anyHorizontalOpen` false 후 300ms 지연 → 버튼 show | 버튼과 패널이 동시에 보이는 것 방지 |
 | Compact↔Expanded 패턴 | 공용 콘텐츠 props 타입 + 공유 서브컴포넌트(TabBar/Grid), 패널별 셸만 다름. `_index.tsx`에서 콜백은 `useCallback`으로 1회 정의 후 양쪽 전달 | DRY — 그리드·탭·콜백 중복 방지 |
+| ExpandedPanelShell | 모든 expanded 패널의 공통 보일러플레이트(backdrop + container + Escape + useContentReady) → render prop 셸로 추출. `escapeEnabled` prop으로 조건부 Escape 지원 (Gallery 모달 등) | 패널 4개가 ~30줄씩 동일 코드 복사 → 62줄 공용 셸 1개로 통합 |
+| 키보드 단축키 테이블 | `_index.tsx`의 per-key if/else → `PANEL_SHORTCUTS: Record<string, ActivePanel>` 선언적 룩업. W→workflow, R→runs. Pricing은 헤더 버튼 전용 | 새 expanded 패널 추가 시 1줄 추가만 필요, 분기 로직 제거 |
 | 음악 패널 선택 시 닫힘 안 함 | `MusicHorizontalPanel`에서 트랙 클릭 = `selectTrack`만, `onClose` 없음 | 음악은 비교 시청하며 고르는 패턴, 배경클릭/Escape로만 닫힘 |
 | 음악 패널 내 재생 컨트롤 | `MusicHorizontalPanel` 하단에 `MusicControls` 재사용 | Horizontal 패널 열림 시 `MusicPlayerWidget`이 숨겨지므로 패널 자체에 재생 제어 필요 |
 | 패널 항목 선택 시 자동 닫힘 | Skill: 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 (Music은 예외) |
@@ -154,7 +156,7 @@ export default [
 | Generate 카드 z-index | `z-[30]` (click-outside backdrop `z-[25]` 위) | backdrop가 Layer 1 카드 클릭을 가로막는 문제 해결 |
 | handleProduce 시그니처 | `(item: SkillDragItem, prompt?)` — 아이템을 파라미터로 받음. DnD 경로: `confirmDialog` 전달, Generate 경로: 선택된 스킬로 구성 | 두 진입점(Generate 클릭, DnD 확인) 모두 지원 |
 | 생성 시 갤러리 큐 표시 | optimistic update (`addOptimisticGeneration`) → fetcher 완료 후 `refetch()` | 생성 API(Replicate)가 느려서 갤러리 fetch와 race condition 발생 |
-| 버튼 레이블 ↔ 패널 타입 | DEMO→`music-*`, SKILLS→`skill-*`, LIBRARY→`gallery-*`. 상단 우측 4버튼(AudioVisual Lab, Moodboard, Launch, Playground)은 placeholder | 표시 레이블 리브랜딩, 내부 패널 타입명은 유지 |
+| 버튼 레이블 ↔ 패널 타입 | DEMO→`music-*`, SKILLS→`skill-*`, LIBRARY→`gallery-*`, P키→`pricing-expanded`. 상단 우측 4버튼(AudioVisual Lab, Moodboard, Launch, Playground)은 placeholder | 표시 레이블 리브랜딩, 내부 패널 타입명은 유지 |
 | 캐릭터 영상/포스터 서빙 | Supabase Storage (`characters` 버킷), DB에 절대 URL 저장 | Cloudflare Workers Static Assets 배포 사이즈 제한 회피, music과 동일 패턴 |
 | 에셋 파일명 → DB 매핑 | 2단계 파싱: `{lookId}_{charId}` 먼저, 실패 시 `{lookbookId}_{charId}` → lookId=`{id}_01` | 레거시(`00_sumin`) + 신규(`00_02_sumin`) 네이밍 공존 |
 | 영상 비율 보정 | WebGL 셰이더에서 `u_videoAspect` uniform으로 cover-crop UV 보정 (zoom punch/글리치 앞단에서 적용) | look별 영상 비율이 다름 (00_01: 1:2, 00_02~04: 9:16). 컨테이너 `aspect-[1/2]`는 고정, 셰이더가 자동 crop |
@@ -163,6 +165,7 @@ export default [
 | 포스터 프리로드 | `usePreloadPosters`로 전체 persona poster 즉시 로드 + WebGLGlitchVideo·FallbackVideo에 `background-image: poster` 적용 | idle 콜백은 WebGL+비디오 초기화로 지연됨, canvas `opacity:0` 동안 poster가 보이도록 다층 배경 |
 | 인증 | `@supabase/ssr` 쿠키 기반, `getUser()` 서버 검증 (JWT 검증). `getSession()` 미사용 | `getSession()`은 JWT를 검증하지 않아 변조 가능, `getUser()`는 Supabase에 실제 확인 |
 | Auth 가드 패턴 | `requireAuth` (페이지, redirect) / `requireAuthApi` (API, 401 throw) 분리 | 페이지는 로그인 폼으로 안내, API는 JSON 에러 응답 |
+| Pricing 데이터 | 하드코딩 상수 (DB/API 미사용), FAQ는 `<button>` + Motion AnimatePresence (Radix Accordion 미사용) | 요금제는 변경 빈도 극히 낮아 DB 불필요, Radix Accordion 의존성 추가 대비 이점 없음 |
 
 ## 노드 에디터 (`/editor`)
 
@@ -256,11 +259,12 @@ Workers 시크릿: `npx wrangler secret put <KEY>` (DATABASE_URL, SUPABASE_URL, 
 ```
 app/
 ├── components/
-│   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel, SkillConfirmDialog, CharacterInfoPanel, LookbookInfoPanel
+│   ├── common/          # VideoPlayerWithMusic, InputImagePanel, RevealPanel, ExpandedPanelShell, SkillConfirmDialog, CharacterInfoPanel, LookbookInfoPanel
 │   ├── layout/          # HomeFloatingBar
 │   ├── music/           # MusicHorizontalPanel (가로 트랙 선택), MusicPanel (세로, 미사용), MusicPlayerWidget
 │   ├── skill/           # SkillPanel (horizontal/compact/expanded)
 │   ├── gallery/         # GalleryPanel(horizontal/compact/expanded), GalleryGrid, GalleryModals, VideoDetailModal, ImageDetailModal
+│   ├── pricing/         # PricingPanel (expanded-only, Hero+Tabs+Cards+FAQ)
 │   ├── workflow/        # WorkflowPanel (워크플로우 템플릿 전용 expanded 패널)
 │   ├── editor/          # 노드 에디터 (EditorCanvas, AutoSave, SaveAsSkillDialog, editorDefaults, MediaBrowser, nodes/)
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)

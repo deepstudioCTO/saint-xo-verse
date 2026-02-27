@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { motion, AnimatePresence } from "motion/react";
-import { useContentReady } from "~/hooks/useContentReady";
+import { motion } from "motion/react";
+import { ExpandedPanelShell } from "~/components/common/ExpandedPanelShell";
 
 interface RunItem {
   id: string;
@@ -104,12 +104,8 @@ function RunGridItem({ run, index }: { run: RunItem; index: number }) {
 }
 
 export function RunsPanel({ open, onClose }: RunsPanelProps) {
-  const contentReady = useContentReady(open, 250);
   const [runs, setRuns] = useState<RunItem[]>([]);
   const [loading, setLoading] = useState(false);
-
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
 
   // Fetch runs data when opened
   useEffect(() => {
@@ -124,65 +120,36 @@ export function RunsPanel({ open, onClose }: RunsPanelProps) {
       .finally(() => setLoading(false));
   }, [open]);
 
-  // Escape to close
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
-
   return (
-    <AnimatePresence>
-      {open && (
+    <ExpandedPanelShell open={open} onClose={onClose}>
+      {(contentReady) => (
         <>
-          {/* Backdrop */}
-          <motion.div
-            className="fixed inset-0 z-[39]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
-          />
-
-          {/* Panel */}
-          <motion.div
-            className="fixed top-20 left-6 right-6 bottom-14 z-[40] glass overflow-hidden flex flex-col rounded-2xl"
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-          >
-            <div className="flex items-center justify-between px-5 pt-4 pb-3">
-              <span className="text-xs font-medium tracking-wider uppercase text-black">Runs</span>
-              <button
-                onClick={onClose}
-                className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
-                title="Close"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-5 pb-5">
-              {!contentReady || loading ? null : runs.length === 0 ? (
-                <p className="text-center text-neutral-400 text-sm py-8">No workflow runs</p>
-              ) : (
-                <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {runs.map((run, i) => (
-                    <RunGridItem key={run.id} run={run} index={i} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </motion.div>
+          <div className="flex items-center justify-between px-5 pt-4 pb-3">
+            <span className="text-xs font-medium tracking-wider uppercase text-black">Runs</span>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-5 pb-5">
+            {!contentReady || loading ? null : runs.length === 0 ? (
+              <p className="text-center text-neutral-400 text-sm py-8">No workflow runs</p>
+            ) : (
+              <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {runs.map((run, i) => (
+                  <RunGridItem key={run.id} run={run} index={i} />
+                ))}
+              </div>
+            )}
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </ExpandedPanelShell>
   );
 }

@@ -31,6 +31,7 @@ import { useCharacterImages } from "~/hooks/useCharacterImages";
 import { usePreloadPosters } from "~/hooks/usePreloadPosters";
 import { WorkflowPanel } from "~/components/workflow/WorkflowPanel";
 import { RunsPanel } from "~/components/workflow/RunsPanel";
+import { PricingPanel } from "~/components/pricing/PricingPanel";
 
 const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform }) => {
   if (!activatorEvent || !activeNodeRect) return transform;
@@ -40,6 +41,11 @@ const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform })
     x: transform.x + (ev.clientX - activeNodeRect.left - 30),
     y: transform.y + (ev.clientY - activeNodeRect.top - 40),
   };
+};
+
+const PANEL_SHORTCUTS: Record<string, ActivePanel> = {
+  w: "workflow-expanded",
+  r: "runs-expanded",
 };
 
 export const meta: Route.MetaFunction = () => [
@@ -361,18 +367,15 @@ export default function Home() {
   const galleryExpandedOpen = activePanel === "gallery-expanded";
   const workflowExpandedOpen = activePanel === "workflow-expanded";
   const runsExpandedOpen = activePanel === "runs-expanded";
+  const pricingExpandedOpen = activePanel === "pricing-expanded";
 
-  // W key → toggle workflow panel, R key → toggle runs panel
+  // Keyboard shortcuts → toggle expanded panels
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (e.key === "w" || e.key === "W") {
-        setActivePanel((prev) => prev === "workflow-expanded" ? null : "workflow-expanded");
-      }
-      if (e.key === "r" || e.key === "R") {
-        setActivePanel((prev) => prev === "runs-expanded" ? null : "runs-expanded");
-      }
+      const panel = PANEL_SHORTCUTS[e.key.toLowerCase()];
+      if (panel) setActivePanel((prev) => prev === panel ? null : panel);
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -649,6 +652,12 @@ export default function Home() {
           <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Moodboard</span>
           <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Launch</span>
           <span className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity">Playground</span>
+          <button
+            onClick={() => setActivePanel(prev => prev === "pricing-expanded" ? null : "pricing-expanded")}
+            className="font-semibold text-black cursor-pointer hover:opacity-70 transition-opacity"
+          >
+            Pricing
+          </button>
           <Form method="post" action="/api/logout">
             <button type="submit" className="font-semibold text-black/40 cursor-pointer hover:text-black transition-colors">Logout</button>
           </Form>
@@ -789,6 +798,11 @@ export default function Home() {
 
       <RunsPanel
         open={runsExpandedOpen}
+        onClose={() => setActivePanel(null)}
+      />
+
+      <PricingPanel
+        open={pricingExpandedOpen}
         onClose={() => setActivePanel(null)}
       />
 

@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useDraggable } from "@dnd-kit/core";
 import { RevealPanel } from "~/components/common/RevealPanel";
-import { useContentReady } from "~/hooks/useContentReady";
+import { ExpandedPanelShell } from "~/components/common/ExpandedPanelShell";
 
 export type SkillDragItem = {
   type: "video" | "image";
@@ -407,62 +407,28 @@ export function SkillExpandedPanel({
   onCollapse,
   ...contentProps
 }: SkillContentProps & { open: boolean; onClose: () => void; onCollapse: () => void }) {
-  const contentReady = useContentReady(open, 250);
-
-  // Stable ref to avoid re-registering listener on every render
-  const onCloseRef = useRef(onClose);
-  onCloseRef.current = onClose;
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onCloseRef.current();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [open]);
-
   return (
-    <AnimatePresence>
-      {open && (
+    <ExpandedPanelShell open={open} onClose={onClose}>
+      {(contentReady) => (
         <>
-          {/* Backdrop */}
-          <motion.div
-            className="fixed inset-0 z-[39]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            onClick={onClose}
+          <SkillTabBar
+            tab={contentProps.tab}
+            onTabChange={contentProps.onTabChange}
+            trailing={
+              <button
+                onClick={onCollapse}
+                className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
+                title="Collapse"
+              >
+                {CollapseIcon}
+              </button>
+            }
           />
-
-          {/* Panel */}
-          <motion.div
-            className="fixed top-20 left-6 right-6 bottom-14 z-[40] glass overflow-hidden flex flex-col rounded-2xl"
-            initial={{ opacity: 0, scale: 0.97 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.97 }}
-            transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-          >
-            <SkillTabBar
-              tab={contentProps.tab}
-              onTabChange={contentProps.onTabChange}
-              trailing={
-                <button
-                  onClick={onCollapse}
-                  className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
-                  title="Collapse"
-                >
-                  {CollapseIcon}
-                </button>
-              }
-            />
-            <div className="flex-1 overflow-y-auto px-5 pb-5">
-              <SkillGrid contentReady={contentReady} gridClassName="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4" {...contentProps} />
-            </div>
-          </motion.div>
+          <div className="flex-1 overflow-y-auto px-5 pb-5">
+            <SkillGrid contentReady={contentReady} gridClassName="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4" {...contentProps} />
+          </div>
         </>
       )}
-    </AnimatePresence>
+    </ExpandedPanelShell>
   );
 }

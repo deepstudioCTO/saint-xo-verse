@@ -4,7 +4,7 @@ import { useAudioPlayer } from "~/hooks/useAudioPlayer";
 import { GlassButton } from "~/components/ui";
 import { MusicPlayerWidget } from "~/components/music/MusicPlayerWidget";
 
-export type ActivePanel = null | "music-horizontal" | "skill-horizontal" | "skill-compact" | "skill-expanded" | "gallery-horizontal" | "gallery-compact" | "gallery-expanded" | "workflow-expanded" | "runs-expanded";
+export type ActivePanel = null | "music-horizontal" | "skill-horizontal" | "skill-compact" | "skill-expanded" | "gallery-horizontal" | "gallery-compact" | "gallery-expanded" | "workflow-expanded" | "runs-expanded" | "pricing-expanded";
 
 interface HomeFloatingBarProps {
   characterId: string | null;

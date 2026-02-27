@@ -1,13 +1,11 @@
 import type React from "react";
-import { useEffect } from "react";
-import { motion, AnimatePresence } from "motion/react";
 import { GlassButton } from "~/components/ui/GlassButton";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "~/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { RevealPanel } from "~/components/common/RevealPanel";
+import { ExpandedPanelShell } from "~/components/common/ExpandedPanelShell";
 import { ResultUploadDialog } from "./ResultUploadDialog";
 import { GalleryGrid } from "./GalleryGrid";
-import { useContentReady } from "~/hooks/useContentReady";
 import type { UseGalleryStateReturn, TypeFilter, SortBy } from "~/hooks/useGalleryState";
 import { SORT_OPTIONS } from "~/hooks/useGalleryState";
 
@@ -107,40 +105,14 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, 
     loadedCharacters,
   } = galleryState;
 
-  const contentReady = useContentReady(open, 250);
-
-  // Close on Escape (only when no modal/dialog is open)
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !modalOpen && !deleteTarget && !uploadDialogOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose, modalOpen, deleteTarget, uploadDialogOpen]);
-
   return (
-    <AnimatePresence>
-      {open && (
+    <ExpandedPanelShell
+      open={open}
+      onClose={onClose}
+      escapeEnabled={!modalOpen && !deleteTarget && !uploadDialogOpen}
+    >
+      {(contentReady) => (
         <>
-        {/* Backdrop for click-outside-to-close */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[39]"
-          onClick={onClose}
-        />
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.97 }}
-          transition={{ duration: 0.25, ease: [0.25, 0.1, 0.25, 1] }}
-          className="fixed top-20 left-6 right-6 bottom-14 z-[40] glass overflow-hidden flex flex-col rounded-2xl"
-        >
           {/* Toolbar: Tabs + Sort + Upload + Collapse */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3">
             <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
@@ -203,9 +175,8 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, 
             characters={loadedCharacters.length > 0 ? loadedCharacters : undefined}
             lookbookId={lookbookId}
           />
-        </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </ExpandedPanelShell>
   );
 }
