@@ -1,5 +1,6 @@
 import type { ResolvedInputs } from "../types";
 import { nodeToImageSpec, type ImageGenerationSpec } from "../spec";
+import type { ImageProvider, PollResult, ProviderRequest } from "./provider";
 
 /**
  * Replicate 모델 버전 + 입력 body 어댑터 (순수 함수).
@@ -184,3 +185,63 @@ export function buildReplicateRequest(
 export function outputMediaType(nodeType: string): "image" | "video" {
   return nodeType === "generate-image" ? "image" : "video";
 }
+
+// ── Provider 어댑터 (전송 계층) ──────────────────────────────
+// 기존 순수 빌더(buildImageRequest 등)를 감싸 provider 계약에 맞춘다.
+
+/** ImageGenerationSpec → Replicate 이미지 요청(tagged). 기존 buildImageRequest를 spread */
+export function replicateImageRequest(spec: ImageGenerationSpec): ProviderRequest {
+  return { provider: "replicate", ...buildImageRequest(spec) };
+}
+
+/** Replicate 예측 응답 → 정규화 상태. succeeded→output[0], failed/canceled→failed, 그 외→processing */
+export function normalizeReplicateStatus(pred: {
+  status: string;
+  output: unknown;
+  error?: string;
+}): PollResult {
+  if (pred.status === "succeeded") {
+    const url = Array.isArray(pred.output) ? (pred.output[0] as string) : (pred.output as string);
+    return { status: "succeeded", url };
+  }
+  if (pred.status === "failed" || pred.status === "canceled") {
+    return { status: "failed", error: pred.error || "generation failed" };
+  }
+  return { status: "processing" };
+}
+
+async function replicateSubmit(
+  req: ProviderRequest,
+  env: Record<string, string>
+): Promise<{ externalId: string }> {
+  if (req.provider !== "replicate") throw new Error("replicateSubmit: replicate 요청 아님");
+  const res = await fetch("https://api.replicate.com/v1/predictions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${env.REPLICATE_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ version: req.version, input: req.input }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Replicate 제출 실패(${res.status}): ${errText.slice(0, 200)}`);
+  }
+  const pred = (await res.json()) as { id: string };
+  return { externalId: pred.id };
+}
+
+async function replicatePoll(externalId: string, env: Record<string, string>): Promise<PollResult> {
+  const res = await fetch(`https://api.replicate.com/v1/predictions/${externalId}`, {
+    headers: { Authorization: `Bearer ${env.REPLICATE_TOKEN}` },
+  });
+  if (!res.ok) return { status: "processing" }; // transient — 다음 폴링에서 재시도
+  const pred = (await res.json()) as { status: string; output: unknown; error?: string };
+  return normalizeReplicateStatus(pred);
+}
+
+export const replicateProvider: ImageProvider = {
+  id: "replicate",
+  submit: replicateSubmit,
+  poll: replicatePoll,
+};

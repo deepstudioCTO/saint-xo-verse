@@ -44,6 +44,22 @@ export interface GenerateNodeData {
   error?: string | null;
   /** Prompt for image generation */
   prompt?: string;
+  /** 이미지 모델 id (imageModels 레지스트리 키). 없으면 nano-banana(back-compat) */
+  model?: string;
+  /** 비율 (모델별 옵션) */
+  aspectRatio?: string;
+  /** 해상도 (모델별 옵션) */
+  resolution?: string;
+  /** 스타일 프리셋 (Soul: style_id uuid / nano: 프롬프트 fold) */
+  stylePreset?: string;
+  /** 스타일 강도 0-1 (Soul) */
+  styleStrength?: number;
+  /** 시드 (Soul) */
+  seed?: number;
+  /** 배치 장수 1|4 (Soul) */
+  batchSize?: number;
+  /** 프롬프트 자동 보강 (Soul) */
+  enhancePrompt?: boolean;
 }
 
 export interface UpscaleNodeData {

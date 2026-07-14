@@ -21,6 +21,10 @@ export interface ImageGenerationSpec {
   stylePreset?: string;
   styleStrength?: number;
   seed?: number;
+  /** 배치 생성 장수 (Soul 네이티브 batch_size). nano-banana는 미지원 → drop */
+  batchSize?: number;
+  /** 프롬프트 자동 보강 (Soul 네이티브 enhance_prompt). nano-banana는 미지원 → drop */
+  enhancePrompt?: boolean;
 }
 
 /**
@@ -48,6 +52,8 @@ export function nodeToImageSpec(
       stylePreset: typeof d.stylePreset === "string" ? d.stylePreset : undefined,
       styleStrength: typeof d.styleStrength === "number" ? d.styleStrength : undefined,
       seed: typeof d.seed === "number" ? d.seed : undefined,
+      batchSize: typeof d.batchSize === "number" ? d.batchSize : undefined,
+      enhancePrompt: typeof d.enhancePrompt === "boolean" ? d.enhancePrompt : undefined,
     },
   };
 }

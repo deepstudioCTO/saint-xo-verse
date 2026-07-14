@@ -55,6 +55,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - `DATABASE_URL` — Supabase PostgreSQL Pooler 연결 문자열
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_KEY` — Supabase
 - `REPLICATE_TOKEN` — Replicate API
+- `HF_API_KEY` / `HF_API_SECRET` — Higgsfield Cloud API (Soul provider). 발급: cloud.higgsfield.ai/api-keys
 - `CLOUDFLARE_API_TOKEN` — cto-b0b 계정 API 토큰 (`.dev.vars`에 설정)
 
 ## 기술 스택
@@ -69,6 +70,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - Cloudflare Workflows (durable execution — 노드 그래프 실행 오케스트레이터, `wrangler.json` workflows 바인딩)
 - ffmpeg.wasm (브라우저 영상 트리밍 + 음악 합성, SharedArrayBuffer 필요)
 - Replicate API (kling-video, nano-banana-pro, real-esrgan, topaz)
+- Higgsfield Cloud API (Soul Reference — 이미지 생성 provider, style_id/seed 네이티브)
 - vitest (순수 로직 단위 테스트 — `app/lib/workflow` 한정, `npm test`)
 - 폰트: Orbitron (영문) + Pretendard (한글)
 
@@ -225,7 +227,11 @@ export default [
 | 클라이언트 | `WorkflowRunProvider`+`useWorkflowRun`(`GET ?runId=` 6초 폴링), 노드는 presentational(GenerateNode/UpscaleNode self-execute 없음). **run 상태를 node.data에 쓰지 않음** | AutoSave가 일시적 실행상태를 scratch에 오염 저장하는 것 방지 |
 | DB 커넥션 | 장시간 Workflow step·고빈도 폴링은 **`withDb`**(`db.server.ts`)로 커넥션 자동 정리 필수. `getDb`는 pool을 안 닫아 Supabase 세션풀(15) 소진(EMAXCONNSESSION) | `getDb`는 짧은 단발 요청에만. Workflow/폴링은 반드시 `withDb` |
 | Replicate 모델 버전 | `app/lib/workflow/providers/replicate.ts`에 중앙화. 버전은 stale 시 422 → `GET /v1/models/{owner}/{name}` latest_version으로 갱신 | 버전 해시가 삭제되면 "version does not exist" 422 |
-| 이미지 생성 파라미터(정규 스펙) | node.data → `ImageGenerationSpec`(`spec.ts` `nodeToImageSpec`, 순수) → provider 어댑터(`replicate.ts` `buildImageRequest`). nano-banana 미지원 필드는 `foldStyleIntoPrompt`로 stylePreset/styleStrength 프롬프트 fold·seed drop. `buildReplicateRequest`의 **generate-image 분기만** spec 경유(generate/upscale 무변경, wrapper 보존) | node.data↔API body 디커플. P3 Look 파라미터 인코딩·Soul 어댑터의 확장점. **Soul은 주석 seam만**(스텁 파일 X — dead code 회피): Soul 추가 시 `buildImageSoul(spec)` 신설, stylePreset→style_id·seed 네이티브 |
+| 이미지 생성 파라미터(정규 스펙) | node.data → `ImageGenerationSpec`(`spec.ts` `nodeToImageSpec`, 순수) → provider 어댑터. nano-banana: `foldStyleIntoPrompt`로 stylePreset/styleStrength fold·seed/batchSize/enhancePrompt drop. Soul: `soul.ts` `buildSoulBody`가 stylePreset→style_id·styleStrength→style_strength·seed/batchSize/enhancePrompt 네이티브 | node.data↔API body 디커플. P3-2 Look 파라미터 인코딩의 확장점 |
+| 이미지 provider 추상화 | **명시적 모델 선택**(A안, ComfyUI식·자동 라우팅 아님). `imageModels.ts` `IMAGE_MODELS`(선언적 SSOT: provider·modelId·refImages·fields[]·비율/해상도)가 노드 UI·provider 선택·요청빌드 3곳 구동. `providers/select.ts` `selectExecution`이 단일 seam: **generate-image만** node.data.model→레지스트리→provider 분기, **generate/upscale은 항상 Replicate**(무회귀). `providers/provider.ts` `ImageProvider{submit,poll}`+`ProviderRequest`(DU). 상태정규화(`normalizeReplicateStatus`/`normalizeSoulStatus`)는 순수(vitest) | 전송계층이 Replicate 전용이던 것을 2-provider로. 파이프라인 durable 골격(step.do/sleep/withDb/externalId재사용)은 무변경, submit/poll만 provider 위임 |
+| 모델 back-compat | `resolveImageModel(data)`: model 없음→**nano-banana**(레거시 템플릿·기존 테스트 무회귀), 알수없음→nano. 팔레트 새 노드 `makeData`→**soul-reference**(문서의 "기본 Soul") | absent와 신규노드 기본값이 다른 이유: 레거시 무회귀 vs 신규는 Soul 선호 |
+| Soul(Higgsfield) provider | 모델 `higgsfield-ai/soul/reference`(레퍼런스 1장+style). base `platform.higgsfield.ai`, 인증 헤더 `hf-api-key`/`hf-secret`(env `HF_API_KEY`/`HF_API_SECRET`). 제출 `POST /{modelPath}`→`request_id`, 폴링 `GET /requests/{id}/status`(completed→`images[0].url`, nsfw/failed→환불). 스타일목록 `/api/soul-styles` 프록시. `refImages.max=1`이라 2장↑이면 노드 경고+첫장만 | 다중레퍼런스는 nano-banana 선택. 상세 [[higgsfield-soul-api]] 메모리 |
+| GenerateNode 동적 필드 | 이미지일 때 모델 `<select>` + `IMAGE_MODELS[model].fields[]` 선언적 조건부 렌더(모델별 필드 다름). 모델 전환 시 비율/해상도 stale 보정. 필드는 controlled-from-data. 스타일 피커는 raw fetch+모듈캐시(`/api/soul-styles`) | 영상(generate)은 kling 고정·편집필드 없음 |
 | 업스케일 모델 | **default=topaz**(~41초). 옵션: SeedVR2(zsxkib, one-step, ~34초·$0.011 최저가) / real-esrgan(~11분, 느림). 실측 벤치 기준 | real-esrgan은 해상도 낮춰도 느림(프레임 오버헤드). SeedVR2 입력은 `media`(video_path/video 아님) |
 | 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(6종)+`makeNode`, `nodeTypes`에 `upscale` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
 
@@ -258,7 +264,7 @@ responseHeaders.set("Cross-Origin-Embedder-Policy", "credentialless"); // requir
 export $(grep -v '^#' .dev.vars | xargs) && npm run deploy
 ```
 
-Workers 시크릿: `npx wrangler secret put <KEY>` (DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, REPLICATE_TOKEN)
+Workers 시크릿: `npx wrangler secret put <KEY>` (DATABASE_URL, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY, REPLICATE_TOKEN, HF_API_KEY, HF_API_SECRET)
 
 빌드 실패 시 `react-router.config.ts`의 `v8_viteEnvironmentApi: true` 확인.
 서울 리전 배포: `wrangler.json`에 `placement.region: "aws:ap-northeast-2"` 설정됨.
@@ -286,7 +292,8 @@ app/
 │   ├── db.server.ts     # Drizzle DB 연결 (getDb 단발 / withDb 커넥션 자동정리) + schema export
 │   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
 │   ├── supabase.server.ts  # Storage 헬퍼
-│   └── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, spec(nodeToImageSpec), providers/replicate, types
+│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, spec(nodeToImageSpec), imageModels(레지스트리), types
+│   │   └── providers/   # 이미지 provider: provider(계약 ImageProvider/ProviderRequest), replicate, soul, select(selectExecution seam)
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅
 │   ├── useLookbookNavigation.ts # Lookbook ↑↓ 키보드 내비게이션

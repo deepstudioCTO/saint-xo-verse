@@ -8,7 +8,8 @@ import {
 } from "~/lib/supabase.server";
 import { topoSort } from "~/lib/workflow/topoSort";
 import { resolveUpstreamInputs } from "~/lib/workflow/resolveUpstreamInputs";
-import { buildReplicateRequest, outputMediaType } from "~/lib/workflow/providers/replicate";
+import { outputMediaType } from "~/lib/workflow/providers/replicate";
+import { selectExecution } from "~/lib/workflow/providers/select";
 import { isExecutableType, type OutputMap, type GraphNodeLike, type GraphEdgeLike } from "~/lib/workflow/types";
 
 export interface GenerationPipelineParams {
@@ -33,7 +34,6 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
   async run(event: Readonly<WorkflowEvent<GenerationPipelineParams>>, step: WorkflowStep) {
     const { runId, graph } = event.payload;
     const env = this.env as unknown as Record<string, string>;
-    const TOKEN = env.REPLICATE_TOKEN;
 
     const nodes = graph.nodes;
     const edges = graph.edges;
@@ -53,10 +53,10 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
         const nodeId = node.id;
         const nodeType = node.type!;
 
-        // 입력 해소 + 요청 빌드 (순수)
+        // 입력 해소 + provider 선택 + 요청 빌드 (순수)
         const resolved = resolveUpstreamInputs(nodes, edges, nodeId, outputs);
-        const built = buildReplicateRequest(nodeType, node.data, resolved);
-        if (!built.ok) {
+        const sel = selectExecution(nodeType, node.data, resolved);
+        if (!sel.ok) {
           await step.do(`fail:${nodeId}`, () =>
             withDb({ env }, async (db) => {
               await db.insert(nodeRuns).values({
@@ -65,13 +65,13 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
                 nodeType,
                 inputs: JSON.stringify(resolved),
                 status: "failed",
-                error: built.reason,
+                error: sel.reason,
                 completedAt: new Date(),
               });
               return { ok: true };
             })
           );
-          throw new Error(`노드 ${nodeId}(${nodeType}) 입력 부족: ${built.reason}`);
+          throw new Error(`노드 ${nodeId}(${nodeType}) 입력 부족: ${sel.reason}`);
         }
 
         // 제출 (check-then-create → 정확히 한 번)
@@ -86,16 +86,7 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
               return { predId: existing[0].externalId, nodeRunId: existing[0].id };
             }
 
-            const res = await fetch("https://api.replicate.com/v1/predictions", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" },
-              body: JSON.stringify(built.request),
-            });
-            if (!res.ok) {
-              const errText = await res.text();
-              throw new Error(`Replicate 제출 실패(${res.status}): ${errText.slice(0, 200)}`);
-            }
-            const pred = (await res.json()) as { id: string };
+            const { externalId } = await sel.provider.submit(sel.request, env);
 
             const [row] = await db
               .insert(nodeRuns)
@@ -105,11 +96,11 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
                 nodeType,
                 inputs: JSON.stringify(resolved),
                 status: "processing",
-                externalId: pred.id,
-                externalProvider: "replicate",
+                externalId,
+                externalProvider: sel.provider.id,
               })
               .returning();
-            return { predId: pred.id, nodeRunId: row.id };
+            return { predId: externalId, nodeRunId: row.id };
           })
         );
 
@@ -117,24 +108,12 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
         let outputUrl: string | null = null;
         for (let attempt = 0; attempt < MAX_POLLS; attempt++) {
           await step.sleep(`wait:${nodeId}:${attempt}`, `${POLL_INTERVAL_SEC} seconds`);
-          const poll = await step.do(`poll:${nodeId}:${attempt}`, async () => {
-            const res = await fetch(`https://api.replicate.com/v1/predictions/${submit.predId}`, {
-              headers: { Authorization: `Bearer ${TOKEN}` },
-            });
-            if (!res.ok) return { status: "unknown" as const };
-            const pred = (await res.json()) as { status: string; output: unknown; error?: string };
-            if (pred.status === "succeeded") {
-              const url = Array.isArray(pred.output) ? pred.output[0] : (pred.output as string);
-              return { status: "succeeded" as const, url };
-            }
-            if (pred.status === "failed" || pred.status === "canceled") {
-              return { status: "failed" as const, error: pred.error || "generation failed" };
-            }
-            return { status: "processing" as const };
-          });
+          const poll = await step.do(`poll:${nodeId}:${attempt}`, () =>
+            sel.provider.poll(submit.predId, env)
+          );
 
           if (poll.status === "succeeded") {
-            outputUrl = poll.url;
+            outputUrl = poll.url ?? null;
             break;
           }
           if (poll.status === "failed") {

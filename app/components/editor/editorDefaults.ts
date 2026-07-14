@@ -30,7 +30,7 @@ export interface PaletteItem {
 
 export const PALETTE: PaletteItem[] = [
   { type: "source", label: "Source", makeData: () => ({ label: "Source", media: null }) },
-  { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", prompt: "" }) },
+  { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", model: "soul-reference", prompt: "", aspectRatio: "2:3", resolution: "1080p", styleStrength: 0.8, batchSize: 1, enhancePrompt: true }) },
   { type: "generate", label: "영상 생성", makeData: () => ({ label: "Video Gen", generateType: "generate" }) },
   { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "topaz", resolution: "2K" }) },
   { type: "subtitle", label: "자막", makeData: () => ({ label: "Subtitles", entries: [] }) },

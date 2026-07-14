@@ -57,4 +57,22 @@ describe("nodeToImageSpec", () => {
       expect(r.spec.seed).toBeUndefined();
     }
   });
+
+  it("batchSize·enhancePrompt 통과 (Soul 네이티브 필드)", () => {
+    const r = nodeToImageSpec({ prompt: "p", batchSize: 4, enhancePrompt: false }, withImages("m"));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.spec.batchSize).toBe(4);
+      expect(r.spec.enhancePrompt).toBe(false);
+    }
+  });
+
+  it("batchSize·enhancePrompt 없으면 undefined", () => {
+    const r = nodeToImageSpec({ prompt: "p" }, withImages("m"));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.spec.batchSize).toBeUndefined();
+      expect(r.spec.enhancePrompt).toBeUndefined();
+    }
+  });
 });
