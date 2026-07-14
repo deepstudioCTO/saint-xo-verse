@@ -1,11 +1,11 @@
 /**
- * "캐릭터 코스프레" 워크플로우 템플릿 시드 (프로토타입 5종 中 1번)
+ * "Y2K 파파라치" 워크플로우 템플릿 시드 (프로토타입 5종 中 Y2K)
  *
- * 그래프: Source[멤버] + Source[캐릭터] → 이미지생성(nano-banana, image_input=[멤버,캐릭터])
- * 검증된 프롬프트(glbgpt Nano Banana Cosplay 튜토리얼).
+ * 그래프: Source[멤버] → 이미지생성(nano-banana, image_input=[멤버]) → Preview
+ * 검증된 프롬프트(retroimageprompt / banana-prompts.net 요소).
  *
  * 실행:
- *   export $(grep -v '^#' .env | xargs) && npx tsx scripts/seed-cosplay-template.ts
+ *   export $(grep -v '^#' .env | xargs) && npx tsx scripts/seed-y2k-template.ts
  */
 
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -18,9 +18,10 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const BASE = "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public";
 const MEMBER_IMAGE = `${BASE}/characters/posters/00_rumi.png`;
-const CHARACTER_IMAGE = `${BASE}/characters/posters/00_sumin.png`;
 
-const NAME = "캐릭터 코스프레";
+const NAME = "Y2K 파파라치";
+const PROMPT =
+  "Y2K paparazzi flash photo, harsh on-camera flash, early-2000s digital camera, heavy 35mm film grain, slight magenta color shift.";
 
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client);
@@ -30,27 +31,14 @@ async function seed() {
     {
       id: "source-member",
       type: "source",
-      position: { x: 40, y: 60 }, // 위 → image_input[0] (멤버)
+      position: { x: 40, y: 180 },
       data: { label: "멤버", media: { type: "image", url: MEMBER_IMAGE, name: "rumi" }, sourceType: "character-image" },
-    },
-    {
-      id: "source-character",
-      type: "source",
-      position: { x: 40, y: 340 }, // 아래 → image_input[1] (캐릭터)
-      data: { label: "캐릭터", media: { type: "image", url: CHARACTER_IMAGE, name: "reference" }, sourceType: "character-image" },
     },
     {
       id: "gen-image",
       type: "generate-image",
       position: { x: 360, y: 180 },
-      data: {
-        label: "코스프레 생성",
-        generateType: "generate-image",
-        prompt:
-          "Make the person in the first image cosplay the character in the second image, matching the outfit, makeup, and props exactly.",
-        resolution: "2K",
-        aspectRatio: "2:3",
-      },
+      data: { label: "Y2K 스냅 생성", generateType: "generate-image", prompt: PROMPT, resolution: "2K", aspectRatio: "2:3" },
     },
     {
       id: "preview",
@@ -63,8 +51,7 @@ async function seed() {
   const style = { stroke: "#444", strokeWidth: 1.5 };
   const edges = JSON.stringify([
     { id: "e1", source: "source-member", target: "gen-image", type: "default", style },
-    { id: "e2", source: "source-character", target: "gen-image", type: "default", style },
-    { id: "e3", source: "gen-image", target: "preview", type: "default", style },
+    { id: "e2", source: "gen-image", target: "preview", type: "default", style },
   ]);
 
   const [existing] = await db.select().from(workflowTemplates).where(eq(workflowTemplates.name, NAME)).limit(1);
@@ -74,7 +61,7 @@ async function seed() {
   } else {
     const [t] = await db
       .insert(workflowTemplates)
-      .values({ name: NAME, category: "image", description: "멤버+캐릭터 2장 → 코스프레 포토카드", nodes, edges, isPublished: true })
+      .values({ name: NAME, category: "image", description: "멤버 1장 → 2000s 플래시 스냅", nodes, edges, isPublished: true })
       .returning();
     console.log(`Created template: ${t.name} (id: ${t.id})`);
   }

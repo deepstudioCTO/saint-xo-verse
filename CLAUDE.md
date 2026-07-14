@@ -225,6 +225,7 @@ export default [
 | 클라이언트 | `WorkflowRunProvider`+`useWorkflowRun`(`GET ?runId=` 6초 폴링), 노드는 presentational(GenerateNode/UpscaleNode self-execute 없음). **run 상태를 node.data에 쓰지 않음** | AutoSave가 일시적 실행상태를 scratch에 오염 저장하는 것 방지 |
 | DB 커넥션 | 장시간 Workflow step·고빈도 폴링은 **`withDb`**(`db.server.ts`)로 커넥션 자동 정리 필수. `getDb`는 pool을 안 닫아 Supabase 세션풀(15) 소진(EMAXCONNSESSION) | `getDb`는 짧은 단발 요청에만. Workflow/폴링은 반드시 `withDb` |
 | Replicate 모델 버전 | `app/lib/workflow/providers/replicate.ts`에 중앙화. 버전은 stale 시 422 → `GET /v1/models/{owner}/{name}` latest_version으로 갱신 | 버전 해시가 삭제되면 "version does not exist" 422 |
+| 이미지 생성 파라미터(정규 스펙) | node.data → `ImageGenerationSpec`(`spec.ts` `nodeToImageSpec`, 순수) → provider 어댑터(`replicate.ts` `buildImageRequest`). nano-banana 미지원 필드는 `foldStyleIntoPrompt`로 stylePreset/styleStrength 프롬프트 fold·seed drop. `buildReplicateRequest`의 **generate-image 분기만** spec 경유(generate/upscale 무변경, wrapper 보존) | node.data↔API body 디커플. P3 Look 파라미터 인코딩·Soul 어댑터의 확장점. **Soul은 주석 seam만**(스텁 파일 X — dead code 회피): Soul 추가 시 `buildImageSoul(spec)` 신설, stylePreset→style_id·seed 네이티브 |
 | 업스케일 모델 | **default=topaz**(~41초). 옵션: SeedVR2(zsxkib, one-step, ~34초·$0.011 최저가) / real-esrgan(~11분, 느림). 실측 벤치 기준 | real-esrgan은 해상도 낮춰도 느림(프레임 오버헤드). SeedVR2 입력은 `media`(video_path/video 아님) |
 | 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(6종)+`makeNode`, `nodeTypes`에 `upscale` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
 
@@ -285,7 +286,7 @@ app/
 │   ├── db.server.ts     # Drizzle DB 연결 (getDb 단발 / withDb 커넥션 자동정리) + schema export
 │   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
 │   ├── supabase.server.ts  # Storage 헬퍼
-│   └── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, providers/replicate, types
+│   └── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, spec(nodeToImageSpec), providers/replicate, types
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅
 │   ├── useLookbookNavigation.ts # Lookbook ↑↓ 키보드 내비게이션
@@ -304,7 +305,7 @@ app/
 │   └── api.*.tsx        # REST API 엔드포인트들
 ├── routes.ts            # ⚠️ 라우트 수동 등록 필수
 workers/                 # Cloudflare Worker 진입점: app.ts (fetch + GenerationPipeline export), generation-pipeline.ts (실행 오케스트레이터 Workflow)
-scripts/                 # 시드, 버킷 생성, 이미지 업로드 (seed-multistep-pipeline-template, seed-cosplay-template 등)
+scripts/                 # 시드, 버킷 생성, 이미지 업로드 (seed-multistep-pipeline-template, seed-kdh-rumi-cosplay-template, seed-figurine/y2k/conceptphoto-template 등)
 drizzle/schema.ts        # DB 스키마 (Drizzle)
 vault/                   # Obsidian vault (gitignore, CLAUDE.md·MEMORY.md 심링크)
 ```

@@ -4,6 +4,8 @@ import {
   buildVideoInput,
   buildUpscaleInput,
   buildReplicateRequest,
+  buildImageRequest,
+  foldStyleIntoPrompt,
   REPLICATE_MODEL_VERSIONS,
 } from "../providers/replicate";
 import type { ResolvedInputs } from "../types";
@@ -45,6 +47,48 @@ describe("body builders", () => {
       model_variant: "3b",
       sample_steps: 1,
     });
+  });
+});
+
+describe("foldStyleIntoPrompt (nano-banana는 style 네이티브 미지원 → 프롬프트로 fold)", () => {
+  it("스타일 없으면 원본 프롬프트 그대로", () => {
+    expect(foldStyleIntoPrompt({ prompt: "hello", referenceImages: [] })).toBe("hello");
+  });
+
+  it("stylePreset만 있으면 접힘", () => {
+    expect(foldStyleIntoPrompt({ prompt: "hello", referenceImages: [], stylePreset: "cyberpunk" })).toBe(
+      "hello, style: cyberpunk"
+    );
+  });
+
+  it("stylePreset + styleStrength 접힘", () => {
+    expect(
+      foldStyleIntoPrompt({ prompt: "hello", referenceImages: [], stylePreset: "cyberpunk", styleStrength: 0.7 })
+    ).toBe("hello, style: cyberpunk (strength 0.7)");
+  });
+
+  it("styleStrength만 있고 stylePreset 없으면 무시(강도만으론 접을 것 없음)", () => {
+    expect(foldStyleIntoPrompt({ prompt: "hello", referenceImages: [], styleStrength: 0.5 })).toBe("hello");
+  });
+});
+
+describe("buildImageRequest (spec → nano-banana 요청)", () => {
+  it("version=image, image_input=referenceImages, folded prompt 반영", () => {
+    const r = buildImageRequest({ prompt: "p", referenceImages: ["a", "b"], stylePreset: "y2k" });
+    expect(r.version).toBe(REPLICATE_MODEL_VERSIONS.image);
+    expect(r.input.image_input).toEqual(["a", "b"]);
+    expect(r.input.prompt).toBe("p, style: y2k");
+  });
+
+  it("seed는 drop (nano-banana 미지원 → body에 없음)", () => {
+    const r = buildImageRequest({ prompt: "p", referenceImages: ["a"], seed: 123 });
+    expect(r.input).not.toHaveProperty("seed");
+  });
+
+  it("resolution·aspectRatio 반영", () => {
+    const r = buildImageRequest({ prompt: "p", referenceImages: ["a"], resolution: "4K", aspectRatio: "9:16" });
+    expect(r.input.resolution).toBe("4K");
+    expect(r.input.aspect_ratio).toBe("9:16");
   });
 });
 

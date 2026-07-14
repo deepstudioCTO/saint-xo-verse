@@ -1,10 +1,17 @@
 import type { ResolvedInputs } from "../types";
+import { nodeToImageSpec, type ImageGenerationSpec } from "../spec";
 
 /**
  * Replicate 모델 버전 + 입력 body 어댑터 (순수 함수).
  *
- * P3 GenerationSpec 어댑터의 시작점 — 현재는 노드 타입별 body 매핑 seam만.
+ * 이미지 생성은 ImageGenerationSpec(정규 스펙, spec.ts)을 nano-banana body로 번역한다.
  * 특정 모델 전용 로직을 라우트/노드에서 걷어내 한 곳으로 모은다.
+ *
+ * ── provider seam ──
+ * Soul(Higgsfield) 추가 시: 이 파일 옆에 buildImageSoul(spec) 신설.
+ *   stylePreset → style_id, styleStrength → style_strength, seed → 네이티브(모두 지원).
+ *   referenceImages[0] → image_url(1장), aspectRatio/resolution → width_and_height 프리셋.
+ * nano-banana는 style/seed 미지원이라 아래처럼 프롬프트로 fold / drop 한다.
  */
 
 export const REPLICATE_MODEL_VERSIONS = {
@@ -93,6 +100,32 @@ export interface ReplicateRequest {
 }
 
 /**
+ * nano-banana는 스타일 프리셋/강도를 네이티브로 못 받으므로 프롬프트 뒤에 접는다.
+ * stylePreset 없으면 원본 그대로(강도만으론 접을 대상 없음).
+ */
+export function foldStyleIntoPrompt(spec: ImageGenerationSpec): string {
+  if (!spec.stylePreset) return spec.prompt;
+  const strength = typeof spec.styleStrength === "number" ? ` (strength ${spec.styleStrength})` : "";
+  return `${spec.prompt}, style: ${spec.stylePreset}${strength}`;
+}
+
+/**
+ * ImageGenerationSpec → nano-banana Replicate 요청.
+ * 미지원 필드 처리: stylePreset/styleStrength → 프롬프트 fold, seed → drop.
+ */
+export function buildImageRequest(spec: ImageGenerationSpec): ReplicateRequest {
+  return {
+    version: REPLICATE_MODEL_VERSIONS.image,
+    input: buildImageInput({
+      images: spec.referenceImages,
+      prompt: foldStyleIntoPrompt(spec),
+      resolution: spec.resolution,
+      aspectRatio: spec.aspectRatio,
+    }),
+  };
+}
+
+/**
  * 노드 타입 + 노드 data + 해소된 upstream 입력 → Replicate 요청({version, input}).
  * 입력이 부족하면(예: 이미지 없음, 모션 없음) 이유 문자열을 담은 에러 객체 반환.
  */
@@ -104,21 +137,10 @@ export function buildReplicateRequest(
   const d = data ?? {};
 
   if (nodeType === "generate-image") {
-    if (resolved.images.length === 0) return { ok: false, reason: "이미지 소스 연결 필요" };
-    const prompt = typeof d.prompt === "string" ? d.prompt : "";
-    if (!prompt.trim()) return { ok: false, reason: "프롬프트 필요" };
-    return {
-      ok: true,
-      request: {
-        version: REPLICATE_MODEL_VERSIONS.image,
-        input: buildImageInput({
-          images: resolved.images,
-          prompt,
-          resolution: typeof d.resolution === "string" ? d.resolution : undefined,
-          aspectRatio: typeof d.aspectRatio === "string" ? d.aspectRatio : undefined,
-        }),
-      },
-    };
+    // node.data → 정규 스펙 → nano-banana 어댑터 (provider seam)
+    const spec = nodeToImageSpec(d, resolved);
+    if (!spec.ok) return spec;
+    return { ok: true, request: buildImageRequest(spec.spec) };
   }
 
   if (nodeType === "generate") {
