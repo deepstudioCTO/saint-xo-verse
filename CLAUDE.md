@@ -66,8 +66,10 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - Motion (Framer Motion 후속)
 - @dnd-kit/core (드래그 앤 드롭 — SkillPanel → Persona)
 - @xyflow/react (노드 기반 에디터 캔버스)
+- Cloudflare Workflows (durable execution — 노드 그래프 실행 오케스트레이터, `wrangler.json` workflows 바인딩)
 - ffmpeg.wasm (브라우저 영상 트리밍 + 음악 합성, SharedArrayBuffer 필요)
 - Replicate API (kling-video, nano-banana-pro, real-esrgan, topaz)
+- vitest (순수 로직 단위 테스트 — `app/lib/workflow` 한정, `npm test`)
 - 폰트: Orbitron (영문) + Pretendard (한글)
 
 ## 인증 (Supabase Auth)
@@ -216,9 +218,14 @@ export default [
 | Save as Skill | EditorCanvas 내 `SaveAsSkillDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
 | motionVideos 마이그레이션 | `scripts/migrate-skills-to-templates.ts` — motionVideo → 최소 노드 그래프 template | Source + MotionRef + Generate 3노드 구성 |
 | 워크플로우 패널 분리 | `WorkflowPanel` (workflow-expanded) — 스킬 패널에서 템플릿 제거, W키 토글 전용 패널. 클릭 시 `/editor?template=<id>` 이동 | 레거시 스킬(motionVideo/conceptImage)과 워크플로우 템플릿은 용도가 다름 — 스킬은 3카드 즉시 생성, 템플릿은 에디터에서 편집 |
-| 템플릿 기반 실행 | `/api/workflow-execute` POST (JSON body), 에디터 GenerateNode에서만 실행 | 홈 3카드 모드는 레거시 전용, 워크플로우 실행은 에디터 경유 |
-| GenerateNode | 에디터 내 생성 노드, upstream SourceNode에서 이미지/비디오 자동 탐색, 5초 폴링 | 에디터 캔버스에서 직접 생성 실행 + 결과 확인 |
-| 워크플로우 폴링 API | `GET /api/workflow-execute?runId=` — Replicate 상태 체크 + Storage 업로드 | GenerateNode와 독립적 폴링 클라이언트를 위한 범용 엔드포인트 |
+| 실행 오케스트레이터 | **Cloudflare Workflow `GenerationPipeline`**(`workers/generation-pipeline.ts`, `workers/app.ts`에서 export, `wrangler.json` workflows 바인딩). Run 버튼→그래프 전체 POST→Workflow create. topoSort로 실행순서, 노드별 `step.do`(제출)+`step.sleep`(폴링)+Storage 업로드 | ComfyUI/n8n식 "전체 Run" 정석. durable(탭 닫아도 완주), 클라 오케스트레이션 아님. 클라 오케스트레이션(per-node effect 연쇄)은 이중과금·안티패턴이라 폐기 |
+| step 규칙 | 모든 네트워크 I/O는 `step.do` 안(재수화 시 재실행 방지), 반환값은 URL/id만(≤1MiB). submit은 **check-then-create**(node_run externalId 있으면 재사용) | 정확히-한-번 제출로 Replicate 이중 과금 방지 |
+| 폴링 상한 | `MAX_POLLS=220` × 6s = 22분. real-esrgan 영상 업스케일이 실측 ~11.6분으로 매우 느림 | Workflows `step.sleep`은 비청구·최대 365일이라 여유롭게. 초과 시 node/run failed 기록 |
+| 입력 해소(체이닝) | `resolveUpstreamInputs(nodes,edges,nodeId,outputs)` 순수함수 — upstream 완료 산출물+SourceNode.media를 노드 입력으로. 서버 Workflow·클라 노드 공유(`app/lib/workflow`) | 기존 수제 BFS 2벌(Preview/Generate) 통합. 코스프레 이미지 순서=position(y) |
+| 클라이언트 | `WorkflowRunProvider`+`useWorkflowRun`(`GET ?runId=` 6초 폴링), 노드는 presentational(GenerateNode/UpscaleNode self-execute 없음). **run 상태를 node.data에 쓰지 않음** | AutoSave가 일시적 실행상태를 scratch에 오염 저장하는 것 방지 |
+| DB 커넥션 | 장시간 Workflow step·고빈도 폴링은 **`withDb`**(`db.server.ts`)로 커넥션 자동 정리 필수. `getDb`는 pool을 안 닫아 Supabase 세션풀(15) 소진(EMAXCONNSESSION) | `getDb`는 짧은 단발 요청에만. Workflow/폴링은 반드시 `withDb` |
+| Replicate 모델 버전 | `app/lib/workflow/providers/replicate.ts`에 중앙화(image/video/real-esrgan/topaz). 버전은 stale 시 422 → `GET /v1/models/{owner}/{name}` latest_version으로 갱신 | 버전 해시가 삭제되면 "version does not exist" 422 |
+| 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(6종)+`makeNode`, `nodeTypes`에 `upscale` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
 
 ## Slack MCP
 
@@ -253,6 +260,7 @@ Workers 시크릿: `npx wrangler secret put <KEY>` (DATABASE_URL, SUPABASE_URL, 
 
 빌드 실패 시 `react-router.config.ts`의 `v8_viteEnvironmentApi: true` 확인.
 서울 리전 배포: `wrangler.json`에 `placement.region: "aws:ap-northeast-2"` 설정됨.
+**Cloudflare Workflows**: `wrangler.json` `workflows` 바인딩(`GENERATION_WORKFLOW`→`GenerationPipeline`). 바인딩 변경 후 `npx wrangler types`로 `Env` 재생성(`worker-configuration.d.ts`, gitignore·생성물). 로컬 dev(`vite dev`)에서도 실행되나 상태는 dev 재시작 간 비영속. 계정 Workflows/Paid 필요.
 
 ## 파일 구조 개요
 
@@ -273,9 +281,10 @@ app/
 │   ├── auth.server.ts         # requireAuth, requireAuthApi 가드
 │   ├── supabase-auth.server.ts # 쿠키 기반 Supabase 클라이언트 팩토리
 │   ├── data.ts          # CHARACTERS, TRACKS, LOOKBOOKS, LOOKS, PERSONAS 폴백 데이터 + 타입 + 룩업 맵
-│   ├── db.server.ts     # Drizzle DB 연결 + 모든 schema 테이블 export
+│   ├── db.server.ts     # Drizzle DB 연결 (getDb 단발 / withDb 커넥션 자동정리) + schema export
 │   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
-│   └── supabase.server.ts  # Storage 헬퍼
+│   ├── supabase.server.ts  # Storage 헬퍼
+│   └── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, providers/replicate, types
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅
 │   ├── useLookbookNavigation.ts # Lookbook ↑↓ 키보드 내비게이션
@@ -293,7 +302,8 @@ app/
 │   ├── api.logout.tsx   # 로그아웃 액션
 │   └── api.*.tsx        # REST API 엔드포인트들
 ├── routes.ts            # ⚠️ 라우트 수동 등록 필수
-scripts/                 # 시드, 버킷 생성, 이미지 업로드
+workers/                 # Cloudflare Worker 진입점: app.ts (fetch + GenerationPipeline export), generation-pipeline.ts (실행 오케스트레이터 Workflow)
+scripts/                 # 시드, 버킷 생성, 이미지 업로드 (seed-multistep-pipeline-template, seed-cosplay-template 등)
 drizzle/schema.ts        # DB 스키마 (Drizzle)
 vault/                   # Obsidian vault (gitignore, CLAUDE.md·MEMORY.md 심링크)
 ```
