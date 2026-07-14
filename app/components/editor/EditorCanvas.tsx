@@ -8,17 +8,63 @@ import {
   Panel,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   addEdge,
   type Node,
   type OnConnect,
 } from "@xyflow/react";
 import type { SourceNodeData, EditorEntryData } from "./editorTypes";
-import { nodeTypes, defaultEdgeOptions, emptyNodes, emptyEdges } from "./editorDefaults";
+import { nodeTypes, defaultEdgeOptions, emptyNodes, emptyEdges, PALETTE, makeNode } from "./editorDefaults";
 import { AutoSave } from "./AutoSave";
 import { SaveAsSkillDialog } from "./SaveAsSkillDialog";
 import { MediaBrowser } from "./MediaBrowser";
+import { WorkflowRunProvider, useWorkflowRun } from "./workflowRun";
 
-// ── Editor Toolbar ───────────────────────────────────────────
+// ── Node Palette ─────────────────────────────────────────────
+
+function NodePalette({ onAdd }: { onAdd: (item: (typeof PALETTE)[number]) => void }) {
+  return (
+    <div className="flex flex-col gap-1 bg-[#1a1a1a]/90 backdrop-blur border border-white/[0.08] rounded-lg p-1.5">
+      <span className="text-[9px] font-semibold tracking-wider uppercase text-white/40 px-1 pb-0.5">노드 추가</span>
+      {PALETTE.map((item) => (
+        <button
+          key={item.type}
+          onClick={() => onAdd(item)}
+          className="text-left px-2 py-1 rounded text-[11px] text-white/70 hover:bg-white/[0.1] hover:text-white transition-colors cursor-pointer"
+        >
+          + {item.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Run controls ─────────────────────────────────────────────
+
+function RunControls({ nodes, edges }: { nodes: Node[]; edges: import("@xyflow/react").Edge[] }) {
+  const { start, isRunning, runStatus, error } = useWorkflowRun();
+  return (
+    <div className="flex items-center gap-2">
+      {runStatus === "completed" && <span className="text-[11px] text-emerald-400">완료</span>}
+      {runStatus === "failed" && (
+        <span className="text-[11px] text-red-400 max-w-[200px] truncate" title={error || undefined}>
+          실패: {error}
+        </span>
+      )}
+      <button
+        onClick={() => start(nodes, edges)}
+        disabled={isRunning}
+        className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer ${
+          isRunning
+            ? "bg-blue-900/40 text-white/40 cursor-not-allowed"
+            : "bg-blue-600 hover:bg-blue-500 text-white"
+        }`}
+      >
+        {isRunning ? "실행 중…" : "▶ Run"}
+      </button>
+    </div>
+  );
+}
 
 function EditorToolbar({ onSaveAsSkill }: { onSaveAsSkill: () => void }) {
   return (
@@ -48,7 +94,9 @@ interface EditorCanvasProps {
 export function EditorCanvas({ entryData }: EditorCanvasProps) {
   return (
     <ReactFlowProvider>
-      <EditorCanvasInner entryData={entryData} />
+      <WorkflowRunProvider>
+        <EditorCanvasInner entryData={entryData} />
+      </WorkflowRunProvider>
     </ReactFlowProvider>
   );
 }
@@ -69,11 +117,9 @@ function EditorCanvasInner({ entryData }: EditorCanvasProps) {
 
   const [nodes, setNodes, onNodesChange] = useNodesState(startNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(startEdges);
+  const { screenToFlowPosition } = useReactFlow();
 
-  // Media browser state
   const [mediaBrowserNodeId, setMediaBrowserNodeId] = useState<string | null>(null);
-
-  // Save as Skill dialog state
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
 
   const onConnect: OnConnect = useCallback(
@@ -81,23 +127,31 @@ function EditorCanvasInner({ entryData }: EditorCanvasProps) {
     [setEdges]
   );
 
-  // Handle clicks inside nodes (for SourceNode "open-media-browser")
   const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     if (node.type === "source") {
       setMediaBrowserNodeId(node.id);
     }
   }, []);
 
-  const handleMediaSelect = useCallback((media: NonNullable<SourceNodeData["media"]>) => {
-    setNodes((nds) =>
-      nds.map((n) =>
-        n.id === mediaBrowserNodeId
-          ? { ...n, data: { ...n.data, media } }
-          : n
-      )
-    );
-    setMediaBrowserNodeId(null);
-  }, [mediaBrowserNodeId, setNodes]);
+  const handleMediaSelect = useCallback(
+    (media: NonNullable<SourceNodeData["media"]>) => {
+      setNodes((nds) => nds.map((n) => (n.id === mediaBrowserNodeId ? { ...n, data: { ...n.data, media } } : n)));
+      setMediaBrowserNodeId(null);
+    },
+    [mediaBrowserNodeId, setNodes]
+  );
+
+  const handleAddNode = useCallback(
+    (item: (typeof PALETTE)[number]) => {
+      // 화면 중앙 근처 + 약간의 지터로 겹침 방지
+      const center = screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+      setNodes((nds) => [
+        ...nds,
+        makeNode(item, { x: center.x + (nds.length % 6) * 30, y: center.y + (nds.length % 6) * 30 }),
+      ]);
+    },
+    [screenToFlowPosition, setNodes]
+  );
 
   const useFitView = !startViewport;
 
@@ -130,8 +184,14 @@ function EditorCanvasInner({ entryData }: EditorCanvasProps) {
           maskColor="rgba(13,13,13,0.75)"
           className="!bg-[#1a1a1a] !border-white/[0.08]"
         />
+        <Panel position="top-left">
+          <NodePalette onAdd={handleAddNode} />
+        </Panel>
         <Panel position="top-right">
-          <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
+          <div className="flex items-center gap-3">
+            <RunControls nodes={nodes} edges={edges} />
+            <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
+          </div>
         </Panel>
         <AutoSave nodes={nodes} edges={edges} />
       </ReactFlow>

@@ -3,6 +3,7 @@ import { SourceNode } from "./nodes/SourceNode";
 import { SubtitleNode } from "./nodes/SubtitleNode";
 import { PreviewNode } from "./nodes/PreviewNode";
 import { GenerateNode } from "./nodes/GenerateNode";
+import { UpscaleNode } from "./nodes/UpscaleNode";
 import type { SourceNodeData, SubtitleNodeData, PreviewNodeData } from "./editorTypes";
 
 // Module-scope nodeTypes to avoid remounting on every render
@@ -12,12 +13,40 @@ export const nodeTypes: NodeTypes = {
   preview: PreviewNode,
   generate: GenerateNode,
   "generate-image": GenerateNode,
+  upscale: UpscaleNode,
 };
 
 export const defaultEdgeOptions = {
   type: "default",
   style: { stroke: "#444", strokeWidth: 1.5 },
 };
+
+// ── 팔레트: 추가 가능한 노드 6종 ──────────────────────────────
+export interface PaletteItem {
+  type: string;
+  label: string;
+  makeData: () => Record<string, unknown>;
+}
+
+export const PALETTE: PaletteItem[] = [
+  { type: "source", label: "Source", makeData: () => ({ label: "Source", media: null }) },
+  { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", prompt: "" }) },
+  { type: "generate", label: "영상 생성", makeData: () => ({ label: "Video Gen", generateType: "generate" }) },
+  { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "real-esrgan", resolution: "2K" }) },
+  { type: "subtitle", label: "자막", makeData: () => ({ label: "Subtitles", entries: [] }) },
+  { type: "preview", label: "Preview", makeData: () => ({ label: "Preview" }) },
+];
+
+let nodeSeq = 0;
+export function makeNode(item: PaletteItem, position: { x: number; y: number }): Node {
+  nodeSeq += 1;
+  return {
+    id: `${item.type}-${Date.now()}-${nodeSeq}`,
+    type: item.type,
+    position,
+    data: item.makeData(),
+  };
+}
 
 export const emptyNodes: Node[] = [
   {

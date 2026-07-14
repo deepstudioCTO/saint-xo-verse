@@ -1,5 +1,7 @@
 import { createRequestHandler } from "react-router";
 
+export { GenerationPipeline } from "./generation-pipeline";
+
 declare module "react-router" {
   interface AppLoadContext {
     cloudflare: {

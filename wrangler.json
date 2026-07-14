@@ -8,6 +8,13 @@
   "assets": {
     "directory": "./build/client"
   },
+  "workflows": [
+    {
+      "name": "generation-pipeline",
+      "binding": "GENERATION_WORKFLOW",
+      "class_name": "GenerationPipeline"
+    }
+  ],
   "placement": {
     "mode": "targeted",
     "region": "aws:ap-northeast-2"

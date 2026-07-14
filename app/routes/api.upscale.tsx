@@ -7,7 +7,7 @@ import { requireAuthApi } from "~/lib/auth.server";
 // Model versions
 const MODELS = {
   "real-esrgan": {
-    version: "42e594a21b2f4c98faad74e1e6c49a1c8ec2c48df3a0f5a81d49e98f22da896c",
+    version: "3e56ce4b57863bd03048b42bc09bdd4db20d427cca5fde9d8ae4dc60e1bb4775",
     name: "lucataco/real-esrgan-video",
   },
   topaz: {

@@ -1,41 +1,17 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import {
   Handle,
   Position,
   useHandleConnections,
   useNodesData,
-  useStore,
   type Node,
   type NodeProps,
-  type ReactFlowState,
 } from "@xyflow/react";
-import type { PreviewNodeData, SourceNodeData, SubtitleNodeData } from "../editorTypes";
+import type { PreviewNodeData, SubtitleNodeData } from "../editorTypes";
 import { MediaDisplay } from "./MediaDisplay";
+import { useResolvedInputs } from "../useResolvedInputs";
 
 type PreviewNodeType = Node<PreviewNodeData, "preview">;
-
-function useUpstreamSource(nodeId: string) {
-  return useStore(
-    useCallback(
-      (s: ReactFlowState) => {
-        const visited = new Set<string>();
-        const queue = [nodeId];
-        while (queue.length > 0) {
-          const id = queue.shift()!;
-          if (visited.has(id)) continue;
-          visited.add(id);
-          const node = s.nodeLookup.get(id);
-          if (node?.type === "source")
-            return (node.data as unknown as SourceNodeData).media;
-          for (const e of s.edges)
-            if (e.target === id) queue.push(e.source);
-        }
-        return null;
-      },
-      [nodeId]
-    )
-  );
-}
 
 function parseTimestamp(ts: string): number {
   const parts = ts.split(":").map(Number);
@@ -45,7 +21,15 @@ function parseTimestamp(ts: string): number {
 }
 
 export function PreviewNode({ id, data }: NodeProps<PreviewNodeType>) {
-  const media = useUpstreamSource(id);
+  const resolved = useResolvedInputs(id);
+  // 미리보기 우선순위: 생성 영상 > 이미지 > 소스 모션영상
+  const media: { type: "image" | "video"; url: string; name: string } | null = resolved.producedVideo
+    ? { type: "video", url: resolved.producedVideo, name: "Output" }
+    : resolved.image
+      ? { type: "image", url: resolved.image, name: "Image" }
+      : resolved.sourceVideo
+        ? { type: "video", url: resolved.sourceVideo, name: "Source" }
+        : null;
   const [currentTime, setCurrentTime] = useState(0);
 
   // Read subtitle entries from directly connected SubtitleNode

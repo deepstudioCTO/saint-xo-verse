@@ -1,173 +1,79 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.workflow-execute";
-import { getDb, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { withDb, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
-import { uploadGeneratedVideo, uploadGeneratedImage } from "~/lib/supabase.server";
-
-const VIDEO_MODEL_VERSION =
-  "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896";
-const IMAGE_MODEL_VERSION =
-  "0785fb14f5aaa30eddf06fd49b6cbdaac4541b8854eb314211666e23a29087e3";
+import { deriveRunStatus } from "~/lib/workflow/deriveRunStatus";
+import type { GraphNodeLike, GraphEdgeLike } from "~/lib/workflow/types";
 
 /**
  * POST /api/workflow-execute
  *
- * 템플릿 기반 워크플로우 실행.
- * Body: { templateId?, inputs: { characterId, imageUrl, motionVideoUrl?, motionVideoId?,
- *         conceptImageUrl?, conceptImageId?, prompt?, lookbookId?, lookId?, musicId? } }
- *
- * templateId가 없으면 ad-hoc 실행 (inputs 기반으로 최소 스냅샷 생성).
+ * 그래프 전체를 Cloudflare Workflow(GenerationPipeline)로 durable 실행한다.
+ * Body: { graph: { nodes, edges }, templateId? }
+ * → workflow_run 생성 후 Workflow 인스턴스 create. 실제 Replicate 실행·폴링·업로드는
+ *   Workflow 내부에서 진행되며, 클라이언트는 GET으로 상태만 폴링한다.
  */
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
   }
 
-  const TOKEN = context.cloudflare.env.REPLICATE_TOKEN;
   const env = (context.cloudflare as { env: Record<string, string> }).env;
   const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
-    const body = await request.json();
-    const { templateId, inputs } = body;
+    const body = (await request.json()) as {
+      graph?: { nodes: GraphNodeLike[]; edges: GraphEdgeLike[] };
+      templateId?: string;
+    };
+    const graph = body.graph;
 
-    if (!inputs || !inputs.imageUrl) {
-      return Response.json(
-        { error: "inputs.imageUrl is required" },
-        { status: 400, headers: authHeaders }
-      );
+    if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
+      return Response.json({ error: "graph.nodes / graph.edges 필요" }, { status: 400, headers: authHeaders });
     }
 
-    const db = getDb(context.cloudflare as { env: Record<string, string> });
-
-    // Load template if provided
-    let template = null;
-    if (templateId) {
-      const [t] = await db
-        .select()
-        .from(workflowTemplates)
-        .where(eq(workflowTemplates.id, templateId))
-        .limit(1);
-      template = t || null;
-    }
-
-    // Determine generation type from inputs
-    const isImage = !inputs.motionVideoUrl && inputs.prompt;
-    const category = isImage ? "image" : "video";
-
-    // Build snapshot
-    const snapshot = template
-      ? JSON.stringify({ nodes: JSON.parse(template.nodes), edges: JSON.parse(template.edges) })
-      : JSON.stringify({
-          nodes: [
-            { id: "source-1", type: "source", data: { label: "Source", media: { type: "image", url: inputs.imageUrl } } },
-            { id: "generate-1", type: category === "image" ? "generate-image" : "generate", data: { label: "Generate", generateType: category === "image" ? "generate-image" : "generate" } },
-          ],
-          edges: [{ id: "e-source-generate", source: "source-1", target: "generate-1" }],
-        });
-
-    // Create workflow_run
-    const [workflowRun] = await db
-      .insert(workflowRuns)
-      .values({
-        templateId: template?.id,
-        templateVersion: template?.currentVersion,
-        templateSnapshot: snapshot,
-        inputs: JSON.stringify(inputs),
-        status: "pending",
-      })
-      .returning();
-
-    // Call Replicate
-    let prediction;
-    if (category === "video") {
-      const predRes = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          version: VIDEO_MODEL_VERSION,
-          input: {
-            image: inputs.imageUrl,
-            video: inputs.motionVideoUrl,
-            prompt: inputs.prompt || "a person performing the motion naturally",
-            mode: "pro",
-            character_orientation: "image",
-          },
-        }),
-      });
-
-      if (!predRes.ok) {
-        const err = await predRes.text();
-        // Clean up the run
-        await db.update(workflowRuns)
-          .set({ status: "failed", error: `Replicate error: ${err.slice(0, 200)}` })
-          .where(eq(workflowRuns.id, workflowRun.id));
-        return Response.json({ error: `생성 요청 실패: ${err.slice(0, 200)}` }, { status: 500, headers: authHeaders });
+    const run = await withDb(context.cloudflare as { env: Record<string, string> }, async (db) => {
+      // 템플릿 메타(선택)
+      let template = null;
+      if (body.templateId) {
+        const [t] = await db
+          .select()
+          .from(workflowTemplates)
+          .where(eq(workflowTemplates.id, body.templateId))
+          .limit(1);
+        template = t || null;
       }
-      prediction = await predRes.json();
-    } else {
-      // Image generation
-      const imageInput: string[] = [inputs.imageUrl];
-      if (inputs.conceptImageUrl) imageInput.push(inputs.conceptImageUrl);
 
-      const predRes = await fetch("https://api.replicate.com/v1/predictions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          version: IMAGE_MODEL_VERSION,
-          input: {
-            prompt: inputs.prompt,
-            image_input: imageInput,
-            resolution: inputs.resolution || "2K",
-            aspect_ratio: inputs.aspectRatio || "2:3",
-            output_format: "jpg",
-            safety_filter_level: "block_only_high",
-          },
-        }),
-      });
+      // workflow_run 생성 (템플릿 스냅샷 = 실행 시점 그래프)
+      const [created] = await db
+        .insert(workflowRuns)
+        .values({
+          templateId: template?.id,
+          templateVersion: template?.currentVersion,
+          templateSnapshot: JSON.stringify(graph),
+          inputs: "{}",
+          status: "pending",
+        })
+        .returning();
+      return created;
+    });
 
-      if (!predRes.ok) {
-        const err = await predRes.text();
-        await db.update(workflowRuns)
-          .set({ status: "failed", error: `Replicate error: ${err.slice(0, 200)}` })
-          .where(eq(workflowRuns.id, workflowRun.id));
-        return Response.json({ error: `생성 요청 실패: ${err.slice(0, 200)}` }, { status: 500, headers: authHeaders });
-      }
-      prediction = await predRes.json();
-    }
+    // Workflow 인스턴스 시작 (durable — 이후는 서버가 진행)
+    const cfEnv = (context.cloudflare as { env: Env }).env;
+    await cfEnv.GENERATION_WORKFLOW.create({
+      id: run.id,
+      params: { runId: run.id, graph },
+    });
 
-    // Create node_run
-    await db
-      .insert(nodeRuns)
-      .values({
-        runId: workflowRun.id,
-        nodeId: "generate-1",
-        nodeType: category === "image" ? "generate-image" : "generate",
-        inputs: JSON.stringify({ image: inputs.imageUrl, video: inputs.motionVideoUrl, prompt: inputs.prompt }),
-        status: "pending",
-        externalId: prediction.id,
-        externalProvider: "replicate",
-      });
-
-    return Response.json({
-      success: true,
-      runId: workflowRun.id,
-      predictionId: prediction.id,
-    }, { headers: authHeaders });
+    return Response.json({ success: true, runId: run.id }, { headers: authHeaders });
   } catch (err) {
-    console.error("workflow-execute error:", err);
+    console.error("workflow-execute action error:", err);
     return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });
   }
 }
 
 /**
- * GET /api/workflow-execute?runId=xxx — 워크플로우 실행 상태 폴링
+ * GET /api/workflow-execute?runId=xxx — 실행 상태 폴링 (DB만 읽음, Replicate 폴링 없음)
  *
  * Returns: { status, nodeRuns: [{ nodeId, nodeType, status, outputs, error }], error }
  */
@@ -175,118 +81,42 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const env = (context.cloudflare as { env: Record<string, string> }).env;
   const { headers: authHeaders } = await requireAuthApi(request, env);
 
-  const TOKEN = context.cloudflare.env.REPLICATE_TOKEN;
   const url = new URL(request.url);
   const runId = url.searchParams.get("runId");
-
   if (!runId) {
     return Response.json({ error: "runId parameter required" }, { status: 400, headers: authHeaders });
   }
 
   try {
-    const db = getDb(env);
+    const result = await withDb(context.cloudflare as { env: Record<string, string> }, async (db) => {
+      const [run] = await db.select().from(workflowRuns).where(eq(workflowRuns.id, runId)).limit(1);
+      if (!run) return null;
+      const nodes = await db.select().from(nodeRuns).where(eq(nodeRuns.runId, runId));
+      return { run, nodes };
+    });
 
-    const [run] = await db
-      .select()
-      .from(workflowRuns)
-      .where(eq(workflowRuns.id, runId))
-      .limit(1);
-
-    if (!run) {
+    if (!result) {
       return Response.json({ error: "Workflow run not found" }, { status: 404, headers: authHeaders });
     }
+    const { run, nodes } = result;
 
-    // Fetch all node_runs for this workflow
-    const nodes = await db
-      .select()
-      .from(nodeRuns)
-      .where(eq(nodeRuns.runId, runId));
+    // 전체 상태: 노드가 있으면 파생, 없으면 run.status
+    const status = nodes.length > 0 ? deriveRunStatus(nodes) : run.status;
 
-    // Poll Replicate for any pending/processing node_runs
-    let anyUpdated = false;
-    for (const node of nodes) {
-      if ((node.status === "pending" || node.status === "processing") && node.externalId && node.externalProvider === "replicate") {
-        const res = await fetch(
-          `https://api.replicate.com/v1/predictions/${node.externalId}`,
-          { headers: { Authorization: `Bearer ${TOKEN}` } }
-        );
-        if (!res.ok) continue;
-        const pred = await res.json();
-
-        let newStatus = node.status;
-        let outputs = node.outputs;
-        let error = node.error;
-
-        if (pred.status === "succeeded") {
-          newStatus = "completed";
-          const isImage = node.nodeType === "generate-image";
-
-          // Upload to Supabase Storage for persistence
-          try {
-            const outputUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
-            if (isImage) {
-              const { publicUrl } = await uploadGeneratedImage(env, outputUrl, node.id);
-              outputs = JSON.stringify({ url: publicUrl, type: "image" });
-            } else {
-              const { publicUrl } = await uploadGeneratedVideo(env, outputUrl, node.id);
-              outputs = JSON.stringify({ url: publicUrl, type: "video" });
-            }
-          } catch (uploadErr) {
-            console.error("Upload failed, using CDN URL:", uploadErr);
-            const outputUrl = Array.isArray(pred.output) ? pred.output[0] : pred.output;
-            outputs = JSON.stringify({ url: outputUrl, type: isImage ? "image" : "video" });
-          }
-        } else if (pred.status === "failed") {
-          newStatus = "failed";
-          error = pred.error || "Generation failed";
-        } else if (pred.status === "processing") {
-          newStatus = "processing";
-        }
-
-        if (newStatus !== node.status) {
-          anyUpdated = true;
-          const now = (newStatus === "completed" || newStatus === "failed") ? new Date() : undefined;
-          await db.update(nodeRuns)
-            .set({ status: newStatus, outputs, error, completedAt: now })
-            .where(eq(nodeRuns.id, node.id));
-
-          // Update node in-memory for response
-          node.status = newStatus;
-          node.outputs = outputs;
-          node.error = error;
-        }
-      }
-    }
-
-    // Update workflow_run status based on node_runs
-    if (anyUpdated) {
-      const allCompleted = nodes.every((n) => n.status === "completed");
-      const anyFailed = nodes.some((n) => n.status === "failed");
-      const newRunStatus = allCompleted ? "completed" : anyFailed ? "failed" : "running";
-      const runOutputs = allCompleted
-        ? JSON.stringify(nodes.map((n) => ({ nodeId: n.nodeId, outputs: n.outputs ? JSON.parse(n.outputs) : null })))
-        : undefined;
-      const completedAt = (newRunStatus === "completed" || newRunStatus === "failed") ? new Date() : undefined;
-
-      await db.update(workflowRuns).set({
-        status: newRunStatus,
-        outputs: runOutputs,
-        completedAt,
-        ...(anyFailed ? { error: nodes.find((n) => n.status === "failed")?.error } : {}),
-      }).where(eq(workflowRuns.id, runId));
-    }
-
-    return Response.json({
-      status: run.status === "pending" && nodes.some((n) => n.status !== "pending") ? "running" : (anyUpdated ? (nodes.every((n) => n.status === "completed") ? "completed" : nodes.some((n) => n.status === "failed") ? "failed" : "running") : run.status),
-      nodeRuns: nodes.map((n) => ({
-        nodeId: n.nodeId,
-        nodeType: n.nodeType,
-        status: n.status,
-        outputs: n.outputs ? JSON.parse(n.outputs) : null,
-        error: n.error,
-      })),
-      error: run.error,
-    }, { headers: authHeaders });
+    return Response.json(
+      {
+        status,
+        nodeRuns: nodes.map((n) => ({
+          nodeId: n.nodeId,
+          nodeType: n.nodeType,
+          status: n.status,
+          outputs: n.outputs ? JSON.parse(n.outputs) : null,
+          error: n.error,
+        })),
+        error: run.error,
+      },
+      { headers: authHeaders }
+    );
   } catch (err) {
     console.error("workflow-execute poll error:", err);
     return Response.json({ error: String(err) }, { status: 500, headers: authHeaders });

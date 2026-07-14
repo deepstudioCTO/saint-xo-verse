@@ -8,3 +8,6 @@
 /.react-router/
 /build/
 vault/
+
+# wrangler generated types
+worker-configuration.d.ts
