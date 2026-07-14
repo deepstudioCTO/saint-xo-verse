@@ -1,17 +1,20 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.workflow-execute";
-import { withDb, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { withDb, workflowTemplates, workflowRuns, nodeRuns, personas, looks } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
 import { deriveRunStatus } from "~/lib/workflow/deriveRunStatus";
+import { injectLookParams, pickLookStyleParams } from "~/lib/workflow/lookParams";
 import type { GraphNodeLike, GraphEdgeLike } from "~/lib/workflow/types";
 
 /**
  * POST /api/workflow-execute
  *
  * 그래프 전체를 Cloudflare Workflow(GenerationPipeline)로 durable 실행한다.
- * Body: { graph: { nodes, edges }, templateId? }
- * → workflow_run 생성 후 Workflow 인스턴스 create. 실제 Replicate 실행·폴링·업로드는
- *   Workflow 내부에서 진행되며, 클라이언트는 GET으로 상태만 폴링한다.
+ * Body: { graph: { nodes, edges }, templateId?, personaId?, lookId? }
+ * → (personaId/lookId 있으면) 해당 Look의 스타일 파라미터를 generate-image 노드.data에
+ *   오버레이(P3-2) → workflow_run 생성(머지된 그래프를 스냅샷으로 영속) → Workflow 인스턴스
+ *   create. 실제 Replicate/Soul 실행·폴링·업로드는 Workflow 내부에서 진행되며, 클라이언트는
+ *   GET으로 상태만 폴링한다.
  */
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
@@ -25,14 +28,16 @@ export async function action({ request, context }: Route.ActionArgs) {
     const body = (await request.json()) as {
       graph?: { nodes: GraphNodeLike[]; edges: GraphEdgeLike[] };
       templateId?: string;
+      personaId?: string;
+      lookId?: string;
     };
-    const graph = body.graph;
+    const inputGraph = body.graph;
 
-    if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) {
+    if (!inputGraph || !Array.isArray(inputGraph.nodes) || !Array.isArray(inputGraph.edges)) {
       return Response.json({ error: "graph.nodes / graph.edges 필요" }, { status: 400, headers: authHeaders });
     }
 
-    const run = await withDb(context.cloudflare as { env: Record<string, string> }, async (db) => {
+    const { run, graph } = await withDb(context.cloudflare as { env: Record<string, string> }, async (db) => {
       // 템플릿 메타(선택)
       let template = null;
       if (body.templateId) {
@@ -44,18 +49,37 @@ export async function action({ request, context }: Route.ActionArgs) {
         template = t || null;
       }
 
-      // workflow_run 생성 (템플릿 스냅샷 = 실행 시점 그래프)
+      // ── Look 파라미터 해소·주입 (P3-2) ────────────────────────
+      // personaId → persona.lookId 로 해소(향후 persona 오버라이드 확장점), 없으면 lookId 직접.
+      let resolvedLookId = body.lookId ?? null;
+      if (body.personaId) {
+        const [persona] = await db
+          .select({ lookId: personas.lookId })
+          .from(personas)
+          .where(eq(personas.id, body.personaId))
+          .limit(1);
+        if (persona) resolvedLookId = persona.lookId;
+      }
+
+      let resolvedNodes = inputGraph.nodes;
+      if (resolvedLookId) {
+        const [look] = await db.select().from(looks).where(eq(looks.id, resolvedLookId)).limit(1);
+        resolvedNodes = injectLookParams(inputGraph.nodes, pickLookStyleParams(look));
+      }
+      const resolvedGraph = { nodes: resolvedNodes, edges: inputGraph.edges };
+
+      // workflow_run 생성 (스냅샷 = 실행 시점 머지된 그래프 → 재현성)
       const [created] = await db
         .insert(workflowRuns)
         .values({
           templateId: template?.id,
           templateVersion: template?.currentVersion,
-          templateSnapshot: JSON.stringify(graph),
-          inputs: "{}",
+          templateSnapshot: JSON.stringify(resolvedGraph),
+          inputs: JSON.stringify({ personaId: body.personaId ?? null, lookId: resolvedLookId }),
           status: "pending",
         })
         .returning();
-      return created;
+      return { run: created, graph: resolvedGraph };
     });
 
     // Workflow 인스턴스 시작 (durable — 이후는 서버가 진행)

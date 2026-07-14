@@ -103,6 +103,16 @@ export const looks = pgTable("looks", {
   id: text("id").primaryKey(), // "00_01"~"00_04", "01_01"
   lookbookId: text("lookbook_id").notNull(),
   displayOrder: integer("display_order").notNull().default(0),
+  // ── Look 스타일 파라미터 (P3-2) ──────────────────────────────
+  // 정규 스펙(ImageGenerationSpec)과 동일 필드. 전부 nullable = "미지정"(노드 값 유지).
+  // 실행 시 api.workflow-execute가 이 값을 generate-image 노드.data에 오버레이한다.
+  stylePreset: text("style_preset"), // Soul style_id(uuid) / nano 스타일명
+  styleStrength: real("style_strength"), // 0~1 (Soul)
+  seed: integer("seed"), // 재현용 시드 (Soul)
+  aspectRatio: text("aspect_ratio"), // "2:3" 등
+  resolution: text("resolution"), // "1080p" | "2K" 등 (모델별)
+  batchSize: integer("batch_size"), // 1 | 4 (Soul)
+  enhancePrompt: boolean("enhance_prompt"), // 프롬프트 자동 보강 (Soul)
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()

@@ -234,6 +234,7 @@ export default [
 | GenerateNode 동적 필드 | 이미지일 때 모델 `<select>` + `IMAGE_MODELS[model].fields[]` 선언적 조건부 렌더(모델별 필드 다름). 모델 전환 시 비율/해상도 stale 보정. 필드는 controlled-from-data. 스타일 피커는 raw fetch+모듈캐시(`/api/soul-styles`) | 영상(generate)은 kling 고정·편집필드 없음 |
 | 업스케일 모델 | **default=topaz**(~41초). 옵션: SeedVR2(zsxkib, one-step, ~34초·$0.011 최저가) / real-esrgan(~11분, 느림). 실측 벤치 기준 | real-esrgan은 해상도 낮춰도 느림(프레임 오버헤드). SeedVR2 입력은 `media`(video_path/video 아님) |
 | 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(6종)+`makeNode`, `nodeTypes`에 `upscale` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
+| Look 파라미터 인코딩(P3-2) | 스타일 파라미터(정규 스펙 = stylePreset/styleStrength/seed/aspectRatio/resolution/batchSize/enhancePrompt)를 **`looks` 테이블**에 nullable 저장(Look 레벨 = 디자인토큰식 그룹 정의). 실행 시 `api.workflow-execute`가 POST body의 `personaId`(→persona.lookId 해소, persona 오버라이드 확장점) 또는 `lookId`로 look을 조회→`pickLookStyleParams`(비-null만)→`injectLookParams`로 **generate-image 노드.data에 오버레이**(look이 스타일 권위, 정의된 필드만 덮어씀, prompt/model 불변)→**머지된 그래프를 templateSnapshot으로 영속**(재현성). 순수함수 2개는 `app/lib/workflow/lookParams.ts`(vitest). 에디터 툴바 "Look 스타일" 셀렉터(스타일 보유 look만 노출)가 Run 시 lookId 전달 | 템플릿은 중립 레시피로 유지, persona/look 정체성은 실행 시점 주입(ComfyUI식 파라미터 오버라이드). 다운스트림(spec.ts→soul.ts)은 무변경 |
 
 ## Slack MCP
 
@@ -292,7 +293,7 @@ app/
 │   ├── db.server.ts     # Drizzle DB 연결 (getDb 단발 / withDb 커넥션 자동정리) + schema export
 │   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
 │   ├── supabase.server.ts  # Storage 헬퍼
-│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, spec(nodeToImageSpec), imageModels(레지스트리), types
+│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, spec(nodeToImageSpec), imageModels(레지스트리), lookParams(injectLookParams/pickLookStyleParams), types
 │   │   └── providers/   # 이미지 provider: provider(계약 ImageProvider/ProviderRequest), replicate, soul, select(selectExecution seam)
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅

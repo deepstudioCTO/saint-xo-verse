@@ -110,6 +110,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     id: l.id,
     lookbookId: l.lookbookId,
     displayOrder: l.displayOrder,
+    stylePreset: l.stylePreset,
+    styleStrength: l.styleStrength,
+    seed: l.seed,
+    aspectRatio: l.aspectRatio,
+    resolution: l.resolution,
+    batchSize: l.batchSize,
+    enhancePrompt: l.enhancePrompt,
   }));
 
   const allPersonas: Persona[] = dbPersonas.map((p) => ({
