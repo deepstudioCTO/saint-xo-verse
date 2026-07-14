@@ -46,6 +46,18 @@ export interface GenerateNodeData {
   prompt?: string;
 }
 
+export interface UpscaleNodeData {
+  [key: string]: unknown;
+  label: string;
+  /** 업스케일 모델 */
+  model: "real-esrgan" | "topaz";
+  /** 목표 해상도 */
+  resolution: "2K" | "4K";
+  status?: "idle" | "pending" | "processing" | "completed" | "failed";
+  output?: { url: string; type: "video" | "image" } | null;
+  error?: string | null;
+}
+
 export interface EditorProject {
   id: string;
   name: string;
