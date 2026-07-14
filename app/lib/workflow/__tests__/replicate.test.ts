@@ -38,6 +38,14 @@ describe("body builders", () => {
       target_resolution: "1080p",
     });
   });
+
+  it("buildUpscaleInput seedvr2 매핑 (media + one-step)", () => {
+    expect(buildUpscaleInput({ video: "v", model: "seedvr2" })).toMatchObject({
+      media: "v",
+      model_variant: "3b",
+      sample_steps: 1,
+    });
+  });
 });
 
 describe("buildReplicateRequest", () => {
@@ -71,6 +79,21 @@ describe("buildReplicateRequest", () => {
     if (r.ok) {
       expect(r.request.version).toBe(REPLICATE_MODEL_VERSIONS.topaz);
       expect(r.request.input.video).toBe("pv");
+    }
+  });
+
+  it("upscale: model 미지정이면 topaz default", () => {
+    const r = buildReplicateRequest("upscale", {}, { ...empty, producedVideo: "pv" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.request.version).toBe(REPLICATE_MODEL_VERSIONS.topaz);
+  });
+
+  it("upscale: model=seedvr2 반영", () => {
+    const r = buildReplicateRequest("upscale", { model: "seedvr2" }, { ...empty, producedVideo: "pv" });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.request.version).toBe(REPLICATE_MODEL_VERSIONS.seedvr2);
+      expect(r.request.input.media).toBe("pv");
     }
   });
 

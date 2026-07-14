@@ -73,7 +73,7 @@ async function seed() {
       id: "upscale",
       type: "upscale",
       position: { x: 900, y: 180 },
-      data: { label: "업스케일", model: "real-esrgan", resolution: "2K" },
+      data: { label: "업스케일", model: "topaz", resolution: "2K" },
     },
     {
       id: "subtitle",

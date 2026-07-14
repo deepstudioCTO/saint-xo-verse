@@ -32,7 +32,7 @@ export const PALETTE: PaletteItem[] = [
   { type: "source", label: "Source", makeData: () => ({ label: "Source", media: null }) },
   { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", prompt: "" }) },
   { type: "generate", label: "영상 생성", makeData: () => ({ label: "Video Gen", generateType: "generate" }) },
-  { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "real-esrgan", resolution: "2K" }) },
+  { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "topaz", resolution: "2K" }) },
   { type: "subtitle", label: "자막", makeData: () => ({ label: "Subtitles", entries: [] }) },
   { type: "preview", label: "Preview", makeData: () => ({ label: "Preview" }) },
 ];

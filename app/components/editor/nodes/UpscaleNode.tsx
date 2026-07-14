@@ -16,7 +16,7 @@ export function UpscaleNode({ id, data }: NodeProps<UpscaleNodeType>) {
   const run = useNodeRun(id);
   const resolved = useResolvedInputs(id);
 
-  const model = data.model || "real-esrgan";
+  const model = data.model || "topaz";
   const resolution = data.resolution || "2K";
 
   const setModel = useCallback(
@@ -87,8 +87,9 @@ export function UpscaleNode({ id, data }: NodeProps<UpscaleNodeType>) {
           onChange={(e) => setModel(e.target.value)}
           className="nodrag nowheel flex-1 bg-white/[0.05] border border-white/[0.08] rounded px-1.5 py-1 text-[9px] text-white/80 focus:outline-none focus:border-white/20"
         >
-          <option value="real-esrgan">Real-ESRGAN</option>
           <option value="topaz">Topaz</option>
+          <option value="seedvr2">SeedVR2 (빠름)</option>
+          <option value="real-esrgan">Real-ESRGAN (느림)</option>
         </select>
         <select
           value={resolution}

@@ -12,10 +12,12 @@ export const REPLICATE_MODEL_VERSIONS = {
   image: "0785fb14f5aaa30eddf06fd49b6cbdaac4541b8854eb314211666e23a29087e3",
   /** kling motion-control (영상 생성) */
   video: "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896",
-  /** lucataco/real-esrgan-video (latest 버전 — 기존 42e594…는 stale로 422) */
+  /** lucataco/real-esrgan-video (latest 버전 — 기존 42e594…는 stale로 422). ⚠️ 매우 느림(~11분/영상) */
   "real-esrgan": "3e56ce4b57863bd03048b42bc09bdd4db20d427cca5fde9d8ae4dc60e1bb4775",
-  /** topazlabs/video-upscale */
+  /** topazlabs/video-upscale — 프리미엄 품질, ~40초 (default) */
   topaz: "f4dad23bbe2d0bf4736d2ea8c9156f1911d8eeb511c8d0bb390931e25caaef61",
+  /** zsxkib/seedvr2 — ByteDance one-step diffusion, 최속(~34초)·최저가($0.011) */
+  seedvr2: "ca98249be9cb623f02a80a7851a2b1a33d5104c251a8f5a1588f251f79bf7c78",
 } as const;
 
 export interface ImageParams {
@@ -52,16 +54,24 @@ export function buildVideoInput(p: VideoParams): Record<string, unknown> {
   };
 }
 
-export type UpscaleModel = "real-esrgan" | "topaz";
+export type UpscaleModel = "real-esrgan" | "topaz" | "seedvr2";
 
 export interface UpscaleParams {
   video: string;
   model: UpscaleModel;
-  resolution?: string; // UpscaleNodeData: "2K" | "4K"
+  resolution?: string; // UpscaleNodeData: "2K" | "4K" (seedvr2는 무시 — 고정 배율)
 }
 
 export function buildUpscaleInput(p: UpscaleParams): Record<string, unknown> {
   const wants4k = (p.resolution || "2K").toUpperCase() === "4K";
+  if (p.model === "seedvr2") {
+    // one-step diffusion, 배율 고정. media=영상, 영상 입력 시 mp4 출력
+    return {
+      media: p.video,
+      model_variant: "3b",
+      sample_steps: 1,
+    };
+  }
   if (p.model === "topaz") {
     return {
       video: p.video,
@@ -130,7 +140,8 @@ export function buildReplicateRequest(
   if (nodeType === "upscale") {
     const video = resolved.producedVideo || resolved.sourceVideo;
     if (!video) return { ok: false, reason: "업스케일할 영상 연결 필요" };
-    const model: UpscaleModel = d.model === "topaz" ? "topaz" : "real-esrgan";
+    const model: UpscaleModel =
+      d.model === "seedvr2" ? "seedvr2" : d.model === "real-esrgan" ? "real-esrgan" : "topaz";
     return {
       ok: true,
       request: {

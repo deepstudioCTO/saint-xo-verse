@@ -49,8 +49,8 @@ export interface GenerateNodeData {
 export interface UpscaleNodeData {
   [key: string]: unknown;
   label: string;
-  /** 업스케일 모델 */
-  model: "real-esrgan" | "topaz";
+  /** 업스케일 모델 (topaz=default 프리미엄, seedvr2=최속/저가, real-esrgan=느림) */
+  model: "topaz" | "seedvr2" | "real-esrgan";
   /** 목표 해상도 */
   resolution: "2K" | "4K";
   status?: "idle" | "pending" | "processing" | "completed" | "failed";
