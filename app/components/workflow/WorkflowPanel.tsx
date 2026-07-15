@@ -57,11 +57,15 @@ function TemplateItem({
           </svg>
         </div>
       )}
-      <span className="absolute bottom-1 left-1 text-[10px] text-white truncate max-w-[calc(100%-0.5rem)] drop-shadow">
+      <span
+        className={`absolute bottom-2 left-2 max-w-[calc(100%-1rem)] truncate text-[10px] font-medium px-1.5 py-0.5 rounded z-30 backdrop-blur-md transition-all ${
+          isHovering ? "text-white bg-black/50" : "text-white/70 bg-black/20"
+        }`}
+      >
         {template.name}
       </span>
       {template.category && (
-        <span className="absolute top-1 right-1 text-[8px] bg-black/50 text-white/70 px-1 py-0.5 rounded">
+        <span className="absolute top-2 right-2 text-[9px] font-medium px-1.5 py-0.5 rounded z-30 backdrop-blur-md text-white/70 bg-black/20">
           {template.category}
         </span>
       )}
