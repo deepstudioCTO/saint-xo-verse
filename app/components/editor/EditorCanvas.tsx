@@ -41,17 +41,8 @@ function NodePalette({ onAdd }: { onAdd: (item: (typeof PALETTE)[number]) => voi
 
 // ── Run controls ─────────────────────────────────────────────
 
-function RunControls({
-  nodes,
-  edges,
-  lookOptions,
-}: {
-  nodes: Node[];
-  edges: import("@xyflow/react").Edge[];
-  lookOptions: { id: string }[];
-}) {
+function RunControls({ nodes, edges }: { nodes: Node[]; edges: import("@xyflow/react").Edge[] }) {
   const { start, isRunning, runStatus, error } = useWorkflowRun();
-  const [lookId, setLookId] = useState("");
   return (
     <div className="flex items-center gap-2">
       {runStatus === "completed" && <span className="text-[11px] text-emerald-400">완료</span>}
@@ -60,25 +51,8 @@ function RunControls({
           실패: {error}
         </span>
       )}
-      {lookOptions.length > 0 && (
-        <label className="flex items-center gap-1.5" title="선택한 Look의 스타일 파라미터를 생성 노드에 주입">
-          <span className="text-[9px] uppercase tracking-wider text-white/40">Look 스타일</span>
-          <select
-            value={lookId}
-            onChange={(e) => setLookId(e.target.value)}
-            className="bg-[#1a1a1a] border border-white/[0.12] rounded px-2 py-1 text-[11px] text-white/80 focus:outline-none focus:border-white/25 cursor-pointer"
-          >
-            <option value="">(none)</option>
-            {lookOptions.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.id}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
       <button
-        onClick={() => start(nodes, edges, lookId ? { lookId } : undefined)}
+        onClick={() => start(nodes, edges)}
         disabled={isRunning}
         className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer ${
           isRunning
@@ -115,20 +89,19 @@ function EditorToolbar({ onSaveAsSkill }: { onSaveAsSkill: () => void }) {
 
 interface EditorCanvasProps {
   entryData: EditorEntryData;
-  lookOptions: { id: string }[];
 }
 
-export function EditorCanvas({ entryData, lookOptions }: EditorCanvasProps) {
+export function EditorCanvas({ entryData }: EditorCanvasProps) {
   return (
     <ReactFlowProvider>
       <WorkflowRunProvider>
-        <EditorCanvasInner entryData={entryData} lookOptions={lookOptions} />
+        <EditorCanvasInner entryData={entryData} />
       </WorkflowRunProvider>
     </ReactFlowProvider>
   );
 }
 
-function EditorCanvasInner({ entryData, lookOptions }: EditorCanvasProps) {
+function EditorCanvasInner({ entryData }: EditorCanvasProps) {
   const { startNodes, startEdges, startViewport, templateId, templateMeta } = useMemo(() => {
     if (entryData.mode === "empty") {
       return { startNodes: emptyNodes, startEdges: emptyEdges, startViewport: undefined, templateId: undefined, templateMeta: undefined };
@@ -216,7 +189,7 @@ function EditorCanvasInner({ entryData, lookOptions }: EditorCanvasProps) {
         </Panel>
         <Panel position="top-right">
           <div className="flex items-center gap-3">
-            <RunControls nodes={nodes} edges={edges} lookOptions={lookOptions} />
+            <RunControls nodes={nodes} edges={edges} />
             <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
           </div>
         </Panel>

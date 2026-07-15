@@ -1,12 +1,10 @@
 import { isRouteErrorResponse } from "react-router";
 import { data } from "react-router";
-import { asc } from "drizzle-orm";
 import type { Route } from "./+types/editor";
-import { getDb, looks } from "~/lib/db.server";
+import { getDb } from "~/lib/db.server";
 import { loadFromRun, loadFromTemplate, loadSavedProject } from "~/lib/editor-loaders.server";
 import { EditorCanvas } from "~/components/editor/EditorCanvas";
 import type { EditorEntryData } from "~/components/editor/editorTypes";
-import { pickLookStyleParams, hasLookStyleParams } from "~/lib/workflow/lookParams";
 import { requireAuth } from "~/lib/auth.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -25,19 +23,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     (await loadSavedProject(db)) ||
     { mode: "empty" as const };
 
-  // Look 스타일 파라미터를 가진 look 목록 (Run 시 generate-image 노드로 주입, P3-2)
-  const dbLooks = await db.select().from(looks).orderBy(asc(looks.displayOrder));
-  const lookOptions = dbLooks
-    .filter((l) => hasLookStyleParams(pickLookStyleParams(l)))
-    .map((l) => ({ id: l.id }));
-
-  return data({ entryData, lookOptions }, { headers: authHeaders });
+  return data({ entryData }, { headers: authHeaders });
 }
 
 export default function Editor({ loaderData }: Route.ComponentProps) {
   return (
     <div className="w-full h-screen">
-      <EditorCanvas entryData={loaderData.entryData} lookOptions={loaderData.lookOptions} />
+      <EditorCanvas entryData={loaderData.entryData} />
     </div>
   );
 }

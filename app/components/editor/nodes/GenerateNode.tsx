@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Handle, Position, useReactFlow, type Node, type NodeProps } from "@xyflow/react";
 import type { GenerateNodeData } from "../editorTypes";
 import { MediaDisplay } from "./MediaDisplay";
+import { PresetBar } from "../PresetBar";
 import { useNodeRun } from "../workflowRun";
 import { useResolvedInputs } from "../useResolvedInputs";
 import { IMAGE_MODELS, resolveImageModel, type ImageModelDef, type ImageModelId } from "~/lib/workflow/imageModels";
@@ -311,6 +312,7 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
             </Field>
           </div>
           <ImageParamFields model={model} data={data} set={set} />
+          <PresetBar data={data} set={set} />
         </>
       )}
 

@@ -99,6 +99,13 @@
       "when": 1784041436578,
       "tag": "0013_whole_major_mapleleaf",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784081819455,
+      "tag": "0014_nappy_kronos",
+      "breakpoints": true
     }
   ]
 }

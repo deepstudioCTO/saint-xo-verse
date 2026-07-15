@@ -16,15 +16,9 @@ export interface NodeRunState {
   error: string | null;
 }
 
-/** Run 파라미터 컨텍스트 — Look 스타일 파라미터 주입 등 (P3-2) */
-export interface RunOptions {
-  lookId?: string;
-  personaId?: string;
-}
-
 interface WorkflowRunValue {
   /** 그래프 전체 실행 시작 */
-  start: (nodes: Node[], edges: Edge[], opts?: RunOptions) => void;
+  start: (nodes: Node[], edges: Edge[]) => void;
   isRunning: boolean;
   runStatus: "idle" | "pending" | "running" | "completed" | "failed";
   /** nodeId → 실행 상태 */
@@ -53,7 +47,7 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const start = useCallback(
-    async (nodes: Node[], edges: Edge[], opts?: RunOptions) => {
+    async (nodes: Node[], edges: Edge[]) => {
       setError(null);
       setNodeStates({});
       setRunStatus("pending");
@@ -67,7 +61,7 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
         const res = await fetch("/api/workflow-execute", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ graph, lookId: opts?.lookId, personaId: opts?.personaId }),
+          body: JSON.stringify({ graph }),
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));

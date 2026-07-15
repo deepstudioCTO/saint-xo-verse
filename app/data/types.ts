@@ -21,14 +21,6 @@ export interface Look {
   id: string;
   lookbookId: string;
   displayOrder?: number;
-  // Look 스타일 파라미터 (P3-2) — 실행 시 generate-image 노드로 주입되는 정규 스펙 필드
-  stylePreset?: string | null;
-  styleStrength?: number | null;
-  seed?: number | null;
-  aspectRatio?: string | null;
-  resolution?: string | null;
-  batchSize?: number | null;
-  enhancePrompt?: boolean | null;
 }
 
 export interface Persona {

@@ -31,5 +31,6 @@ export default [
   route("api/workflow-execute", "routes/api.workflow-execute.tsx"),
   route("api/runs-data", "routes/api.runs-data.tsx"),
   route("api/soul-styles", "routes/api.soul-styles.tsx"),
+  route("api/style-presets", "routes/api.style-presets.tsx"),
   route("editor", "routes/editor.tsx"),
 ] satisfies RouteConfig;
