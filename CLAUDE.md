@@ -233,7 +233,8 @@ export default [
 | Soul(Higgsfield) provider | 모델 `higgsfield-ai/soul/reference`(레퍼런스 1장+style). base `platform.higgsfield.ai`, 인증 헤더 `hf-api-key`/`hf-secret`(env `HF_API_KEY`/`HF_API_SECRET`). 제출 `POST /{modelPath}`→`request_id`, 폴링 `GET /requests/{id}/status`(completed→`images[0].url`, nsfw/failed→환불). 스타일목록 `/api/soul-styles` 프록시. `refImages.max=1`이라 2장↑이면 노드 경고+첫장만 | 다중레퍼런스는 nano-banana 선택. 상세 [[higgsfield-soul-api]] 메모리 |
 | GenerateNode 동적 필드 | 이미지일 때 모델 `<select>` + `IMAGE_MODELS[model].fields[]` 선언적 조건부 렌더(모델별 필드 다름). 모델 전환 시 비율/해상도 stale 보정. 필드는 controlled-from-data. 스타일 피커는 raw fetch+모듈캐시(`/api/soul-styles`) | 영상(generate)은 kling 고정·편집필드 없음 |
 | 업스케일 모델 | **default=topaz**(~41초). 옵션: SeedVR2(zsxkib, one-step, ~34초·$0.011 최저가) / real-esrgan(~11분, 느림). 실측 벤치 기준 | real-esrgan은 해상도 낮춰도 느림(프레임 오버헤드). SeedVR2 입력은 `media`(video_path/video 아님) |
-| 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(6종)+`makeNode`, `nodeTypes`에 `upscale` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
+| 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(7종)+`makeNode`, `nodeTypes`에 `music` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
+| Music(음악 합성) 노드 | **하이브리드 실행**(a안). 서버 `GenerationPipeline`은 executable 노드(generate/upscale)만 실행 → `music`은 non-executable이라 **무시**(파이프라인·resolveUpstreamInputs 무변경, music은 passthrough). 합성은 **클라이언트 전용** `MusicNode.tsx`: `useResolvedInputs`로 upstream 영상(`producedVideo ?? sourceVideo`) + 선택 트랙(`TRACKS`)을 `mergeVideoWithMusic`(ffmpeg.wasm)로 합성. config(`trackId`)만 node.data, **합성결과 blob URL은 로컬 state**(AutoSave가 scratch에 죽은 URL 저장 방지 — run 상태 non-persist 규칙과 동일). 트리거 2개: 서버 Run 완료 시 자동합성(시그니처당 1회 `useEffect`) + 수동 "합성"/"재합성" 버튼. `MediaDisplay`에 `muted` prop 추가(합성결과만 `muted={false}`) | ffmpeg는 브라우저 전용(SharedArrayBuffer)이라 durable Workflow(네트워크 I/O 전제)에 못 넣음 — 실행모델이 근본적으로 다른 노드를 클라 경계로 분리 |
 | 파라미터 프리셋(P3-2) | generate-image 노드 파라미터 한 벌(model/prompt/stylePreset/styleStrength/seed/aspectRatio/resolution/batchSize/enhancePrompt)을 이름 붙여 **저장/불러오기**. `style_presets` 테이블(룩/페르소나에 강결합 X — name이 자유 라벨, 룩 이름 넣으면 "룩별 프리셋"). CRUD=`api.style-presets`(POST 생성/id수정, GET 목록, DELETE). 순수함수 `presets.ts`(`pickPresetParams`=객체↔파라미터 추출 양방향 공용, `parsePresetBody`=body 검증, vitest). UI=`PresetBar`(GenerateNode 하단, 저장 시 인라인 이름 input·`window.prompt` 금지)+`useStylePresets`(모듈스토어 useSyncExternalStore, 저장/삭제 후 무효화). 불러오기=`updateNodeData`로 노드에 값 주입 → Run은 기존대로 node.data 전송 | 계획서 ②"파라미터 세트를 재현가능 템플릿으로 공식화·재사용"의 실물화. 서버 자동주입 아님(노드에 직접 채움) — 파이프라인(spec/pipeline) 무변경 |
 
 ## Slack MCP
@@ -255,6 +256,8 @@ curl 사용 시 멘션 형식: `<@U03GY6ZV3U4>`
 responseHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
 responseHeaders.set("Cross-Origin-Embedder-Policy", "credentialless"); // require-corp은 외부 리소스 차단됨
 ```
+
+**worker 로딩(`audio-merge.ts` `loadFFmpeg`)**: `classWorkerURL`을 same-origin blob으로 **명시 지정** 필수. `@ffmpeg/ffmpeg` 0.12는 워커를 `new URL("./worker.js", import.meta.url)`로 찾는데 Vite dev(`.vite/deps`)에서 경로 해소 실패 → `load()` 무한 hang. esm worker.js는 상대 import를 쓰므로 그대로 blob화 불가 → 상대 import를 절대 CDN URL로 치환 후 blob화(`buildFFmpegWorkerURL`, 워커 스크립트는 same-origin 필수·내부 절대 cross-origin import는 CORS 허용). `FFMPEG_VERSION` 상수는 package.json `@ffmpeg/ffmpeg`와 반드시 일치(메인스레드 클래스↔워커 프로토콜 동일 버전 요구). 미지정 시 dev에서 갤러리 Download-with-music·Music 노드 모두 hang.
 
 ## 배포
 

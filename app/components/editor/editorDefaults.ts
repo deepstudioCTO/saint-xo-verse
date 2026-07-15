@@ -4,6 +4,7 @@ import { SubtitleNode } from "./nodes/SubtitleNode";
 import { PreviewNode } from "./nodes/PreviewNode";
 import { GenerateNode } from "./nodes/GenerateNode";
 import { UpscaleNode } from "./nodes/UpscaleNode";
+import { MusicNode } from "./nodes/MusicNode";
 import type { SourceNodeData, SubtitleNodeData, PreviewNodeData } from "./editorTypes";
 
 // Module-scope nodeTypes to avoid remounting on every render
@@ -14,6 +15,7 @@ export const nodeTypes: NodeTypes = {
   generate: GenerateNode,
   "generate-image": GenerateNode,
   upscale: UpscaleNode,
+  music: MusicNode,
 };
 
 export const defaultEdgeOptions = {
@@ -33,6 +35,7 @@ export const PALETTE: PaletteItem[] = [
   { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", model: "soul-reference", prompt: "", aspectRatio: "2:3", resolution: "1080p", styleStrength: 0.8, batchSize: 1, enhancePrompt: true }) },
   { type: "generate", label: "영상 생성", makeData: () => ({ label: "Video Gen", generateType: "generate" }) },
   { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "topaz", resolution: "2K" }) },
+  { type: "music", label: "음악 합성", makeData: () => ({ label: "Music", trackId: null }) },
   { type: "subtitle", label: "자막", makeData: () => ({ label: "Subtitles", entries: [] }) },
   { type: "preview", label: "Preview", makeData: () => ({ label: "Preview" }) },
 ];

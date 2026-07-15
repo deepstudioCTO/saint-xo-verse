@@ -74,6 +74,13 @@ export interface UpscaleNodeData {
   error?: string | null;
 }
 
+export interface MusicNodeData {
+  [key: string]: unknown;
+  label: string;
+  /** 선택된 음악 트랙 id (TRACKS_BY_ID 키). config만 node.data에 저장 */
+  trackId: string | null;
+}
+
 export interface EditorProject {
   id: string;
   name: string;

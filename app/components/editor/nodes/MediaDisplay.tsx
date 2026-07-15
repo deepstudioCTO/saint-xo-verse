@@ -12,9 +12,11 @@ interface MediaDisplayProps {
   stopPlayPropagation?: boolean;
   /** Called on video timeupdate with currentTime in seconds */
   onTimeUpdate?: (time: number) => void;
+  /** Mute the video element (default true). Set false to hear merged audio (Music node). */
+  muted?: boolean;
 }
 
-export function MediaDisplay({ media, stopPlayPropagation, onTimeUpdate }: MediaDisplayProps) {
+export function MediaDisplay({ media, stopPlayPropagation, onTimeUpdate, muted = true }: MediaDisplayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [aspectRatio, setAspectRatio] = useState<number | null>(null);
@@ -44,7 +46,7 @@ export function MediaDisplay({ media, stopPlayPropagation, onTimeUpdate }: Media
             ref={videoRef}
             src={media.url}
             className="w-full h-full object-contain"
-            muted
+            muted={muted}
             playsInline
             preload="metadata"
             onLoadedMetadata={(e) => {
