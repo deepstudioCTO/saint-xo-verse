@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 import type { Route } from "./+types/api.runs-data";
-import { getDb, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { withDb, workflowRuns, nodeRuns } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -8,18 +8,20 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const { headers: authHeaders } = await requireAuthApi(request, env);
 
   try {
-    const db = getDb(env);
+    // getDb는 { env } 래퍼를 받는다 — env를 그대로 넘기면 DATABASE_URL을 못 찾아 매 요청 500
+    const { runs, allNodeRuns } = await withDb({ env }, async (db) => {
+      const runs = await db
+        .select()
+        .from(workflowRuns)
+        .orderBy(desc(workflowRuns.startedAt));
 
-    const runs = await db
-      .select()
-      .from(workflowRuns)
-      .orderBy(desc(workflowRuns.startedAt));
-
-    // Fetch all node_runs for these runs in one query
-    const runIds = runs.map((r) => r.id);
-    const allNodeRuns = runIds.length > 0
-      ? await db.select().from(nodeRuns)
-      : [];
+      const runIds = runs.map((r) => r.id);
+      const allNodeRuns =
+        runIds.length > 0
+          ? await db.select().from(nodeRuns).where(inArray(nodeRuns.runId, runIds))
+          : [];
+      return { runs, allNodeRuns };
+    });
 
     // Group node_runs by runId
     const nodeRunsByRunId = new Map<string, typeof allNodeRuns>();

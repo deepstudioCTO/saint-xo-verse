@@ -17,7 +17,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const type = url.searchParams.get("type");
 
-  const db = getDb(env);
+  // getDb는 { env } 래퍼를 받는다 — env를 그대로 넘기면 DATABASE_URL을 못 찾아 매 요청 500
+  const db = getDb({ env });
   const storageCtx = { env };
 
   if (type === "character-images") {
