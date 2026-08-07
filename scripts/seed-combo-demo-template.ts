@@ -136,6 +136,9 @@ async function seed() {
   ]);
 
   const description = "Look(멤버)·Music(트랙)만 교체해 동일 그래프로 변주를 생성하는 조합 데모";
+  // W패널은 thumbnailUrl을 <img>로 렌더하고 이름 라벨이 흰색이라, 썸네일이 없으면
+  // 빈 회색 카드가 되고 이름도 안 보인다. 영상 템플릿 관례대로 멤버 입력 이미지를 쓴다.
+  const thumbnailUrl = persona.defaultInput ?? persona.poster;
 
   const [existing] = await db
     .select()
@@ -146,13 +149,13 @@ async function seed() {
   if (existing) {
     await db
       .update(workflowTemplates)
-      .set({ nodes, edges, description, category: "video", isPublished: true })
+      .set({ nodes, edges, description, thumbnailUrl, category: "video", isPublished: true })
       .where(eq(workflowTemplates.id, existing.id));
     console.log(`Updated template: ${NAME} (id: ${existing.id})`);
   } else {
     const [t] = await db
       .insert(workflowTemplates)
-      .values({ name: NAME, category: "video", description, nodes, edges, isPublished: true })
+      .values({ name: NAME, category: "video", description, thumbnailUrl, nodes, edges, isPublished: true })
       .returning();
     console.log(`Created template: ${t.name} (id: ${t.id})`);
   }
