@@ -11,3 +11,6 @@ vault/
 
 # wrangler generated types
 worker-configuration.d.ts
+
+# Ableton 분석 캐시 (음원 옆에 자동 생성)
+*.asd

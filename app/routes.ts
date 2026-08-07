@@ -32,5 +32,6 @@ export default [
   route("api/runs-data", "routes/api.runs-data.tsx"),
   route("api/soul-styles", "routes/api.soul-styles.tsx"),
   route("api/style-presets", "routes/api.style-presets.tsx"),
+  route("api/personas", "routes/api.personas.tsx"),
   route("editor", "routes/editor.tsx"),
 ] satisfies RouteConfig;

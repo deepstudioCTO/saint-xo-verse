@@ -9,7 +9,7 @@ import type {
 /**
  * nodeId의 upstream을 BFS로 훑어 실행 입력을 해소한다.
  *
- * - SourceNode.media(image) 와 완료된 generate/upscale 산출 이미지 → images[]
+ * - SourceNode/LookNode.media(image) 와 완료된 generate/upscale 산출 이미지 → images[]
  * - SourceNode.media(video) → sourceVideo (모션 레퍼런스, 가장 가까운 1개)
  * - 완료된 생성/업스케일 산출 비디오 → producedVideo (가장 가까운 1개)
  *
@@ -61,7 +61,9 @@ export function resolveUpstreamInputs(
       const node = nodeById.get(id);
       if (node) {
         const type = node.type;
-        if (type === "source") {
+        // look = 페르소나 피커형 소스. 해소된 레퍼런스 이미지가 node.data.media에 있어
+        // source와 동일하게 취급한다 (서버는 그래프 스냅샷만 보므로 DB 조회 없음).
+        if (type === "source" || type === "look") {
           const media = node.data?.media as MediaRef | null | undefined;
           const pos = node.position ?? { x: 0, y: 0 };
           if (media?.type === "image") {

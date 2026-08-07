@@ -14,6 +14,12 @@ const vid = (id: string, url: string, pos = { x: 0, y: 0 }): GraphNodeLike => ({
   position: pos,
   data: { media: { type: "video", url, name: id } },
 });
+const look = (id: string, url: string, pos = { x: 0, y: 0 }): GraphNodeLike => ({
+  id,
+  type: "look",
+  position: pos,
+  data: { media: { type: "image", url, name: id }, lookId: "00_01", characterId: id },
+});
 const gen = (id: string, type: string, pos = { x: 0, y: 0 }): GraphNodeLike => ({
   id,
   type,
@@ -93,5 +99,34 @@ describe("resolveUpstreamInputs", () => {
     const r = resolveUpstreamInputs(nodes, [], "g");
     expect(r.images).toEqual([]);
     expect(r.image).toBeNull();
+  });
+
+  it("look 노드의 레퍼런스 이미지를 source와 동일하게 수집", () => {
+    const nodes = [look("l", "u://rumi.png"), gen("g", "generate-image", { x: 300, y: 0 })];
+    const edges = [e("l", "g")];
+    const r = resolveUpstreamInputs(nodes, edges, "g");
+    expect(r.images).toEqual(["u://rumi.png"]);
+    expect(r.image).toBe("u://rumi.png");
+  });
+
+  it("멤버 미선택 look(media=null)은 입력에 포함되지 않음", () => {
+    const nodes: GraphNodeLike[] = [
+      { id: "l", type: "look", position: { x: 0, y: 0 }, data: { media: null } },
+      gen("g", "generate-image", { x: 300, y: 0 }),
+    ];
+    const r = resolveUpstreamInputs(nodes, [e("l", "g")], "g");
+    expect(r.images).toEqual([]);
+    expect(r.image).toBeNull();
+  });
+
+  it("코스프레: look(멤버) + source(캐릭터) 혼합도 position(y) 순서 유지", () => {
+    const nodes = [
+      look("member", "u://member.png", { x: 0, y: 80 }),
+      img("character", "u://cat.png", { x: 0, y: 320 }),
+      gen("g", "generate-image", { x: 400, y: 200 }),
+    ];
+    const edges = [e("member", "g"), e("character", "g")];
+    const r = resolveUpstreamInputs(nodes, edges, "g");
+    expect(r.images).toEqual(["u://member.png", "u://cat.png"]);
   });
 });

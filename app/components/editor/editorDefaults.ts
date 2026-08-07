@@ -1,5 +1,6 @@
 import type { Node, Edge, NodeTypes } from "@xyflow/react";
 import { SourceNode } from "./nodes/SourceNode";
+import { LookNode } from "./nodes/LookNode";
 import { SubtitleNode } from "./nodes/SubtitleNode";
 import { PreviewNode } from "./nodes/PreviewNode";
 import { GenerateNode } from "./nodes/GenerateNode";
@@ -10,6 +11,7 @@ import type { SourceNodeData, SubtitleNodeData, PreviewNodeData } from "./editor
 // Module-scope nodeTypes to avoid remounting on every render
 export const nodeTypes: NodeTypes = {
   source: SourceNode,
+  look: LookNode,
   subtitle: SubtitleNode,
   preview: PreviewNode,
   generate: GenerateNode,
@@ -32,6 +34,7 @@ export interface PaletteItem {
 
 export const PALETTE: PaletteItem[] = [
   { type: "source", label: "Source", makeData: () => ({ label: "Source", media: null }) },
+  { type: "look", label: "룩/멤버", makeData: () => ({ label: "Look", lookId: null, characterId: null, media: null }) },
   { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", model: "soul-reference", prompt: "", aspectRatio: "2:3", resolution: "1080p", styleStrength: 0.8, batchSize: 1, enhancePrompt: true }) },
   { type: "generate", label: "영상 생성", makeData: () => ({ label: "Video Gen", generateType: "generate" }) },
   { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "topaz", resolution: "2K" }) },

@@ -11,6 +11,22 @@ export interface SourceNodeData {
   } | null;
 }
 
+/**
+ * Look 노드 — 페르소나(멤버)를 골라 레퍼런스 이미지를 하류로 내보내는 소스형 노드.
+ *
+ * media를 SourceNode와 같은 형태로 두는 이유: 서버 GenerationPipeline은 그래프 스냅샷만
+ * 보고 DB 페르소나를 조회하지 않는다. 해소된 URL이 node.data에 있어야 하고, 그러면
+ * resolveUpstreamInputs가 source와 동일한 분기로 처리할 수 있다.
+ * (스타일 파라미터는 주입하지 않는다 — 프리셋은 GenerateNode의 PresetBar 담당)
+ */
+export interface LookNodeData {
+  [key: string]: unknown;
+  label: string;
+  lookId: string | null;
+  characterId: string | null;
+  media: { type: "image"; url: string; name: string } | null;
+}
+
 export interface SubtitleEntry {
   id: string;
   start: string;
