@@ -192,6 +192,8 @@ export default [
 | AutoSave URL 정리 | 첫 저장 성공 후 `replaceState("/editor")` | URL params는 초기 진입 힌트일 뿐, 저장 후엔 DB가 진실의 원천. 새로고침 시 savedProject에서 복원 |
 | AutoSave 초기화 우선순위 | `entryData.graph > savedProject > empty` (loader가 `EditorEntryData`로 해석 완료) | component는 JSON parse 불필요, `mode`로 분기 |
 | 템플릿 수정 모드 | `loadFromTemplate`이 `templateMeta(name,category)` 포함 반환 → `SaveAsSkillDialog`가 프리필 + "Update Skill" 타이틀 | 기존 템플릿 수정 시 이름/카테고리 재입력 불필요 |
+| Look(룩/멤버) 노드 | 페르소나 피커형 **비실행 소스 노드**. `media`를 SourceNode와 동일 형태로 저장 → `resolveUpstreamInputs`가 `source \|\| look` 한 분기로 처리(파이프라인 무변경). 카탈로그는 `/api/personas`(레퍼런스=`defaultInput ?? poster`, looks는 **lookbookId→displayOrder** 정렬 — displayOrder 단독은 00_01,01_01,00_02…로 섞여 그룹이 쪼개짐) + `usePersonaCatalog`(모듈스토어). **스타일 파라미터는 주입하지 않음** | 조합 UX의 "멤버 교체" 지점. 서버 Workflow는 그래프 스냅샷만 보고 DB를 조회하지 않으므로 해소된 URL이 node.data에 있어야 함. cc24687의 서버 주입 방식은 e6721aa에서 폐기 — 프리셋은 PresetBar 담당 |
+| 노드 세로 크기 함정 | Look 노드는 포스터(1:2)를 200px 폭으로 그려 **세로 ~490px**. 템플릿 시드에서 아래 노드는 y+600 이상 확보 | 짧은 노드 기준(y+400)으로 배치하면 겹침 |
 
 ### 구성
 - Lookbook 00 "Showcase": 4 looks
@@ -225,6 +227,7 @@ export default [
 | 폴링 상한 | `MAX_POLLS=220` × 6s = 22분. real-esrgan 영상 업스케일이 실측 ~11.6분으로 매우 느림 | Workflows `step.sleep`은 비청구·최대 365일이라 여유롭게. 초과 시 node/run failed 기록 |
 | 입력 해소(체이닝) | `resolveUpstreamInputs(nodes,edges,nodeId,outputs)` 순수함수 — upstream 완료 산출물+SourceNode.media를 노드 입력으로. 서버 Workflow·클라 노드 공유(`app/lib/workflow`) | 기존 수제 BFS 2벌(Preview/Generate) 통합. 코스프레 이미지 순서=position(y) |
 | 클라이언트 | `WorkflowRunProvider`+`useWorkflowRun`(`GET ?runId=` 6초 폴링), 노드는 presentational(GenerateNode/UpscaleNode self-execute 없음). **run 상태를 node.data에 쓰지 않음** | AutoSave가 일시적 실행상태를 scratch에 오염 저장하는 것 방지 |
+| Run 시 templateId 전송 | `start(nodes, edges, templateId?)` → POST body에 포함. `EditorCanvasInner`의 templateId(entryData 유래)를 `RunControls`가 전달 | 미전송 시 `workflow_runs.template_id`가 전부 null → **템플릿 재사용률 집계 불가**. 소급 복구 안 되므로 지표는 배선 시점부터 유효 |
 | DB 커넥션 | 장시간 Workflow step·고빈도 폴링은 **`withDb`**(`db.server.ts`)로 커넥션 자동 정리 필수. `getDb`는 pool을 안 닫아 Supabase 세션풀(15) 소진(EMAXCONNSESSION) | `getDb`는 짧은 단발 요청에만. Workflow/폴링은 반드시 `withDb` |
 | Replicate 모델 버전 | `app/lib/workflow/providers/replicate.ts`에 중앙화. 버전은 stale 시 422 → `GET /v1/models/{owner}/{name}` latest_version으로 갱신 | 버전 해시가 삭제되면 "version does not exist" 422 |
 | 이미지 생성 파라미터(정규 스펙) | node.data → `ImageGenerationSpec`(`spec.ts` `nodeToImageSpec`, 순수) → provider 어댑터. nano-banana: `foldStyleIntoPrompt`로 stylePreset/styleStrength fold·seed/batchSize/enhancePrompt drop. Soul: `soul.ts` `buildSoulBody`가 stylePreset→style_id·styleStrength→style_strength·seed/batchSize/enhancePrompt 네이티브 | node.data↔API body 디커플 |

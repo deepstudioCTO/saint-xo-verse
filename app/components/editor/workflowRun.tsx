@@ -17,8 +17,11 @@ export interface NodeRunState {
 }
 
 interface WorkflowRunValue {
-  /** 그래프 전체 실행 시작 */
-  start: (nodes: Node[], edges: Edge[]) => void;
+  /**
+   * 그래프 전체 실행 시작.
+   * templateId를 넘기면 workflow_run에 출처가 기록된다 — 템플릿 재사용률 집계의 유일한 소스.
+   */
+  start: (nodes: Node[], edges: Edge[], templateId?: string) => void;
   isRunning: boolean;
   runStatus: "idle" | "pending" | "running" | "completed" | "failed";
   /** nodeId → 실행 상태 */
@@ -47,7 +50,7 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const start = useCallback(
-    async (nodes: Node[], edges: Edge[]) => {
+    async (nodes: Node[], edges: Edge[], templateId?: string) => {
       setError(null);
       setNodeStates({});
       setRunStatus("pending");
@@ -61,7 +64,7 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
         const res = await fetch("/api/workflow-execute", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ graph }),
+          body: JSON.stringify(templateId ? { graph, templateId } : { graph }),
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));

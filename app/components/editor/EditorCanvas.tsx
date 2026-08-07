@@ -41,7 +41,15 @@ function NodePalette({ onAdd }: { onAdd: (item: (typeof PALETTE)[number]) => voi
 
 // ── Run controls ─────────────────────────────────────────────
 
-function RunControls({ nodes, edges }: { nodes: Node[]; edges: import("@xyflow/react").Edge[] }) {
+function RunControls({
+  nodes,
+  edges,
+  templateId,
+}: {
+  nodes: Node[];
+  edges: import("@xyflow/react").Edge[];
+  templateId?: string;
+}) {
   const { start, isRunning, runStatus, error } = useWorkflowRun();
   return (
     <div className="flex items-center gap-2">
@@ -52,7 +60,7 @@ function RunControls({ nodes, edges }: { nodes: Node[]; edges: import("@xyflow/r
         </span>
       )}
       <button
-        onClick={() => start(nodes, edges)}
+        onClick={() => start(nodes, edges, templateId)}
         disabled={isRunning}
         className={`px-4 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-colors cursor-pointer ${
           isRunning
@@ -189,7 +197,7 @@ function EditorCanvasInner({ entryData }: EditorCanvasProps) {
         </Panel>
         <Panel position="top-right">
           <div className="flex items-center gap-3">
-            <RunControls nodes={nodes} edges={edges} />
+            <RunControls nodes={nodes} edges={edges} templateId={templateId} />
             <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
           </div>
         </Panel>
