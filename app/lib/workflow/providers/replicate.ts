@@ -20,8 +20,13 @@ export const REPLICATE_MODEL_VERSIONS = {
   image: "0785fb14f5aaa30eddf06fd49b6cbdaac4541b8854eb314211666e23a29087e3",
   /** openai/gpt-image-2 (이미지 생성) — 다중 레퍼런스 + 지시 준수 강함. OpenAI 키 불필요(Replicate 프록시) */
   "gpt-image-2": "225c978a7f938acc350564c4548ddc2476bfb33364bec6b5422227f55ce56bd3",
-  /** kling motion-control (영상 생성) */
-  video: "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896",
+  /**
+   * kwaivgi/kling-v3-motion-control (영상 생성).
+   * v2.6 대비 "character identity 보존 개선 + 부드러운 모션 전이"가 공식 개선점.
+   * 입력 스키마는 v2.6과 동일(image/video/prompt/character_orientation/mode/keep_original_sound)
+   * — 버전 해시만 바꾸면 되고 buildVideoInput은 무변경. v3에서 mode:"pro"=1080p.
+   */
+  video: "15430b300f8c044e8f9e3567fd6daadf6d62e9bb0cee23fdb7969d3b26542f40",
   /** lucataco/real-esrgan-video (latest 버전 — 기존 42e594…는 stale로 422). ⚠️ 매우 느림(~11분/영상) */
   "real-esrgan": "3e56ce4b57863bd03048b42bc09bdd4db20d427cca5fde9d8ae4dc60e1bb4775",
   /** topazlabs/video-upscale — 프리미엄 품질, ~40초 (default) */
