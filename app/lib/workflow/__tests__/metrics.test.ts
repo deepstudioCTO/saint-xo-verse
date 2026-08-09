@@ -114,8 +114,34 @@ describe("summarizeReliability", () => {
     ];
     const rel = summarizeReliability([], nodes);
     expect(rel.nodeTotal).toBe(4);
+    expect(rel.nodeAttempted).toBe(4);
     expect(rel.nodeFailed).toBe(1);
     expect(rel.nodeFailureRate).toBe(25);
+  });
+
+  it("실행 예정(pending) 행은 실패율 분모에서 제외 — 사전 생성이 지표를 희석하지 않는다", () => {
+    const nodes = [
+      node("a", "generate-image", "completed"),
+      node("a", "generate", "failed"),
+      node("a", "upscale", "pending"), // run 시작 시 미리 만든 행
+    ];
+    const rel = summarizeReliability([], nodes);
+    expect(rel.nodeTotal).toBe(3);
+    expect(rel.nodeAttempted).toBe(2);
+    expect(rel.nodeFailureRate).toBe(50); // 원시 행 수(3) 기준이면 33%로 희석된다
+  });
+
+  it("미실행(skipped)은 실패로 세지 않고 분모에서도 뺀다", () => {
+    const nodes = [
+      node("a", "generate-image", "failed"),
+      node("a", "generate", "skipped"),
+      node("a", "upscale", "skipped"),
+    ];
+    const rel = summarizeReliability([], nodes);
+    expect(rel.nodeSkipped).toBe(2);
+    expect(rel.nodeFailed).toBe(1);
+    expect(rel.nodeAttempted).toBe(1);
+    expect(rel.nodeFailureRate).toBe(100);
   });
 
   it("채택률은 항상 null (기록 컬럼 없음)", () => {

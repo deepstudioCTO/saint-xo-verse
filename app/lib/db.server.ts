@@ -26,6 +26,10 @@ export function getDbClient(context: { env: Record<string, string> }) {
   return { db: drizzle(client), client };
 }
 
+export type WorkflowDb = ReturnType<typeof drizzle>;
+/** withDb가 넘기는 db, 또는 db.transaction의 tx — 저장소 함수는 둘 다 받는다 */
+export type WorkflowDbOrTx = WorkflowDb | Parameters<Parameters<WorkflowDb["transaction"]>[0]>[0];
+
 /** DB 작업을 커넥션 자동 정리와 함께 실행 */
 export async function withDb<T>(
   context: { env: Record<string, string> },

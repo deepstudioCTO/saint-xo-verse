@@ -8,10 +8,11 @@ import {
   useState,
 } from "react";
 import type { Node, Edge } from "@xyflow/react";
-import type { OutputMap, NodeOutput } from "~/lib/workflow/types";
+import type { OutputMap, NodeOutput, NodeRunStatus } from "~/lib/workflow/types";
 
 export interface NodeRunState {
-  status: "pending" | "processing" | "completed" | "failed";
+  /** 상태 어휘는 workflow/types.ts 단일 소스 — 여기서 따로 선언하지 않는다 */
+  status: NodeRunStatus;
   output: NodeOutput | null;
   error: string | null;
 }
@@ -105,7 +106,7 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
         const next: Record<string, NodeRunState> = {};
         for (const nr of data.nodeRuns) {
           next[nr.nodeId] = {
-            status: (nr.status as NodeRunState["status"]) || "pending",
+            status: (nr.status as NodeRunStatus) || "pending",
             output: nr.outputs,
             error: nr.error,
           };

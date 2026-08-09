@@ -12,6 +12,8 @@
  * 레거시 generations 체계는 제거됐다 — 집계는 workflow_runs/node_runs 단일 소스.
  */
 
+import { isAttemptedStatus } from "./types";
+
 export interface RunRow {
   id: string;
   status: string;
@@ -103,7 +105,15 @@ export interface ReliabilitySummary {
   unfinished: number;
   /** completed / (completed + failed). 미결 run은 분모에서 제외 */
   successRate: number | null;
+  /** node_runs 원시 행 수 — 실행 예정(pending)·미실행(skipped) 포함 */
   nodeTotal: number;
+  /**
+   * 실행이 실제로 시도된 노드 수 = 노드 실패율의 분모.
+   * run 시작 시 노드 행을 미리 만들므로, 원시 행 수를 분모로 쓰면 실패율이 희석된다.
+   */
+  nodeAttempted: number;
+  /** upstream 실패로 끝내 실행되지 않은 노드 — 실패로 세지 않는다(시도된 적이 없다) */
+  nodeSkipped: number;
   nodeFailed: number;
   nodeFailureRate: number | null;
   /**
@@ -125,6 +135,8 @@ export function summarizeReliability(runs: RunRow[], nodeRuns: NodeRunRow[]): Re
   const decided = completed + failed;
 
   const nodeFailed = nodeRuns.filter((n) => n.status === "failed").length;
+  const nodeSkipped = nodeRuns.filter((n) => n.status === "skipped").length;
+  const nodeAttempted = nodeRuns.filter((n) => isAttemptedStatus(n.status)).length;
 
   return {
     total: runs.length,
@@ -133,8 +145,10 @@ export function summarizeReliability(runs: RunRow[], nodeRuns: NodeRunRow[]): Re
     unfinished,
     successRate: decided > 0 ? (completed / decided) * 100 : null,
     nodeTotal: nodeRuns.length,
+    nodeAttempted,
+    nodeSkipped,
     nodeFailed,
-    nodeFailureRate: nodeRuns.length > 0 ? (nodeFailed / nodeRuns.length) * 100 : null,
+    nodeFailureRate: nodeAttempted > 0 ? (nodeFailed / nodeAttempted) * 100 : null,
     adoptionRate: null,
   };
 }
@@ -309,8 +323,9 @@ export function renderMarkdown(r: MetricsReport): string {
     `| 완료 / 실패 | ${rel.completed} / ${rel.failed} |`,
     `| 미결(진행중·대기) | ${rel.unfinished}건 |`,
     `| run 성공률 | ${fmt(rel.successRate)}% |`,
-    `| 노드 실행 | ${rel.nodeTotal}건 (실패 ${rel.nodeFailed}) |`,
+    `| 노드 실행 시도 | ${rel.nodeAttempted}건 (실패 ${rel.nodeFailed}) |`,
     `| 노드 실패율 | ${fmt(rel.nodeFailureRate)}% |`,
+    `| 제외: 미실행(upstream 실패)·실행 예정 | ${rel.nodeSkipped} / ${rel.nodeTotal - rel.nodeAttempted - rel.nodeSkipped}건 |`,
     "",
     "> 생성물 채택률: **미측정** — 채택 여부를 기록하는 컬럼이 없습니다. 보고서에 쓰려면 채택 플래그를 먼저 도입해야 합니다.",
     "",

@@ -50,14 +50,8 @@ export interface GenerateNodeData {
   label: string;
   /** "generate" for video, "generate-image" for image */
   generateType: "generate" | "generate-image";
-  /** Active workflow run ID (set after triggering generation) */
-  runId?: string;
-  /** Current generation status */
-  status?: "idle" | "pending" | "processing" | "completed" | "failed";
-  /** Output media after completion */
-  output?: { url: string; type: "video" | "image" } | null;
-  /** Error message on failure */
-  error?: string | null;
+  // 실행 상태(status/output/error/runId)는 node.data에 두지 않는다 —
+  // AutoSave가 일시적 실행상태를 scratch에 오염 저장한다. 표시는 useNodeRun 경유.
   /** Prompt for image generation */
   prompt?: string;
   /** 이미지 모델 id (imageModels 레지스트리 키). 없으면 nano-banana(back-compat) */
@@ -85,9 +79,7 @@ export interface UpscaleNodeData {
   model: "topaz" | "seedvr2" | "real-esrgan";
   /** 목표 해상도 */
   resolution: "2K" | "4K";
-  status?: "idle" | "pending" | "processing" | "completed" | "failed";
-  output?: { url: string; type: "video" | "image" } | null;
-  error?: string | null;
+  // 실행 상태는 node.data에 두지 않는다 (GenerateNodeData 주석 참조)
 }
 
 export interface MusicNodeData {

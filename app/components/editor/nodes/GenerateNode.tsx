@@ -6,6 +6,7 @@ import { PresetBar } from "../PresetBar";
 import { useNodeRun } from "../workflowRun";
 import { useResolvedInputs } from "../useResolvedInputs";
 import { IMAGE_MODELS, resolveImageModel, type ImageModelDef, type ImageModelId } from "~/lib/workflow/imageModels";
+import { isRunningStatus } from "~/lib/workflow/types";
 
 type GenerateNodeType = Node<GenerateNodeData, "generate">;
 
@@ -224,7 +225,7 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
   );
 
   const status = run?.status ?? "idle";
-  const isRunning = status === "pending" || status === "processing";
+  const isRunning = isRunningStatus(status);
   const completed = status === "completed" && run?.output;
 
   // 레퍼런스 이미지 개수 검증 (Soul는 1장만)
@@ -280,6 +281,14 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
                 <line x1="9" y1="9" x2="15" y2="15" />
               </svg>
               <span className="text-[9px] text-red-400/80 text-center truncate w-full">{run?.error || "Failed"}</span>
+            </div>
+          ) : status === "skipped" ? (
+            <div className="flex flex-col items-center gap-1.5 text-white/25">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              <span className="text-[9px]">미실행</span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1.5 text-white/20">

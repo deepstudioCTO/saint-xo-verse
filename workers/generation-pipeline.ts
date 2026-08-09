@@ -1,16 +1,24 @@
 import { WorkflowEntrypoint, type WorkflowEvent, type WorkflowStep } from "cloudflare:workers";
-import { eq, and } from "drizzle-orm";
-import { withDb, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { eq } from "drizzle-orm";
+import { withDb, workflowRuns } from "~/lib/db.server";
+import {
+  completeNodeRun,
+  failNodeRun,
+  failNodeRunAt,
+  findNodeRun,
+  recordSubmission,
+  skipUnreachedNodeRuns,
+} from "~/lib/nodeRunStore.server";
 import {
   uploadGeneratedImage,
   uploadGeneratedVideo,
   uploadUpscaledVideo,
 } from "~/lib/supabase.server";
-import { topoSort } from "~/lib/workflow/topoSort";
+import { planExecutableNodes } from "~/lib/workflow/planNodeRuns";
 import { resolveUpstreamInputs } from "~/lib/workflow/resolveUpstreamInputs";
 import { outputMediaType } from "~/lib/workflow/providers/replicate";
 import { selectExecution } from "~/lib/workflow/providers/select";
-import { isExecutableType, type OutputMap, type GraphNodeLike, type GraphEdgeLike } from "~/lib/workflow/types";
+import type { OutputMap, GraphNodeLike, GraphEdgeLike } from "~/lib/workflow/types";
 
 export interface GenerationPipelineParams {
   runId: string;
@@ -23,12 +31,13 @@ const MAX_POLLS = 220; // 6s * 220 = 22분 상한. real-esrgan 영상 업스케�
 /**
  * 노드 그래프를 durable하게 실행하는 서버 오케스트레이터.
  *
- * - topoSort로 실행 순서 결정, 실행가능 노드(generate/generate-image/upscale)만 처리
+ * - planExecutableNodes로 실행 순서 결정 — run 생성 시 node_runs를 미리 만드는 쪽과 같은 함수를 써야
+ *   두 집합이 어긋나지 않는다(어긋나면 run 상태 파생이 조용히 틀린다)
  * - 각 노드: resolveUpstreamInputs로 입력 해소 → Replicate 제출 → step.sleep 폴링 → Storage 업로드
  * - 산출물은 outputs 맵으로 downstream 노드에 전달(체이닝)
  * - 모든 네트워크 I/O는 step.do 안(재수화 시 재실행 방지). 반환값은 URL/id만(≤1MiB)
  * - submit은 check-then-create로 정확히-한-번 제출(중복 과금 방지)
- * - 모든 DB 접근은 withDb로 커넥션 자동 정리(EMAXCONNSESSION 방지)
+ * - 모든 DB 접근은 withDb로 커넥션 자동 정리(EMAXCONNSESSION 방지), SQL은 nodeRunStore에 위임
  */
 export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipelineParams> {
   async run(event: Readonly<WorkflowEvent<GenerationPipelineParams>>, step: WorkflowStep) {
@@ -37,7 +46,7 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
 
     const nodes = graph.nodes;
     const edges = graph.edges;
-    const order = topoSort(nodes, edges).filter((n) => isExecutableType(n.type));
+    const order = planExecutableNodes(nodes, edges);
 
     const outputs: OutputMap = {};
 
@@ -59,14 +68,12 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
         if (!sel.ok) {
           await step.do(`fail:${nodeId}`, () =>
             withDb({ env }, async (db) => {
-              await db.insert(nodeRuns).values({
+              await failNodeRunAt(db, {
                 runId,
                 nodeId,
                 nodeType,
                 inputs: JSON.stringify(resolved),
-                status: "failed",
                 error: sel.reason,
-                completedAt: new Date(),
               });
               return { ok: true };
             })
@@ -77,30 +84,23 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
         // 제출 (check-then-create → 정확히 한 번)
         const submit = await step.do(`submit:${nodeId}`, () =>
           withDb({ env }, async (db) => {
-            const existing = await db
-              .select()
-              .from(nodeRuns)
-              .where(and(eq(nodeRuns.runId, runId), eq(nodeRuns.nodeId, nodeId)))
-              .limit(1);
-            if (existing[0]?.externalId) {
-              return { predId: existing[0].externalId, nodeRunId: existing[0].id };
+            const existing = await findNodeRun(db, runId, nodeId);
+            if (existing?.externalId) {
+              return { predId: existing.externalId, nodeRunId: existing.id };
             }
 
             const { externalId } = await sel.provider.submit(sel.request, env);
 
-            const [row] = await db
-              .insert(nodeRuns)
-              .values({
-                runId,
-                nodeId,
-                nodeType,
-                inputs: JSON.stringify(resolved),
-                status: "processing",
-                externalId,
-                externalProvider: sel.provider.id,
-              })
-              .returning();
-            return { predId: externalId, nodeRunId: row.id };
+            const nodeRunId = await recordSubmission(db, {
+              existingId: existing?.id ?? null,
+              runId,
+              nodeId,
+              nodeType,
+              inputs: JSON.stringify(resolved),
+              externalId,
+              providerId: sel.provider.id,
+            });
+            return { predId: externalId, nodeRunId };
           })
         );
 
@@ -119,10 +119,7 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
           if (poll.status === "failed") {
             await step.do(`persist-fail:${nodeId}`, () =>
               withDb({ env }, async (db) => {
-                await db
-                  .update(nodeRuns)
-                  .set({ status: "failed", error: poll.error, completedAt: new Date() })
-                  .where(eq(nodeRuns.id, submit.nodeRunId));
+                await failNodeRun(db, submit.nodeRunId, poll.error ?? "generation failed");
                 return { ok: true };
               })
             );
@@ -133,10 +130,7 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
         if (!outputUrl) {
           await step.do(`persist-timeout:${nodeId}`, () =>
             withDb({ env }, async (db) => {
-              await db
-                .update(nodeRuns)
-                .set({ status: "failed", error: "polling timeout", completedAt: new Date() })
-                .where(eq(nodeRuns.id, submit.nodeRunId));
+              await failNodeRun(db, submit.nodeRunId, "polling timeout");
               return { ok: true };
             })
           );
@@ -162,10 +156,7 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
           }
           const out = { url: publicUrl, type: mediaType };
           await withDb({ env }, async (db) => {
-            await db
-              .update(nodeRuns)
-              .set({ status: "completed", outputs: JSON.stringify(out), completedAt: new Date() })
-              .where(eq(nodeRuns.id, submit.nodeRunId));
+            await completeNodeRun(db, submit.nodeRunId, out);
           });
           return out;
         });
@@ -189,6 +180,9 @@ export class GenerationPipeline extends WorkflowEntrypoint<Env, GenerationPipeli
     } catch (err) {
       await step.do("mark-failed", () =>
         withDb({ env }, async (db) => {
+          // 끝내 실행되지 못한 노드를 skipped로 닫는다 — pending으로 두면 에디터에
+          // "Queued..." 스피너가 영원히 남고, failed로 뭉치면 노드 실패율이 부풀어 지표가 틀린다
+          await skipUnreachedNodeRuns(db, runId);
           await db
             .update(workflowRuns)
             .set({ status: "failed", error: String(err).slice(0, 500), completedAt: new Date() })

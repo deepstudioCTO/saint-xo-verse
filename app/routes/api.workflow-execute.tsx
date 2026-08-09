@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.workflow-execute";
 import { withDb, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
+import { planRunNodes } from "~/lib/nodeRunStore.server";
 import { requireAuthApi } from "~/lib/auth.server";
-import { deriveRunStatus } from "~/lib/workflow/deriveRunStatus";
+import { planExecutableNodes } from "~/lib/workflow/planNodeRuns";
+import { resolveRunStatus } from "~/lib/workflow/resolveRunStatus";
 import { parseRunInputs } from "~/lib/workflow/runInputs";
 import type { GraphNodeLike, GraphEdgeLike } from "~/lib/workflow/types";
 
@@ -49,18 +51,24 @@ export async function action({ request, context }: Route.ActionArgs) {
         template = t || null;
       }
 
-      // workflow_run 생성 (템플릿 스냅샷 = 실행 시점 그래프)
-      const [created] = await db
-        .insert(workflowRuns)
-        .values({
-          templateId: template?.id,
-          templateVersion: template?.currentVersion,
-          templateSnapshot: JSON.stringify(graph),
-          inputs: JSON.stringify(parseRunInputs(body.inputs)),
-          status: "pending",
-        })
-        .returning();
-      return created;
+      // workflow_run + 실행 대상 node_runs를 한 트랜잭션으로 생성.
+      // 노드 행을 미리 만들어 두어야 폴링 쪽이 "아직 제출 안 된 노드"를 볼 수 있다
+      // (행이 제출 시점에 생기면 일부만 완료된 순간을 run 완료로 오판한다).
+      const planned = planExecutableNodes(graph.nodes, graph.edges);
+      return db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(workflowRuns)
+          .values({
+            templateId: template?.id,
+            templateVersion: template?.currentVersion,
+            templateSnapshot: JSON.stringify(graph),
+            inputs: JSON.stringify(parseRunInputs(body.inputs)),
+            status: "pending",
+          })
+          .returning();
+        await planRunNodes(tx, created.id, planned);
+        return created;
+      });
     });
 
     // Workflow 인스턴스 시작 (durable — 이후는 서버가 진행)
@@ -105,8 +113,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
     const { run, nodes } = result;
 
-    // 전체 상태: 노드가 있으면 파생, 없으면 run.status
-    const status = nodes.length > 0 ? deriveRunStatus(nodes) : run.status;
+    // 종료 판정 권한은 run.status(파이프라인 소유)에만 있다 — 파생은 진행 표시용
+    const status = resolveRunStatus(run.status, nodes);
 
     return Response.json(
       {

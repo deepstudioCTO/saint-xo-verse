@@ -4,6 +4,7 @@ import type { UpscaleNodeData } from "../editorTypes";
 import { MediaDisplay } from "./MediaDisplay";
 import { useNodeRun } from "../workflowRun";
 import { useResolvedInputs } from "../useResolvedInputs";
+import { isRunningStatus } from "~/lib/workflow/types";
 
 type UpscaleNodeType = Node<UpscaleNodeData, "upscale">;
 
@@ -29,7 +30,7 @@ export function UpscaleNode({ id, data }: NodeProps<UpscaleNodeType>) {
   );
 
   const status = run?.status ?? "idle";
-  const isRunning = status === "pending" || status === "processing";
+  const isRunning = isRunningStatus(status);
   const completed = status === "completed" && run?.output;
   const hasVideo = !!(resolved.producedVideo || resolved.sourceVideo);
 
@@ -57,7 +58,9 @@ export function UpscaleNode({ id, data }: NodeProps<UpscaleNodeType>) {
           {isRunning ? (
             <div className="flex flex-col items-center gap-2">
               <div className="w-5 h-5 border-2 border-white/20 border-t-blue-400 rounded-full animate-spin" />
-              <span className="text-[10px] text-white/50">Upscaling...</span>
+              <span className="text-[10px] text-white/50">
+                {status === "pending" ? "Queued..." : "Upscaling..."}
+              </span>
             </div>
           ) : status === "failed" ? (
             <div className="flex flex-col items-center gap-1.5 px-3">
@@ -67,6 +70,14 @@ export function UpscaleNode({ id, data }: NodeProps<UpscaleNodeType>) {
                 <line x1="9" y1="9" x2="15" y2="15" />
               </svg>
               <span className="text-[9px] text-red-400/80 text-center truncate w-full">{run?.error || "Failed"}</span>
+            </div>
+          ) : status === "skipped" ? (
+            <div className="flex flex-col items-center gap-1.5 text-white/25">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="8" y1="12" x2="16" y2="12" />
+              </svg>
+              <span className="text-[9px]">미실행</span>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-1.5 text-white/20">
