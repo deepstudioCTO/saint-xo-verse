@@ -159,12 +159,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     publicUrl: img.publicUrl,
   }));
 
-  // skill id → 실행용 템플릿 id (sourceSkillId 매핑). 스킬 래퍼는 W패널 목록에서 제외
+  // skill id → 실행용 템플릿 id (sourceSkillId 매핑). 스킬 래퍼는 W패널(WORKFLOWS) 목록에서 제외
   const templateIdBySkillId: Record<string, string> = {};
   for (const t of dbTemplates) {
     if (t.sourceSkillId) templateIdBySkillId[t.sourceSkillId] = t.id;
   }
-  const skillTemplates = dbTemplates
+  // WORKFLOWS = 사용자가 에디터에서 만드는 노드 그래프 템플릿 (스킬 래퍼 제외)
+  const workflows = dbTemplates
     .filter((t) => !t.sourceSkillId)
     .map((t) => ({
       id: t.id,
@@ -193,7 +194,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     storiesCount,
     skillVideos,
     skillImages,
-    skillTemplates,
+    workflows,
     templateIdBySkillId,
   }, { headers: authHeaders });
 }
@@ -210,7 +211,7 @@ export default function Home() {
     storiesCount,
     skillVideos,
     skillImages,
-    skillTemplates,
+    workflows,
     templateIdBySkillId,
   } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -678,6 +679,7 @@ export default function Home() {
             <div className="flex items-center gap-3 text-[10px] tracking-wider mt-1.5">
               <button onClick={() => setActivePanel(prev => prev === "skill-compact" || prev === "skill-expanded" ? null : "skill-compact")} disabled={!isSelecting} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity disabled:opacity-30 disabled:cursor-not-allowed"><span className="font-semibold text-black">SKILLS</span><span className="text-gray-400">{String(skillsCount).padStart(2, "0")}</span></button>
               <button onClick={() => setActivePanel(prev => prev === "gallery-compact" || prev === "gallery-expanded" ? null : "gallery-compact")} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"><span className="font-semibold text-black">LIBRARY</span><span className="text-gray-400">{String(storiesCount).padStart(2, "0")}</span></button>
+              <button onClick={() => setActivePanel(prev => prev === "workflow-expanded" ? null : "workflow-expanded")} className="flex items-center gap-2 cursor-pointer hover:opacity-70 transition-opacity"><span className="font-semibold text-black">WORKFLOWS</span><span className="text-gray-400">{String(workflows.length).padStart(2, "0")}</span></button>
             </div>
           </div>
         </div>
@@ -825,7 +827,7 @@ export default function Home() {
       <WorkflowPanel
         open={workflowExpandedOpen}
         onClose={() => setActivePanel(null)}
-        templates={skillTemplates}
+        templates={workflows}
       />
 
       <PricingPanel

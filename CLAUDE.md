@@ -176,11 +176,11 @@ export default [
 ### 핵심 설계 결정
 | 항목 | 결정 | 이유 |
 |------|------|------|
-| ReactFlowProvider | `EditorCanvas`(wrapper) → `ReactFlowProvider` → `EditorCanvasInner`. ReactFlow 형제인 SaveAsSkillDialog·MediaBrowser도 context 접근 가능 | `<ReactFlow>`는 내부 Provider를 만들지만 형제 컴포넌트는 접근 불가 → useReactFlow() throw |
+| ReactFlowProvider | `EditorCanvas`(wrapper) → `ReactFlowProvider` → `EditorCanvasInner`. ReactFlow 형제인 SaveAsWorkflowDialog·MediaBrowser도 context 접근 가능 | `<ReactFlow>`는 내부 Provider를 만들지만 형제 컴포넌트는 접근 불가 → useReactFlow() throw |
 | 에디터 진입점 (3개) | `?run=` (run snapshot), `?template=<id\|name>` (UUID→ID, 그외→name 조회), 파라미터 없음 (scratch/empty) | `?generationId=`·`?media=` 제거 → Library Edit은 `?template=demo`로 통일 |
 | Loader 분리 | `editor-loaders.server.ts`에 `loadFromRun`/`loadFromTemplate`/`loadSavedProject` 3함수, `editor.tsx` loader는 위임 ~15줄 | 인라인 5개 if/else 제거, JSON parse는 함수 내부 1회만 |
 | EditorEntryData | discriminated union (`mode: "run"\|"template"\|"scratch"\|"empty"` + `GraphData`). `WorkflowData` 삭제 | loader→component 계약이 타입 안전, JSON string 대신 parsed Node[]/Edge[] 전달 |
-| 에디터 컴포넌트 분리 | `editorDefaults.ts` (nodeTypes/상수), `AutoSave.tsx`, `SaveAsSkillDialog.tsx`, `EditorCanvas.tsx` (캔버스+툴바) | 396줄 모놀리스 → 4파일 분리 |
+| 에디터 컴포넌트 분리 | `editorDefaults.ts` (nodeTypes/상수), `AutoSave.tsx`, `SaveAsWorkflowDialog.tsx`, `EditorCanvas.tsx` (캔버스+툴바) | 396줄 모놀리스 → 4파일 분리 |
 | nodeTypes 위치 | 모듈 스코프 정의 (`editorDefaults.ts`): source, subtitle, preview, generate, generate-image | 인라인 정의 시 매 렌더마다 노드 리마운트. generate와 generate-image는 같은 `GenerateNode` 컴포넌트 |
 | 자막 입력 영역 | `className="nodrag nopan nowheel"` | React Flow 이벤트가 input 포커스/스크롤 가로채기 방지 |
 | 프리뷰 업스트림 데이터 | `useHandleConnections` + `useNodesData` | React Flow v12 권장 패턴, 엣지 연결 기반 데이터 흐름 |
@@ -191,7 +191,7 @@ export default [
 | SourceNode 래퍼 | `<div>` (not `<button>`) | MediaDisplay 내부 play `<button>`과 중첩 시 hydration mismatch → React 트리 리마운트 |
 | AutoSave URL 정리 | 첫 저장 성공 후 `replaceState("/editor")` | URL params는 초기 진입 힌트일 뿐, 저장 후엔 DB가 진실의 원천. 새로고침 시 savedProject에서 복원 |
 | AutoSave 초기화 우선순위 | `entryData.graph > savedProject > empty` (loader가 `EditorEntryData`로 해석 완료) | component는 JSON parse 불필요, `mode`로 분기 |
-| 템플릿 수정 모드 | `loadFromTemplate`이 `templateMeta(name,category)` 포함 반환 → `SaveAsSkillDialog`가 프리필 + "Update Skill" 타이틀 | 기존 템플릿 수정 시 이름/카테고리 재입력 불필요 |
+| 템플릿 수정 모드 | `loadFromTemplate`이 `templateMeta(name,category)` 포함 반환 → `SaveAsWorkflowDialog`가 프리필 + "Update Workflow" 타이틀 | 기존 템플릿 수정 시 이름/카테고리 재입력 불필요 |
 | Look(룩/멤버) 노드 | 페르소나 피커형 **비실행 소스 노드**. `media`를 SourceNode와 동일 형태로 저장 → `resolveUpstreamInputs`가 `source \|\| look` 한 분기로 처리(파이프라인 무변경). 카탈로그는 `/api/personas`(레퍼런스=`defaultInput ?? poster`, looks는 **lookbookId→displayOrder** 정렬 — displayOrder 단독은 00_01,01_01,00_02…로 섞여 그룹이 쪼개짐) + `usePersonaCatalog`(모듈스토어). **스타일 파라미터는 주입하지 않음** | 조합 UX의 "멤버 교체" 지점. 서버 Workflow는 그래프 스냅샷만 보고 DB를 조회하지 않으므로 해소된 URL이 node.data에 있어야 함. cc24687의 서버 주입 방식은 e6721aa에서 폐기 — 프리셋은 PresetBar 담당 |
 | 노드 세로 크기 함정 | Look 노드는 포스터(1:2)를 200px 폭으로 그려 **세로 ~490px**. 템플릿 시드에서 아래 노드는 y+600 이상 확보 | 짧은 노드 기준(y+400)으로 배치하면 겹침 |
 
@@ -221,7 +221,8 @@ export default [
 | templateSnapshot | 실행 시점 nodes+edges 전체 JSON | 템플릿 변경돼도 실행 기록은 자기완결적 |
 | editor_projects | 유지 (scratch 작업 공간) | Figma/ComfyUI 패턴 — 에디터는 항상 scratch에서 작동 |
 | 템플릿 CRUD | `POST/GET/DELETE /api/workflow-templates`, id 있으면 update + version++ | 단일 엔드포인트로 생성/수정/삭제/목록 |
-| Save as Skill | EditorCanvas 내 `SaveAsSkillDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
+| Save as Workflow | EditorCanvas 내 `SaveAsWorkflowDialog` + React Flow `<Panel>` 툴바 | scratch → template 복사, 기존 template 열었을 때 Update 모드 |
+| SKILLS ↔ WORKFLOWS 용어 경계 | **SKILLS = 모션영상·컨셉이미지 카탈로그**(홈 헤더 `SKILLS`, SkillPanel, `useSkillTeaching`, `buildSkillGraph`, `createSkillTemplate`, `sourceSkillId`, `resolveSkillGraph`). **WORKFLOWS = 노드 그래프 템플릿**(`workflow_templates`, `/api/workflow-templates`, 홈 헤더 `WORKFLOWS`, WorkflowPanel, 에디터 `SaveAsWorkflowDialog`, `_index.tsx`의 `workflows`). 에디터에서 저장하면 WORKFLOWS로 가지 SKILLS에 안 뜬다 | 에디터가 "Skill"이라 부르던 시절엔 표기가 동작과 정반대라 "스킬 저장했는데 스킬 패널에 없다"는 혼동 발생. 이름이 겹쳐 보여도 `buildSkillGraph`/`sourceSkillId` 계열은 전부 SKILLS 개념이므로 일괄 치환 금지 |
 | 스킬 그래프 단일 소스 | `buildSkillGraph`(순수함수, vitest — 스킬 1개→3노드 그래프) + 서버 헬퍼 `createSkillTemplate`(`skill-template.server.ts`). 마이그레이션 스크립트 2개(멱등)·업로드 라우트 자동생성·홈 즉석 폴백이 전부 이것만 호출. 빈 캐릭터 source(`media:null`)가 주입 슬롯 관례 | 그래프 모양이 4곳에 복제되는 것 방지. `injectTemplateInputs→resolveUpstreamInputs` 조합 테스트가 홈 Generate 입력 계약을 보장 |
 | 스킬↔템플릿 매핑 | `workflow_templates.sourceSkillId` = 원본 motionVideo/conceptImage id. **홈 스킬 패널은 모션/컨셉 카탈로그를 표시**(hover 재생 유지)하고 실행 시 이 매핑으로 템플릿을 찾음. null = 일반(수제/데모) 템플릿 → W패널 목록엔 sourceSkillId null만, 스킬 래퍼는 숨김. 업로드 시 템플릿 자동 생성, 스킬 삭제 시 매핑 템플릿 동반 삭제 | 사용자 개념: "스킬 = 모션영상"(템플릿은 실행용 포장). 데모 템플릿이 스킬 목록에 섞이는 것 방지. 백필: `scripts/backfill-template-skill-ids.ts` |
 | 홈 3카드 Generate | `handleProduce` = `resolveSkillGraph`(매핑 템플릿 fetch, 없으면 `buildSkillGraph` 즉석 조립 — templateId만 미기록) → `injectTemplateInputs`(페르소나 이미지·prompt 주입) → `POST /api/workflow-execute`(templateId+inputs 메타) → Library optimistic run(실제 runId) | 홈 생성도 templateId 기록 → 재사용률 지표 유효. 주입은 클라이언트(서버는 스냅샷만 봄 — Look 노드와 동일 원칙). image 스킬은 prompt 필수(`nodeToImageSpec`이 빈 prompt 거부) |
@@ -299,7 +300,7 @@ app/
 │   ├── gallery/         # Library(run 뷰): GalleryPanel(horizontal/compact/expanded), GalleryGrid, RunGridItem, RunDetailModal, GalleryModals
 │   ├── pricing/         # PricingPanel (expanded-only, Hero+Tabs+Cards+FAQ)
 │   ├── workflow/        # WorkflowPanel (워크플로우 템플릿 전용 expanded 패널)
-│   ├── editor/          # 노드 에디터 (EditorCanvas, AutoSave, SaveAsSkillDialog, editorDefaults, MediaBrowser, nodes/)
+│   ├── editor/          # 노드 에디터 (EditorCanvas, AutoSave, SaveAsWorkflowDialog, editorDefaults, MediaBrowser, nodes/)
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
 │   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등
 ├── lib/

@@ -12,7 +12,7 @@ interface HomeFloatingBarProps {
   lookbookId: string;
   activePanel: ActivePanel;
   onPanelChange: (panel: ActivePanel) => void;
-  /** 선택된 스킬(템플릿) 썸네일 — SKILLS 버튼 미리보기 */
+  /** 선택된 스킬(모션영상·컨셉이미지) 썸네일 — SKILLS 버튼 미리보기 */
   selectedSkillThumbnailUrl: string | null;
   children?: ReactNode;
 }

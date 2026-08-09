@@ -16,7 +16,7 @@ import {
 import type { SourceNodeData, EditorEntryData } from "./editorTypes";
 import { nodeTypes, defaultEdgeOptions, emptyNodes, emptyEdges, PALETTE, makeNode } from "./editorDefaults";
 import { AutoSave } from "./AutoSave";
-import { SaveAsSkillDialog } from "./SaveAsSkillDialog";
+import { SaveAsWorkflowDialog } from "./SaveAsWorkflowDialog";
 import { MediaBrowser } from "./MediaBrowser";
 import { WorkflowRunProvider, useWorkflowRun } from "./workflowRun";
 
@@ -74,14 +74,14 @@ function RunControls({
   );
 }
 
-function EditorToolbar({ onSaveAsSkill }: { onSaveAsSkill: () => void }) {
+function EditorToolbar({ onSaveAsWorkflow }: { onSaveAsWorkflow: () => void }) {
   return (
     <div className="flex gap-2">
       <button
-        onClick={onSaveAsSkill}
+        onClick={onSaveAsWorkflow}
         className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white/8 text-white/70 border border-white/10 hover:bg-white/15 hover:text-white transition-colors cursor-pointer"
       >
-        Save as Skill
+        Save as Workflow
       </button>
       <a
         href="/"
@@ -198,7 +198,7 @@ function EditorCanvasInner({ entryData }: EditorCanvasProps) {
         <Panel position="top-right">
           <div className="flex items-center gap-3">
             <RunControls nodes={nodes} edges={edges} templateId={templateId} />
-            <EditorToolbar onSaveAsSkill={() => setSaveDialogOpen(true)} />
+            <EditorToolbar onSaveAsWorkflow={() => setSaveDialogOpen(true)} />
           </div>
         </Panel>
         <AutoSave nodes={nodes} edges={edges} />
@@ -210,7 +210,7 @@ function EditorCanvasInner({ entryData }: EditorCanvasProps) {
         onSelect={handleMediaSelect}
       />
 
-      <SaveAsSkillDialog
+      <SaveAsWorkflowDialog
         open={saveDialogOpen}
         onClose={() => setSaveDialogOpen(false)}
         nodes={nodes}

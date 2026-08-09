@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useReactFlow, type Node, type Edge } from "@xyflow/react";
 import { useFetcher } from "react-router";
 
-interface SaveAsSkillDialogProps {
+interface SaveAsWorkflowDialogProps {
   open: boolean;
   onClose: () => void;
   nodes: Node[];
@@ -11,7 +11,7 @@ interface SaveAsSkillDialogProps {
   templateMeta?: { name: string; category: string | null }; // 기존 템플릿 메타데이터
 }
 
-export function SaveAsSkillDialog({ open, onClose, nodes, edges, templateId, templateMeta }: SaveAsSkillDialogProps) {
+export function SaveAsWorkflowDialog({ open, onClose, nodes, edges, templateId, templateMeta }: SaveAsWorkflowDialogProps) {
   const { getViewport } = useReactFlow();
   const fetcher = useFetcher();
   const [name, setName] = useState(templateMeta?.name ?? "");
@@ -56,7 +56,7 @@ export function SaveAsSkillDialog({ open, onClose, nodes, edges, templateId, tem
         className="bg-[#1a1a1a] border border-white/10 rounded-xl p-6 w-80 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-white text-sm font-semibold mb-4">{templateId ? "Update Skill" : "Save as Skill"}</h3>
+        <h3 className="text-white text-sm font-semibold mb-4">{templateId ? "Update Workflow" : "Save as Workflow"}</h3>
 
         <label className="block text-white/50 text-xs mb-1">Name</label>
         <input
