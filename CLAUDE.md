@@ -21,7 +21,7 @@
 
 **원칙:** 코드에서 직접 확인할 수 있는 내용은 문서화하지 않는다. 문서는 "코드만으로는 알 수 없는 것"을 담는다.
 
-**이 파일의 크기 제한: 500줄 이하 유지** (현재 ~330줄)
+**이 파일의 크기 제한: 500줄 이하 유지** (현재 ~345줄)
 - 새 내용 추가 시 기존 항목 중 코드에서 확인 가능해진 것은 삭제하여 총량 관리
 - 500줄 초과 시 `vault/specs/` 디렉토리로 분리: 큰 시스템(패널, 에디터 등)의 설계 결정 테이블을 개별 `vault/specs/{system-name}.md`로 이동하고, 이 파일에는 한 줄 인덱스만 남김
 - `specs/` 전환 시 규칙: 인덱스에 없는 spec은 존재하지 않는 것과 같음, 해당 시스템 수정 전 반드시 Read
@@ -194,6 +194,9 @@ export default [
 | 템플릿 수정 모드 | `loadFromTemplate`이 `templateMeta(name,category)` 포함 반환 → `SaveAsWorkflowDialog`가 프리필 + "Update Workflow" 타이틀 | 기존 템플릿 수정 시 이름/카테고리 재입력 불필요 |
 | Look(룩/멤버) 노드 | 페르소나 피커형 **비실행 소스 노드**. `media`를 SourceNode와 동일 형태로 저장 → `resolveUpstreamInputs`가 `source \|\| look` 한 분기로 처리(파이프라인 무변경). 카탈로그는 `/api/personas`(레퍼런스=`defaultInput ?? poster`, looks는 **lookbookId→displayOrder** 정렬 — displayOrder 단독은 00_01,01_01,00_02…로 섞여 그룹이 쪼개짐) + `usePersonaCatalog`(모듈스토어). **스타일 파라미터는 주입하지 않음** | 조합 UX의 "멤버 교체" 지점. 서버 Workflow는 그래프 스냅샷만 보고 DB를 조회하지 않으므로 해소된 URL이 node.data에 있어야 함. cc24687의 서버 주입 방식은 e6721aa에서 폐기 — 프리셋은 PresetBar 담당 |
 | 노드 세로 크기 함정 | Look 노드는 포스터(1:2)를 200px 폭으로 그려 **세로 ~490px**. 템플릿 시드에서 아래 노드는 y+600 이상 확보 | 짧은 노드 기준(y+400)으로 배치하면 겹침 |
+| frame(첫 프레임) 노드 | **완전 비실행 노드**(Music과 달리 클라에서도 아무것도 실행 안 함 — 순수 passthrough). 영상 in → 이미지 out. data는 `{label}`뿐이고 썸네일 URL은 저장하지 않는다 — `resolveFrameThumbnail`(순수, 노드 미리보기 `useFrameThumbnail`과 실행 입력이 **같은 함수** 사용)로 매번 그래프에서 해소. `resolveUpstreamInputs`에서 **탐색 경계**라 frame 너머 영상은 `sourceVideo`로 새지 않는다 | kling motion-control은 입력 이미지에서 출발해 모션을 따라가므로 이미지 생성이 모션 첫 프레임 포즈를 참조해야 초반이 안 튄다. 이 결합을 이미지 노드 안에 자동 주입으로 숨기면 그래프를 봐도 이유를 알 수 없다 → 노드·엣지로 드러냄. 경계 규칙이 없으면 같은 영상이 "포즈 참조"와 "모션 소스" 두 역할로 갈리지 않는다 |
+| 포즈 참조 순서 = rank | images 정렬은 `rank → distance → y → x → id`. frame 유래 이미지는 rank 1이라 **캔버스 배치와 무관하게 항상 마지막**. 템플릿의 y 배치는 가독성용일 뿐 | 순서를 y에만 맡기면 템플릿을 연 사람이 frame 노드를 드래그하는 순간 조용히 뒤집히고, 프롬프트가 가리키는 "the last reference image"가 다른 이미지를 뜻하게 된다. 순서 결정 주체를 캔버스 좌표 → **노드 타입**으로 옮겨 테스트로 고정. (의미 입력이 3개 이상 되면 named `targetHandle`로 이관할 것) |
+| 포즈 정합 프롬프트 | 코드는 이미지를 하나 더 흘려보내는 데까지만(자동 주입 없음). 문구는 **레퍼런스별 역할을 위치로 명시**하는 형태여야 한다: "Reference 1 = SUBJECT(얼굴·헤어·메이크업·의상), LAST reference = POSE AND FRAMING GUIDE ONLY(샷사이즈·크롭·머리각도·포즈만) + 그 인물의 얼굴·의상·모자·배경·텍스트는 가져오지 말 것". `full-body` 같은 **샷 사이즈 지시 금지** | 실측 3회 A/B: ①"identical to earlier refs + match pose" → 포즈 안 옮겨옴 ②"reproduce last ref's pose/framing" → 포즈는 옮겨오지만 **의상·모자·헤어까지 오염** ③역할 위치 명시 → 정체성은 ref1, 프레이밍은 포즈참조로 깨끗이 분리(채택). 모션 첫 프레임 10건 중 대부분이 **얼굴 클로즈업 셀피**(자막·이모지 포함)라 `full-body`는 포즈 참조와 정면충돌 |
 
 ### 구성
 - Lookbook 00 "Showcase": 4 looks
@@ -244,10 +247,12 @@ export default [
 | 이미지 생성 파라미터(정규 스펙) | node.data → `ImageGenerationSpec`(`spec.ts` `nodeToImageSpec`, 순수) → provider 어댑터. nano-banana: `foldStyleIntoPrompt`로 stylePreset/styleStrength fold·seed/batchSize/enhancePrompt drop. Soul: `soul.ts` `buildSoulBody`가 stylePreset→style_id·styleStrength→style_strength·seed/batchSize/enhancePrompt 네이티브 | node.data↔API body 디커플 |
 | 이미지 provider 추상화 | **명시적 모델 선택**(A안, ComfyUI식·자동 라우팅 아님). `imageModels.ts` `IMAGE_MODELS`(선언적 SSOT: provider·modelId·refImages·fields[]·비율/해상도)가 노드 UI·provider 선택·요청빌드 3곳 구동. `providers/select.ts` `selectExecution`이 단일 seam: **generate-image만** node.data.model→레지스트리→provider 분기, **generate/upscale은 항상 Replicate**(무회귀). `providers/provider.ts` `ImageProvider{submit,poll}`+`ProviderRequest`(DU). 상태정규화(`normalizeReplicateStatus`/`normalizeSoulStatus`)는 순수(vitest) | 전송계층이 Replicate 전용이던 것을 2-provider로. 파이프라인 durable 골격(step.do/sleep/withDb/externalId재사용)은 무변경, submit/poll만 provider 위임 |
 | 모델 back-compat | `resolveImageModel(data)`: model 없음→**nano-banana**(레거시 템플릿·기존 테스트 무회귀), 알수없음→nano. 팔레트 새 노드 `makeData`→**soul-reference**(문서의 "기본 Soul") | absent와 신규노드 기본값이 다른 이유: 레거시 무회귀 vs 신규는 Soul 선호 |
+| gpt-image-2 | `openai/gpt-image-2`(Replicate, OpenAI 키 불필요 — 프록시). 다중 레퍼런스(`input_images`) + 지시 준수가 강해 **포즈 참조 템플릿의 기본 모델**. 같은 Replicate provider 안에서도 body가 달라 `replicateImageRequest(spec, modelId)`가 분기(미지정·미지 모델→nano body, 무회귀). **`resolution`→`quality`(low/medium/high)로 매핑**하고 노드 UI는 `resolutionLabel`로 "Quality"라 표시 | quality 전용 필드를 새로 파면 node.data·`ImageGenerationSpec`·`style_presets` 컬럼까지 늘어난다(마이그레이션 발생). 기존 필드 재사용 + 라벨 교체가 비용 대비 정확 |
+| 포즈 참조 템플릿의 모델 명시 | frame이 붙은 이미지 생성 노드는 시드에서 `model`을 **반드시 명시**(gpt-image-2 또는 nano-banana) | 팔레트 기본값 soul-reference는 `refImages.max=1`이라 포즈 참조가 조용히 버려진다(노드 경고는 뜨지만 시드는 UI를 거치지 않음) |
 | Soul(Higgsfield) provider | 모델 `higgsfield-ai/soul/reference`(레퍼런스 1장+style). base `platform.higgsfield.ai`, 인증 헤더 `hf-api-key`/`hf-secret`(env `HF_API_KEY`/`HF_API_SECRET`). 제출 `POST /{modelPath}`→`request_id`, 폴링 `GET /requests/{id}/status`(completed→`images[0].url`, nsfw/failed→환불). 스타일목록 `/api/soul-styles` 프록시. `refImages.max=1`이라 2장↑이면 노드 경고+첫장만 | 다중레퍼런스는 nano-banana 선택. 상세 [[higgsfield-soul-api]] 메모리 |
 | GenerateNode 동적 필드 | 이미지일 때 모델 `<select>` + `IMAGE_MODELS[model].fields[]` 선언적 조건부 렌더(모델별 필드 다름). 모델 전환 시 비율/해상도 stale 보정. 필드는 controlled-from-data. 스타일 피커는 raw fetch+모듈캐시(`/api/soul-styles`) | 영상(generate)은 kling 고정·편집필드 없음 |
 | 업스케일 모델 | **default=topaz**(~41초). 옵션: SeedVR2(zsxkib, one-step, ~34초·$0.011 최저가) / real-esrgan(~11분, 느림). 실측 벤치 기준 | real-esrgan은 해상도 낮춰도 느림(프레임 오버헤드). SeedVR2 입력은 `media`(video_path/video 아님) |
-| 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`(7종)+`makeNode`, `nodeTypes`에 `music` 추가. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 | |
+| 팔레트/노드 등록 | `editorDefaults.ts` `PALETTE`+`makeNode`, `nodeTypes`. 새 노드 = PALETTE 1줄 + nodeTypes 1줄 + `editorTypes.ts` 데이터 인터페이스. **비실행 노드는 이게 전부** — `EXECUTABLE_NODE_TYPES`·`planExecutableNodes`는 건드리지 않는다 | 비실행 노드가 실행 집합에 섞이면 `node_runs` 사전 실체화 행이 영원히 pending으로 남아 run이 완료 판정을 못 받는다 |
 | Music(음악 합성) 노드 | **하이브리드 실행**(a안). 서버 `GenerationPipeline`은 executable 노드(generate/upscale)만 실행 → `music`은 non-executable이라 **무시**(파이프라인·resolveUpstreamInputs 무변경, music은 passthrough). 합성은 **클라이언트 전용** `MusicNode.tsx`: `useResolvedInputs`로 upstream 영상(`producedVideo ?? sourceVideo`) + 선택 트랙(`TRACKS`)을 `mergeVideoWithMusic`(ffmpeg.wasm)로 합성. config(`trackId`)만 node.data, **합성결과 blob URL은 로컬 state**(AutoSave가 scratch에 죽은 URL 저장 방지 — run 상태 non-persist 규칙과 동일). 트리거 2개: 서버 Run 완료 시 자동합성(시그니처당 1회 `useEffect`) + 수동 "합성"/"재합성" 버튼. `MediaDisplay`에 `muted` prop 추가(합성결과만 `muted={false}`) | ffmpeg는 브라우저 전용(SharedArrayBuffer)이라 durable Workflow(네트워크 I/O 전제)에 못 넣음 — 실행모델이 근본적으로 다른 노드를 클라 경계로 분리 |
 | 파라미터 프리셋(P3-2) | generate-image 노드 파라미터 한 벌(model/prompt/stylePreset/styleStrength/seed/aspectRatio/resolution/batchSize/enhancePrompt)을 이름 붙여 **저장/불러오기**. `style_presets` 테이블(룩/페르소나에 강결합 X — name이 자유 라벨, 룩 이름 넣으면 "룩별 프리셋"). CRUD=`api.style-presets`(POST 생성/id수정, GET 목록, DELETE). 순수함수 `presets.ts`(`pickPresetParams`=객체↔파라미터 추출 양방향 공용, `parsePresetBody`=body 검증, vitest). UI=`PresetBar`(GenerateNode 하단, 저장 시 인라인 이름 input·`window.prompt` 금지)+`useStylePresets`(모듈스토어 useSyncExternalStore, 저장/삭제 후 무효화). 불러오기=`updateNodeData`로 노드에 값 주입 → Run은 기존대로 node.data 전송 | 계획서 ②"파라미터 세트를 재현가능 템플릿으로 공식화·재사용"의 실물화. 서버 자동주입 아님(노드에 직접 채움) — 파이프라인(spec/pipeline) 무변경 |
 
@@ -300,7 +305,7 @@ app/
 │   ├── gallery/         # Library(run 뷰): GalleryPanel(horizontal/compact/expanded), GalleryGrid, RunGridItem, RunDetailModal, GalleryModals
 │   ├── pricing/         # PricingPanel (expanded-only, Hero+Tabs+Cards+FAQ)
 │   ├── workflow/        # WorkflowPanel (워크플로우 템플릿 전용 expanded 패널)
-│   ├── editor/          # 노드 에디터 (EditorCanvas, AutoSave, SaveAsWorkflowDialog, editorDefaults, MediaBrowser, nodes/)
+│   ├── editor/          # 노드 에디터 (EditorCanvas, AutoSave, SaveAsWorkflowDialog, editorDefaults, MediaBrowser, useResolvedInputs, useFrameThumbnail, nodes/)
 │   ├── effects/         # VideoCanvas (WebGL/Canvas 글리치 렌더러)
 │   └── ui/              # shadcn/ui + LargeTitle, GlassButton, Icons 등
 ├── lib/
@@ -310,7 +315,7 @@ app/
 │   ├── db.server.ts     # Drizzle DB 연결 (getDb 단발 / withDb 커넥션 자동정리) + schema export
 │   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
 │   ├── supabase.server.ts  # Storage 헬퍼
-│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs, topoSort, deriveRunStatus, deriveFinalOutput, injectTemplateInputs, runInputs, libraryRun(toLibraryRun), storagePath, spec(nodeToImageSpec), imageModels(레지스트리), presets, metrics, types(RunItem/RunInputs 단일 정의)
+│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs(+resolveFrameThumbnail), topoSort, deriveRunStatus, deriveFinalOutput, injectTemplateInputs, runInputs, libraryRun(toLibraryRun), storagePath, spec(nodeToImageSpec), imageModels(레지스트리), presets, metrics, types(RunItem/RunInputs 단일 정의)
 │   │   └── providers/   # 이미지 provider: provider(계약 ImageProvider/ProviderRequest), replicate, soul, select(selectExecution seam)
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅
