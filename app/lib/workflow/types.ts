@@ -21,6 +21,8 @@ export interface MediaRef {
   type: "image" | "video";
   url: string;
   name?: string;
+  /** 영상 첫 프레임 JPG (motion_videos.thumbnail_path 유래). frame 노드가 포즈 참조로 읽는다 */
+  thumbnailUrl?: string | null;
 }
 
 /** 생성/업스케일 노드의 완료 산출물 */

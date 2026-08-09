@@ -6,6 +6,7 @@ import { PreviewNode } from "./nodes/PreviewNode";
 import { GenerateNode } from "./nodes/GenerateNode";
 import { UpscaleNode } from "./nodes/UpscaleNode";
 import { MusicNode } from "./nodes/MusicNode";
+import { FrameNode } from "./nodes/FrameNode";
 import type { SourceNodeData, SubtitleNodeData, PreviewNodeData } from "./editorTypes";
 
 // Module-scope nodeTypes to avoid remounting on every render
@@ -18,6 +19,7 @@ export const nodeTypes: NodeTypes = {
   "generate-image": GenerateNode,
   upscale: UpscaleNode,
   music: MusicNode,
+  frame: FrameNode,
 };
 
 export const defaultEdgeOptions = {
@@ -25,7 +27,7 @@ export const defaultEdgeOptions = {
   style: { stroke: "#444", strokeWidth: 1.5 },
 };
 
-// ── 팔레트: 추가 가능한 노드 6종 ──────────────────────────────
+// ── 팔레트: 추가 가능한 노드 ────────────────────────────────
 export interface PaletteItem {
   type: string;
   label: string;
@@ -35,6 +37,7 @@ export interface PaletteItem {
 export const PALETTE: PaletteItem[] = [
   { type: "source", label: "Source", makeData: () => ({ label: "Source", media: null }) },
   { type: "look", label: "룩/멤버", makeData: () => ({ label: "Look", lookId: null, characterId: null, media: null }) },
+  { type: "frame", label: "첫 프레임", makeData: () => ({ label: "First Frame" }) },
   { type: "generate-image", label: "이미지 생성", makeData: () => ({ label: "Image Gen", generateType: "generate-image", model: "soul-reference", prompt: "", aspectRatio: "2:3", resolution: "1080p", styleStrength: 0.8, batchSize: 1, enhancePrompt: true }) },
   { type: "generate", label: "영상 생성", makeData: () => ({ label: "Video Gen", generateType: "generate" }) },
   { type: "upscale", label: "업스케일", makeData: () => ({ label: "Upscale", model: "topaz", resolution: "2K" }) },

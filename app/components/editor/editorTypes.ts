@@ -45,6 +45,16 @@ export interface PreviewNodeData {
   label: string;
 }
 
+/**
+ * frame("첫 프레임") 노드 — 업스트림 영상의 첫 프레임을 이미지로 흘려보내는 비실행 노드.
+ * data는 label 뿐이다. 해소된 썸네일 URL은 저장하지 않고 매번 그래프에서 해소한다
+ * (resolveFrameThumbnail) — AutoSave가 죽은 URL을 scratch에 굳히는 것을 막는다.
+ */
+export interface FrameNodeData {
+  [key: string]: unknown;
+  label: string;
+}
+
 export interface GenerateNodeData {
   [key: string]: unknown;
   label: string;
