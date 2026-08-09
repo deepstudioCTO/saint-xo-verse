@@ -28,7 +28,7 @@ export function selectExecution(
     if (model.provider === "soul") {
       return { ok: true, provider: soulProvider, request: buildSoulRequest(spec.spec, model.modelId) };
     }
-    return { ok: true, provider: replicateProvider, request: replicateImageRequest(spec.spec) };
+    return { ok: true, provider: replicateProvider, request: replicateImageRequest(spec.spec, model.id) };
   }
 
   // generate / upscale → Replicate typed 빌더 (무변경)

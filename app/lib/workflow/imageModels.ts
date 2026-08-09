@@ -12,7 +12,7 @@ import { SOUL_REFERENCE_MODEL_PATH } from "./providers/soul";
  */
 
 export type ImageProviderId = "replicate" | "soul";
-export type ImageModelId = "nano-banana" | "soul-reference";
+export type ImageModelId = "nano-banana" | "soul-reference" | "gpt-image-2";
 
 /** 노드가 그릴 수 있는 파라미터 필드 (모델별 fields[]로 선택 노출) */
 export type ImageFieldId =
@@ -37,6 +37,12 @@ export interface ImageModelDef {
   fields: ImageFieldId[];
   aspectRatios: string[];
   resolutions: string[];
+  /**
+   * resolution 필드의 표시 라벨. 기본 "Resolution".
+   * gpt-image-2는 해상도가 아니라 quality(low|medium|high)를 받는데, node.data 스키마와
+   * 프리셋 컬럼을 늘리지 않으려고 resolution 필드를 재사용하므로 라벨만 바꿔 단다.
+   */
+  resolutionLabel?: string;
 }
 
 export const IMAGE_MODELS: Record<ImageModelId, ImageModelDef> = {
@@ -49,6 +55,20 @@ export const IMAGE_MODELS: Record<ImageModelId, ImageModelDef> = {
     fields: ["prompt", "aspectRatio", "resolution"],
     aspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16", "4:3", "3:4"],
     resolutions: ["1K", "2K", "4K"],
+  },
+  "gpt-image-2": {
+    id: "gpt-image-2",
+    provider: "replicate",
+    modelId: REPLICATE_MODEL_VERSIONS["gpt-image-2"],
+    label: "GPT Image 2",
+    // OpenAI images/edits 계열의 문서상 상한(16장)을 따른다. 실사용은 2~3장.
+    refImages: { min: 0, max: 16 },
+    fields: ["prompt", "aspectRatio", "resolution"],
+    aspectRatios: ["2:3", "3:2", "1:1", "16:9", "9:16", "4:3", "3:4", "auto"],
+    // 실제로는 quality 값 (buildGptImageRequest에서 quality로 매핑).
+    // 다른 모델과 같은 오름차순 관례 — [0]=기본(저비용), 마지막=모델 전환 시 stale 보정값
+    resolutions: ["low", "medium", "high"],
+    resolutionLabel: "Quality",
   },
   "soul-reference": {
     id: "soul-reference",

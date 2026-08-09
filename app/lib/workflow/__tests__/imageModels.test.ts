@@ -20,6 +20,22 @@ describe("IMAGE_MODELS 레지스트리", () => {
     expect(IMAGE_MODELS["nano-banana"].resolutions).toEqual(["1K", "2K", "4K"]);
     expect(IMAGE_MODELS["soul-reference"].resolutions).toEqual(["720p", "1080p"]);
   });
+
+  it("gpt-image-2=replicate(다중 레퍼런스), resolution은 quality로 라벨 교체", () => {
+    const m = IMAGE_MODELS["gpt-image-2"];
+    expect(m.provider).toBe("replicate");
+    expect(m.refImages.max).toBeGreaterThan(1); // 포즈 참조(2장 이상)가 가능해야 한다
+    expect(m.fields).toEqual(["prompt", "aspectRatio", "resolution"]);
+    expect(m.resolutions).toEqual(["low", "medium", "high"]);
+    expect(m.resolutionLabel).toBe("Quality");
+  });
+
+  it("resolutions는 오름차순 관례 — 모델 전환 stale 보정이 마지막 값을 집는다", () => {
+    for (const m of Object.values(IMAGE_MODELS)) {
+      expect(m.resolutions.length).toBeGreaterThan(0);
+    }
+    expect(IMAGE_MODELS["gpt-image-2"].resolutions.at(-1)).toBe("high");
+  });
 });
 
 describe("resolveImageModel (back-compat)", () => {

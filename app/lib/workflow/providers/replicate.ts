@@ -18,6 +18,8 @@ import type { ImageProvider, PollResult, ProviderRequest } from "./provider";
 export const REPLICATE_MODEL_VERSIONS = {
   /** google/nano-banana-pro (이미지 생성) */
   image: "0785fb14f5aaa30eddf06fd49b6cbdaac4541b8854eb314211666e23a29087e3",
+  /** openai/gpt-image-2 (이미지 생성) — 다중 레퍼런스 + 지시 준수 강함. OpenAI 키 불필요(Replicate 프록시) */
+  "gpt-image-2": "225c978a7f938acc350564c4548ddc2476bfb33364bec6b5422227f55ce56bd3",
   /** kling motion-control (영상 생성) */
   video: "0b9053d30c02c3b6574ddf14f33499f7b69302c81954ad86239fa67bc5e52896",
   /** lucataco/real-esrgan-video (latest 버전 — 기존 42e594…는 stale로 422). ⚠️ 매우 느림(~11분/영상) */
@@ -127,6 +129,29 @@ export function buildImageRequest(spec: ImageGenerationSpec): ReplicateRequest {
 }
 
 /**
+ * ImageGenerationSpec → openai/gpt-image-2 Replicate 요청.
+ *
+ * 필드 매핑: referenceImages → input_images(다중 지원), aspectRatio → aspect_ratio,
+ * **resolution → quality**(gpt-image-2는 1K/2K/4K가 아니라 low|medium|high|auto를 받는다.
+ * node.data 스키마·프리셋 컬럼을 늘리지 않으려고 기존 resolution 필드를 재사용하고,
+ * 노드 UI 라벨만 레지스트리의 resolutionLabel로 "Quality"라고 표시한다).
+ * 미지원: stylePreset/styleStrength → 프롬프트 fold(nano와 동일), seed/batchSize/enhancePrompt → drop.
+ */
+export function buildGptImageRequest(spec: ImageGenerationSpec): ReplicateRequest {
+  const quality = spec.resolution && spec.resolution !== "auto" ? spec.resolution : "auto";
+  return {
+    version: REPLICATE_MODEL_VERSIONS["gpt-image-2"],
+    input: {
+      prompt: foldStyleIntoPrompt(spec),
+      input_images: spec.referenceImages,
+      aspect_ratio: spec.aspectRatio || "2:3",
+      quality,
+      output_format: "jpeg",
+    },
+  };
+}
+
+/**
  * 노드 타입 + 노드 data + 해소된 upstream 입력 → Replicate 요청({version, input}).
  * 입력이 부족하면(예: 이미지 없음, 모션 없음) 이유 문자열을 담은 에러 객체 반환.
  */
@@ -189,9 +214,14 @@ export function outputMediaType(nodeType: string): "image" | "video" {
 // ── Provider 어댑터 (전송 계층) ──────────────────────────────
 // 기존 순수 빌더(buildImageRequest 등)를 감싸 provider 계약에 맞춘다.
 
-/** ImageGenerationSpec → Replicate 이미지 요청(tagged). 기존 buildImageRequest를 spread */
-export function replicateImageRequest(spec: ImageGenerationSpec): ProviderRequest {
-  return { provider: "replicate", ...buildImageRequest(spec) };
+/**
+ * ImageGenerationSpec → Replicate 이미지 요청(tagged).
+ * Replicate provider 안에서도 모델별로 body가 다르므로 modelId로 분기한다.
+ * (미지정·미지 모델은 nano-banana — 레거시 템플릿 무회귀)
+ */
+export function replicateImageRequest(spec: ImageGenerationSpec, modelId?: string): ProviderRequest {
+  const built = modelId === "gpt-image-2" ? buildGptImageRequest(spec) : buildImageRequest(spec);
+  return { provider: "replicate", ...built };
 }
 
 /** Replicate 예측 응답 → 정규화 상태. succeeded→output[0], failed/canceled→failed, 그 외→processing */

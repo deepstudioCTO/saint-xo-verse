@@ -143,7 +143,7 @@ function ImageParamFields({
         {has("resolution") && (
           <div className="flex-1">
             <SelectField
-              label="Resolution"
+              label={model.resolutionLabel || "Resolution"}
               value={data.resolution || model.resolutions[0]}
               options={model.resolutions}
               onChange={(v) => set({ resolution: v })}

@@ -5,6 +5,8 @@ import {
   buildUpscaleInput,
   buildReplicateRequest,
   buildImageRequest,
+  buildGptImageRequest,
+  replicateImageRequest,
   foldStyleIntoPrompt,
   REPLICATE_MODEL_VERSIONS,
 } from "../providers/replicate";
@@ -89,6 +91,57 @@ describe("buildImageRequest (spec → nano-banana 요청)", () => {
     const r = buildImageRequest({ prompt: "p", referenceImages: ["a"], resolution: "4K", aspectRatio: "9:16" });
     expect(r.input.resolution).toBe("4K");
     expect(r.input.aspect_ratio).toBe("9:16");
+  });
+});
+
+describe("buildGptImageRequest (spec → gpt-image-2 요청)", () => {
+  it("input_images에 레퍼런스 순서 그대로 (포즈 참조가 마지막)", () => {
+    const r = buildGptImageRequest({
+      prompt: "match the pose of the last reference",
+      referenceImages: ["u://member.png", "u://motion-f0.jpg"],
+    });
+    expect(r.version).toBe(REPLICATE_MODEL_VERSIONS["gpt-image-2"]);
+    expect(r.input.input_images).toEqual(["u://member.png", "u://motion-f0.jpg"]);
+  });
+
+  it("resolution은 quality로 매핑 (해상도 필드 재사용)", () => {
+    expect(buildGptImageRequest({ prompt: "p", referenceImages: ["a"], resolution: "high" }).input.quality).toBe("high");
+    // 미지정이면 auto
+    expect(buildGptImageRequest({ prompt: "p", referenceImages: ["a"] }).input.quality).toBe("auto");
+  });
+
+  it("stylePreset은 프롬프트 fold, seed/batchSize/enhancePrompt는 drop", () => {
+    const r = buildGptImageRequest({
+      prompt: "p",
+      referenceImages: ["a"],
+      stylePreset: "y2k",
+      seed: 7,
+      batchSize: 4,
+      enhancePrompt: true,
+    });
+    expect(r.input.prompt).toBe("p, style: y2k");
+    expect(r.input).not.toHaveProperty("seed");
+    expect(r.input).not.toHaveProperty("batch_size");
+    expect(r.input).not.toHaveProperty("enhance_prompt");
+  });
+});
+
+describe("replicateImageRequest (모델별 body 분기)", () => {
+  const spec = { prompt: "p", referenceImages: ["a", "b"] };
+
+  it("gpt-image-2 → gpt body", () => {
+    const r = replicateImageRequest(spec, "gpt-image-2");
+    expect(r.provider).toBe("replicate");
+    expect(r).toMatchObject({ version: REPLICATE_MODEL_VERSIONS["gpt-image-2"] });
+    expect((r as { input: Record<string, unknown> }).input).toHaveProperty("input_images");
+  });
+
+  it("무회귀: modelId 미지정·미지 모델은 nano-banana body", () => {
+    for (const m of [undefined, "nano-banana", "unknown-xyz"]) {
+      const r = replicateImageRequest(spec, m);
+      expect(r).toMatchObject({ version: REPLICATE_MODEL_VERSIONS.image });
+      expect((r as { input: Record<string, unknown> }).input).toHaveProperty("image_input");
+    }
   });
 });
 
