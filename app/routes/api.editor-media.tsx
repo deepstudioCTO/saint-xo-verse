@@ -1,12 +1,13 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { Route } from "./+types/api.editor-media";
-import { getDb, characterImages, motionVideos, characters } from "~/lib/db.server";
+import { getDb, characterImages, motionVideos, conceptImages, characters } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
 import { getPublicUrl } from "~/lib/supabase.server";
 
 /**
  * GET /api/editor-media?type=character-images&characterId=xxx
  * GET /api/editor-media?type=motion-videos
+ * GET /api/editor-media?type=uploads  — 업로드 에셋(모션영상 + 컨셉이미지), 홈 스킬 패널과 동일 카탈로그
  *
  * 에디터 MediaBrowser에서 사용하는 미디어 조회 API.
  */
@@ -78,8 +79,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return Response.json({ items }, { headers: authHeaders });
   }
 
+  if (type === "uploads") {
+    const [videos, images] = await Promise.all([
+      db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
+      db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
+    ]);
+
+    const items = [
+      ...videos.map((v) => ({
+        id: v.id,
+        type: "video" as const,
+        url: getPublicUrl(storageCtx, v.storagePath),
+        thumbnailUrl: v.thumbnailPath ? getPublicUrl(storageCtx, v.thumbnailPath) : null,
+        name: v.name,
+      })),
+      ...images.map((img) => ({
+        id: img.id,
+        type: "image" as const,
+        url: img.publicUrl,
+        thumbnailUrl: null,
+        name: img.name || "Untitled",
+      })),
+    ];
+
+    return Response.json({ items }, { headers: authHeaders });
+  }
+
   return Response.json(
-    { error: "type parameter must be 'character-images' or 'motion-videos'" },
+    { error: "type parameter must be 'character-images', 'motion-videos' or 'uploads'" },
     { status: 400, headers: authHeaders }
   );
 }
