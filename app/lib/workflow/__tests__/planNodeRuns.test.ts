@@ -46,4 +46,19 @@ describe("planExecutableNodes", () => {
       "upscale",
     ]);
   });
+
+  it("disabled 노드는 실행 대상에서 빠진다 (그래프에는 남는다)", () => {
+    const off = nodes.map((n) =>
+      n.id === "upscale" ? { ...n, data: { ...(n.data ?? {}), disabled: true } } : n
+    );
+    const ids = planExecutableNodes(off, edges).map((n) => n.id);
+    expect(ids).toEqual(["gen-image", "gen-video"]);
+  });
+
+  it("disabled가 false·undefined면 평소대로 실행된다", () => {
+    const off = nodes.map((n) =>
+      n.id === "upscale" ? { ...n, data: { ...(n.data ?? {}), disabled: false } } : n
+    );
+    expect(planExecutableNodes(off, edges).map((n) => n.id)).toContain("upscale");
+  });
 });

@@ -3,9 +3,13 @@
  *
  * 그래프:
  *   Look(멤버) ─────────────────┐
- *                              ├→ 이미지생성 → 영상생성
+ *                              ├→ 이미지생성 → 영상생성 → [업스케일 OFF] → 음악합성 → 자막 → Preview
  *   Source(모션영상) → 첫프레임 ┘         ↑
  *          └────────────────────────────┘
+ *
+ * 기존 "멀티스텝 생성 파이프라인"·"룩×음악 조합 데모"를 이 하나로 통합했다. 셋이 같은 파이프라인의
+ * 부분집합이었고 따로 두면 어느 것이 정본인지 모호해진다. 업스케일은 기본 OFF —
+ * 대량 생성 시 시간·비용을 아끼고, 품질 비교가 필요한 컷에서만 노드 헤더로 켠다.
  *
  * kling motion-control은 입력 이미지에서 출발해 모션 영상의 동작을 따라간다. 그래서 생성
  * 이미지의 포즈가 모션 첫 프레임과 어긋나면 영상 초반이 튄다. 이 결합을 이미지 생성 노드
@@ -85,10 +89,13 @@ async function seed() {
       data: {
         label: "이미지 생성",
         generateType: "generate-image",
-        // 모델 명시 필수: 팔레트 기본값(soul-reference)은 레퍼런스 1장만 받아 포즈 참조가 버려진다
-        model: "gpt-image-2",
+        // 모델 명시 필수: 팔레트 기본값(soul-reference)은 레퍼런스 1장만 받아 포즈 참조가 버려진다.
+        // gpt-image-2는 "실존 인물의 얼굴을 그대로 재현하라"는 이 프롬프트를 안전 필터가
+        // 민감 판정(E005)해 8건 중 3건이 실패했다. nano-banana는 safety_filter_level를
+        // block_only_high로 낮출 수 있고 레퍼런스도 14장까지 받아 포즈 참조가 그대로 동작한다.
+        model: "nano-banana",
         prompt: POSE_PROMPT,
-        resolution: "high",
+        resolution: "2K",
         aspectRatio: "2:3",
       },
     },
@@ -103,9 +110,29 @@ async function seed() {
       },
     },
     {
+      // 기본 OFF. 느리고 비싼 단계라 대량 생성 시엔 꺼두고, 품질 컷이 필요할 때만 켠다.
+      // 노드를 지우지 않고 끄는 이유: 파이프라인에 업스케일 단계가 있다는 사실이 그래프에 남는다.
+      id: "upscale",
+      type: "upscale",
+      position: { x: 1300, y: 340 },
+      data: { label: "업스케일", model: "topaz", resolution: "2K", disabled: true },
+    },
+    {
+      id: "music",
+      type: "music",
+      position: { x: 1620, y: 340 },
+      data: { label: "음악 합성", trackId: null },
+    },
+    {
+      id: "subtitle",
+      type: "subtitle",
+      position: { x: 1940, y: 320 },
+      data: { label: "자막", entries: [] },
+    },
+    {
       id: "preview",
       type: "preview",
-      position: { x: 1300, y: 340 },
+      position: { x: 2260, y: 320 },
       data: { label: "Preview" },
     },
   ]);
@@ -119,7 +146,12 @@ async function seed() {
     { id: "e-genimage-genvideo", source: "gen-image", target: "gen-video", type: "default", style },
     // 모션 소스 경로: 모션영상 → 영상생성 (직결)
     { id: "e-motion-genvideo", source: "source-motion", target: "gen-video", type: "default", style },
-    { id: "e-genvideo-preview", source: "gen-video", target: "preview", type: "default", style },
+    // 업스케일이 꺼져 있어도 엣지는 유지된다 — 음악 합성은 산출물이 없는 노드를 건너뛰고
+    // 그 앞의 생성 영상을 그대로 받는다(resolveUpstreamInputs 규칙).
+    { id: "e-genvideo-upscale", source: "gen-video", target: "upscale", type: "default", style },
+    { id: "e-upscale-music", source: "upscale", target: "music", type: "default", style },
+    { id: "e-music-subtitle", source: "music", target: "subtitle", type: "default", style },
+    { id: "e-subtitle-preview", source: "subtitle", target: "preview", type: "default", style },
   ]);
 
   // 동일 이름 존재 시 갱신 (멱등 — 재실행해도 템플릿이 중복 생성되지 않는다)

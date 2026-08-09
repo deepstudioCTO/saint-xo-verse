@@ -9,6 +9,7 @@ import {
 } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import type { OutputMap, NodeOutput, NodeRunStatus } from "~/lib/workflow/types";
+import { deriveRunInputs } from "~/lib/workflow/runInputs";
 
 export interface NodeRunState {
   /** 상태 어휘는 workflow/types.ts 단일 소스 — 여기서 따로 선언하지 않는다 */
@@ -68,7 +69,9 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
           body: JSON.stringify({
             graph,
             ...(templateId ? { templateId } : {}),
-            inputs: { source: "editor" },
+            // 조합 정보(멤버·룩·트랙·썸네일)는 그래프에서 읽는다 — 안 실으면
+            // LIBRARY 카드가 이름을 못 찾아 "Unknown"으로 뜬다.
+            inputs: { ...deriveRunInputs(graph.nodes), source: "editor" },
           }),
         });
         if (!res.ok) {

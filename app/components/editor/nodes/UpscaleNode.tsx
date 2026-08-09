@@ -33,12 +33,32 @@ export function UpscaleNode({ id, data }: NodeProps<UpscaleNodeType>) {
   const isRunning = isRunningStatus(status);
   const completed = status === "completed" && run?.output;
   const hasVideo = !!(resolved.producedVideo || resolved.sourceVideo);
+  const disabled = data.disabled === true;
+
+  const toggleDisabled = useCallback(
+    () => updateNodeData(id, { disabled: !disabled }),
+    [id, disabled, updateNodeData]
+  );
 
   return (
-    <div className="bg-[#1a1a1a] rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.4)] border border-white/[0.08] w-[220px]">
+    <div
+      className={`bg-[#1a1a1a] rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.4)] border w-[220px] transition-opacity ${
+        disabled ? "border-white/[0.08] opacity-45" : "border-white/[0.08]"
+      }`}
+    >
       <div className="px-3 py-2 border-b border-white/[0.08] flex items-center justify-between">
         <span className="text-[10px] font-semibold tracking-wider uppercase text-white/80">{data.label}</span>
-        <span className="text-[9px] text-white/30">UPSCALE</span>
+        <button
+          onClick={toggleDisabled}
+          title={disabled ? "이 노드를 실행에 포함" : "이 노드를 이번 실행에서 제외"}
+          className={`nodrag text-[9px] px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
+            disabled
+              ? "bg-white/[0.08] text-white/40 hover:text-white/70"
+              : "text-white/30 hover:text-white/60"
+          }`}
+        >
+          {disabled ? "OFF" : "UPSCALE"}
+        </button>
       </div>
 
       {completed && run?.output?.url ? (

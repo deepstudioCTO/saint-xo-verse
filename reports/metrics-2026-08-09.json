@@ -1,0 +1,55 @@
+{
+  "generatedAt": "2026-08-09T19:17:30.716Z",
+  "durations": {
+    "counted": 16,
+    "medianSec": 400.1835,
+    "meanSec": 370.16962500000005,
+    "minSec": 176.688,
+    "maxSec": 491.617,
+    "excludedIncomplete": 0,
+    "excludedNegative": 0
+  },
+  "manualBaselineMin": null,
+  "reductionPct": null,
+  "reliability": {
+    "total": 16,
+    "completed": 16,
+    "failed": 0,
+    "unfinished": 0,
+    "successRate": 100,
+    "nodeTotal": 32,
+    "nodeAttempted": 32,
+    "nodeSkipped": 0,
+    "nodeFailed": 0,
+    "nodeFailureRate": 0,
+    "adoptionRate": null
+  },
+  "templateReuse": {
+    "attributedRuns": 16,
+    "unattributedRuns": 0,
+    "attributionRate": 100,
+    "usage": [
+      {
+        "templateId": "8393bef8-a707-4bd7-9969-c414f480d9d7",
+        "name": "모션 컨트롤",
+        "runCount": 16
+      }
+    ],
+    "reusedTemplates": 1,
+    "reuseRate": 100
+  },
+  "outputs": {
+    "videos": 16,
+    "images": 16
+  },
+  "monthly": [
+    {
+      "month": "2026-08",
+      "runs": 16
+    }
+  ],
+  "templateCounts": {
+    "total": 19,
+    "published": 17
+  }
+}

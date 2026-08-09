@@ -89,6 +89,11 @@ export interface UpscaleNodeData {
   model: "topaz" | "seedvr2" | "real-esrgan";
   /** 목표 해상도 */
   resolution: "2K" | "4K";
+  /**
+   * true면 실행에서 제외된다(planExecutableNodes가 거른다). 그래프에는 그대로 남는다 —
+   * 느리고 비싼 단계를 이번 실행만 끄고 싶을 때 쓴다. 설정값이므로 node.data에 두는 게 맞다.
+   */
+  disabled?: boolean;
   // 실행 상태는 node.data에 두지 않는다 (GenerateNodeData 주석 참조)
 }
 
