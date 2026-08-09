@@ -20,7 +20,8 @@ function notify() {
   _listeners.forEach((fn) => fn());
 }
 
-function getCurrentTrack(): Track {
+/** 현재 선택된 트랙 (모듈 싱글톤). 홈 Generate가 run inputs.musicId 기록에 사용 */
+export function getCurrentTrack(): Track {
   return TRACKS_BY_ID[_currentTrackId] ?? TRACKS[0];
 }
 

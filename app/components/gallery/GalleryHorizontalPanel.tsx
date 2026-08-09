@@ -2,37 +2,37 @@ import { useRef, useMemo, useEffect } from "react";
 import type React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { GalleryGrid } from "./GalleryGrid";
-import type { UseGalleryStateReturn } from "~/hooks/useGalleryState";
+import type { UseLibraryStateReturn } from "~/hooks/useLibraryState";
 
 interface GalleryHorizontalPanelProps {
   open: boolean;
-  galleryState: UseGalleryStateReturn;
+  libraryState: UseLibraryStateReturn;
   gridRef?: React.Ref<HTMLDivElement>;
   flyingCardTargetId?: string | null;
 }
 
 export function GalleryHorizontalPanel({
   open,
-  galleryState,
+  libraryState,
   gridRef,
   flyingCardTargetId,
 }: GalleryHorizontalPanelProps) {
   const {
-    sortedGenerations,
+    sortedRuns,
     loading,
-    handleGenerationClick,
+    handleRunClick,
     getCharacterName,
-  } = galleryState;
+  } = libraryState;
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Reverse so oldest = left, newest = right
   const reversed = useMemo(
-    () => [...sortedGenerations].reverse(),
-    [sortedGenerations]
+    () => [...sortedRuns].reverse(),
+    [sortedRuns]
   );
 
-  // Auto-scroll to right when panel opens or new generation is added
+  // Auto-scroll to right when panel opens or new run is added
   useEffect(() => {
     if (!open) return;
     requestAnimationFrame(() => {
@@ -55,11 +55,11 @@ export function GalleryHorizontalPanel({
         >
           <div ref={scrollContainerRef} className="overflow-x-auto flex-1 min-h-0 p-4">
             <GalleryGrid
-              generations={reversed}
+              runs={reversed}
               loading={loading}
               contentReady
               getCharacterName={getCharacterName}
-              onGenerationClick={handleGenerationClick}
+              onRunClick={handleRunClick}
               gridClassName="grid-flow-col auto-cols-[75px] gap-2"
               gridRef={gridRef}
               flyingCardTargetId={flyingCardTargetId}

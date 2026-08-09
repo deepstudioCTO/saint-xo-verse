@@ -1,24 +1,15 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
-import { useFetcher } from "react-router";
 import { PointerSensor, useSensor, useSensors, type DragStartEvent, type DragEndEvent, type DragMoveEvent } from "@dnd-kit/core";
-import type { SkillDragItem } from "~/components/skill/SkillPanel";
+import { toast } from "sonner";
+import type { SkillDragItem, SkillVideo, SkillImage, SkillTab } from "~/components/skill/SkillPanel";
+import { videoToDragItem, imageToDragItem } from "~/components/skill/SkillPanel";
 import type { ActivePanel } from "~/components/layout/HomeFloatingBar";
 import type { Persona } from "~/lib/data";
-import type { UseGalleryStateReturn } from "~/hooks/useGalleryState";
-
-interface SkillVideo {
-  id: string;
-  name: string;
-  videoUrl: string;
-  thumbnailUrl: string | null;
-  duration: number;
-}
-
-interface SkillImage {
-  id: string;
-  name: string | null;
-  publicUrl: string;
-}
+import type { UseLibraryStateReturn } from "~/hooks/useLibraryState";
+import { getCurrentTrack } from "~/hooks/useAudioPlayer";
+import { injectTemplateInputs } from "~/lib/workflow/injectTemplateInputs";
+import { buildSkillGraph } from "~/lib/workflow/buildSkillGraph";
+import type { GraphNodeLike, GraphEdgeLike } from "~/lib/workflow/types";
 
 export interface FlyingCardState {
   thumbnailUrl: string;
@@ -28,6 +19,52 @@ export interface FlyingCardState {
   endY: number;
 }
 
+interface SkillGraph {
+  nodes: GraphNodeLike[];
+  edges: GraphEdgeLike[];
+  templateId: string | null;
+}
+
+/**
+ * 스킬의 실행 그래프 확보.
+ * 1순위: sourceSkillId로 매핑된 템플릿 fetch (templateId 기록 → 재사용률 지표 유효)
+ * 폴백: buildSkillGraph로 즉석 조립 (매핑 없는 스킬 — templateId 미기록이지만 실행은 됨)
+ */
+export async function resolveSkillGraph(
+  item: SkillDragItem,
+  templateId: string | undefined
+): Promise<SkillGraph> {
+  if (templateId) {
+    const res = await fetch(`/api/workflow-templates?id=${templateId}`);
+    if (res.ok) {
+      const { template } = (await res.json()) as { template: { nodes: string; edges: string } };
+      return {
+        nodes: JSON.parse(template.nodes) as GraphNodeLike[],
+        edges: JSON.parse(template.edges) as GraphEdgeLike[],
+        templateId,
+      };
+    }
+    // 템플릿 조회 실패는 폴백으로 계속
+  }
+
+  const built =
+    item.category === "video"
+      ? buildSkillGraph({
+          kind: "motion",
+          motionVideoId: item.id,
+          name: item.name,
+          videoUrl: item.videoUrl ?? "",
+          thumbnailUrl: item.thumbnailUrl || null,
+        })
+      : buildSkillGraph({
+          kind: "concept",
+          conceptImageId: item.id,
+          name: item.name,
+          imageUrl: item.publicUrl ?? "",
+        });
+  return { nodes: built.nodes, edges: built.edges, templateId: null };
+}
+
 interface UseSkillTeachingParams {
   currentCharacter: Persona | null;
   currentLookbookId: string;
@@ -35,12 +72,19 @@ interface UseSkillTeachingParams {
   selectedImgUrl: string;
   skillVideos: SkillVideo[];
   skillImages: SkillImage[];
-  galleryState: UseGalleryStateReturn;
+  /** motionVideos.id/conceptImages.id → 실행용 템플릿 id (workflow_templates.sourceSkillId 기반) */
+  templateIdBySkillId: Record<string, string>;
+  libraryState: UseLibraryStateReturn;
   activePanel: ActivePanel;
   setActivePanel: (p: ActivePanel) => void;
   selectedId: string | null;
 }
 
+/**
+ * 3카드/DnD 스킬 생성 플로우.
+ * 스킬 카탈로그 = 모션영상/컨셉이미지 (표시·선택), 실행 = 워크플로우 체계:
+ * resolveSkillGraph(그래프 확보) → injectTemplateInputs(주입) → POST /api/workflow-execute.
+ */
 export function useSkillTeaching({
   currentCharacter,
   currentLookbookId,
@@ -48,19 +92,20 @@ export function useSkillTeaching({
   selectedImgUrl,
   skillVideos,
   skillImages,
-  galleryState,
+  templateIdBySkillId,
+  libraryState,
   activePanel,
   setActivePanel,
   selectedId,
 }: UseSkillTeachingParams) {
   // Skill selection state
-  const [skillTab, setSkillTab] = useState<"video" | "image">("video");
+  const [skillTab, setSkillTab] = useState<SkillTab>("video");
   const [selectedSkillVideoId, setSelectedSkillVideoId] = useState<string | null>(null);
   const [selectedSkillImageId, setSelectedSkillImageId] = useState<string | null>(null);
   const [threeCardActive, setThreeCardActive] = useState(false);
   const [generateClicked, setGenerateClicked] = useState(false);
 
-  const handleSkillTabChange = useCallback((t: "video" | "image") => {
+  const handleSkillTabChange = useCallback((t: SkillTab) => {
     setSkillTab(t);
     if (t === "video") setSelectedSkillImageId(null);
     else setSelectedSkillVideoId(null);
@@ -120,7 +165,6 @@ export function useSkillTeaching({
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
-  const fetcher = useFetcher();
   const isGenerating = generateClicked;
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -160,93 +204,83 @@ export function useSkillTeaching({
     setActivePanel(null);
   }, [setActivePanel]);
 
-  const handleProduce = useCallback((item: SkillDragItem, prompt?: string) => {
+  const handleProduce = useCallback(async (item: SkillDragItem, prompt?: string) => {
     if (!item || !currentCharacter) return;
-
-    const personaRect = personaRef.current?.getBoundingClientRect();
-    const startX = personaRect ? personaRect.left + personaRect.width / 2 - 30 : window.innerWidth / 2;
-    const startY = personaRect ? personaRect.top + personaRect.height * 0.3 : window.innerHeight / 2;
-    const thumbnailUrl = item.thumbnailUrl;
-
-    const formData = new FormData();
-    if (item.type === "video") {
-      formData.append("imageUrl", selectedImgUrl);
-      formData.append("videoUrl", item.videoUrl || "");
-      formData.append("memberId", currentCharacter.characterId);
-      formData.append("motionVideoId", item.id);
-      formData.append("lookbookId", currentLookbookId);
-      formData.append("lookId", currentLookId);
-      if (prompt) formData.append("prompt", prompt);
-      fetcher.submit(formData, { method: "post", action: "/api/generate" });
-    } else {
-      formData.append("characterImageUrl", selectedImgUrl);
-      formData.append("conceptImageUrl", item.publicUrl || "");
-      formData.append("conceptImageId", item.id);
-      formData.append("prompt", prompt || "");
-      formData.append("memberId", currentCharacter.characterId);
-      formData.append("lookbookId", currentLookbookId);
-      formData.append("lookId", currentLookId);
-      fetcher.submit(formData, { method: "post", action: "/api/generate-image" });
+    if (item.category === "image" && !prompt?.trim()) {
+      toast.error("Image generation needs a prompt.");
+      return;
     }
-
-    const optimisticId = `optimistic-${Date.now()}`;
-    setFlyingCardTargetId(optimisticId);
-    galleryState.addOptimisticGeneration({
-      id: optimisticId,
-      type: item.type,
-      memberId: currentCharacter.characterId,
-      musicId: null,
-      motionVideoId: item.type === "video" ? item.id : null,
-      conceptImageId: item.type === "image" ? item.id : null,
-      lookbookId: currentLookbookId,
-      lookId: currentLookId,
-      videoUrl: null,
-      outputUrl: null,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      motionName: item.type === "video" ? item.name : null,
-      conceptImageName: item.type === "image" ? item.name : null,
-      errorMessage: null,
-      prompt: prompt || null,
-      upscaleStatus: null,
-      upscaleModel: null,
-      upscaledVideoUrl: null,
-    });
 
     setGenerateClicked(true);
     setActivePanel(null);
-    if (confirmDialog) setConfirmDialog(null);
-  }, [confirmDialog, currentCharacter, selectedImgUrl, currentLookbookId, currentLookId, fetcher, galleryState, setActivePanel]);
+    setConfirmDialog(null);
+
+    try {
+      // 1. 실행 그래프 확보 (매핑 템플릿 우선, 없으면 즉석 조립)
+      const graph = await resolveSkillGraph(item, templateIdBySkillId[item.id]);
+
+      // 2. 선택값 주입 (빈 캐릭터 소스 슬롯 + 프롬프트)
+      const injected = injectTemplateInputs(graph.nodes, {
+        characterImage: { url: selectedImgUrl, name: currentCharacter.name },
+        ...(prompt ? { prompt } : {}),
+      });
+
+      // 3. 실행 + run 메타데이터 기록
+      const res = await fetch("/api/workflow-execute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          graph: { nodes: injected, edges: graph.edges },
+          ...(graph.templateId ? { templateId: graph.templateId } : {}),
+          inputs: {
+            characterId: currentCharacter.characterId,
+            lookId: currentLookId,
+            lookbookId: currentLookbookId,
+            musicId: getCurrentTrack().id,
+            prompt: prompt ?? undefined,
+            thumbnailUrl: selectedImgUrl,
+            source: "home",
+          },
+        }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error((j as { error?: string }).error || "Failed to start run");
+      }
+      const { runId } = (await res.json()) as { runId: string };
+
+      // 4. Library optimistic run (실제 runId — 서버 fetch가 같은 id로 대체)
+      setFlyingCardTargetId(runId);
+      libraryState.addOptimisticRun({
+        id: runId,
+        status: "pending",
+        outputUrl: null,
+        outputType: null,
+        thumbnailUrl: selectedImgUrl,
+        characterId: currentCharacter.characterId,
+        lookId: currentLookId,
+        lookbookId: currentLookbookId,
+        musicId: getCurrentTrack().id,
+        prompt: prompt ?? null,
+        source: "home",
+        templateId: graph.templateId,
+        templateName: item.name,
+        templateCategory: item.category,
+        error: null,
+        startedAt: new Date().toISOString(),
+        completedAt: null,
+      });
+    } catch (err) {
+      console.error("Generate failed:", err);
+      toast.error(`Generate failed: ${err instanceof Error ? err.message : String(err)}`);
+      setGenerateClicked(false);
+    }
+  }, [currentCharacter, selectedImgUrl, currentLookbookId, currentLookId, templateIdBySkillId, libraryState, setActivePanel]);
 
   const handleGenerateClick = useCallback((prompt?: string) => {
-    let item: SkillDragItem | null = null;
-    if (selectedSkillVideo) {
-      item = {
-        type: "video",
-        id: selectedSkillVideo.id,
-        thumbnailUrl: selectedSkillVideo.thumbnailUrl || "",
-        name: selectedSkillVideo.name,
-        videoUrl: selectedSkillVideo.videoUrl,
-        duration: selectedSkillVideo.duration,
-      };
-    } else if (selectedSkillImage) {
-      item = {
-        type: "image",
-        id: selectedSkillImage.id,
-        thumbnailUrl: selectedSkillImage.publicUrl,
-        name: selectedSkillImage.name || "",
-        publicUrl: selectedSkillImage.publicUrl,
-      };
-    }
-    if (item) handleProduce(item, prompt);
+    if (selectedSkillVideo) handleProduce(videoToDragItem(selectedSkillVideo), prompt);
+    else if (selectedSkillImage) handleProduce(imageToDragItem(selectedSkillImage), prompt);
   }, [selectedSkillVideo, selectedSkillImage, handleProduce]);
-
-  // Refetch gallery when fetcher completes
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data) {
-      galleryState.refetch();
-    }
-  }, [fetcher.state, fetcher.data, galleryState]);
 
   // Reset skill selections on character change
   useEffect(() => {
@@ -259,7 +293,7 @@ export function useSkillTeaching({
   // Close compact panels / 3-card mode on Escape
   useEffect(() => {
     if (!activePanel && !threeCardActive) return;
-    if (activePanel === "gallery-expanded" || activePanel === "skill-expanded" || activePanel === "workflow-expanded" || activePanel === "runs-expanded") return;
+    if (activePanel === "gallery-expanded" || activePanel === "skill-expanded" || activePanel === "workflow-expanded") return;
     const handler = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (threeCardActive) {

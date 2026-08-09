@@ -8,6 +8,8 @@
  *
  * 보고서에 들어갈 숫자를 만드는 코드이므로, **셀 수 없는 것은 세지 않고 왜 못 세는지를
  * 남긴다.** 제외한 행의 수와 사유를 항상 함께 반환한다.
+ *
+ * 레거시 generations 체계는 제거됐다 — 집계는 workflow_runs/node_runs 단일 소스.
  */
 
 export interface RunRow {
@@ -24,14 +26,6 @@ export interface NodeRunRow {
   status: string;
   /** JSON 문자열 — { url, type } */
   outputs: string | null;
-  /** 전환기 매핑: 값이 있으면 generations 행과 동일 산출물 */
-  legacyGenerationId: string | null;
-}
-
-export interface GenerationRow {
-  type: string;
-  status: string;
-  createdAt: Date;
 }
 
 export interface TemplateRow {
@@ -204,19 +198,12 @@ export function summarizeTemplateReuse(runs: RunRow[], templates: TemplateRow[])
 // ── 산출물 집계 (보고서 실측값) ──────────────────────────────
 
 export interface OutputSummary {
-  /** 레거시 generations 완료 건수 */
-  legacyVideos: number;
-  legacyImages: number;
   /**
-   * 워크플로우 generate 노드 완료 건수 중 영상 산출.
+   * 워크플로우 생성 노드 완료 건수.
    * upscale은 같은 편의 파생물이므로 편수에 세지 않는다.
-   * legacyGenerationId가 있는 행은 generations와 중복이라 제외.
    */
-  workflowVideos: number;
-  workflowImages: number;
-  /** 숏폼 편수 = legacyVideos + workflowVideos (중복 제거 후) */
-  shortformTotal: number;
-  imageTotal: number;
+  videos: number;
+  images: number;
 }
 
 function parsedOutputType(raw: string | null): string | null {
@@ -228,34 +215,18 @@ function parsedOutputType(raw: string | null): string | null {
   }
 }
 
-export function summarizeOutputs(generations: GenerationRow[], nodeRuns: NodeRunRow[]): OutputSummary {
-  let legacyVideos = 0;
-  let legacyImages = 0;
-  for (const g of generations) {
-    if (g.status !== "completed") continue;
-    if (g.type === "video") legacyVideos++;
-    else if (g.type === "image") legacyImages++;
-  }
-
-  let workflowVideos = 0;
-  let workflowImages = 0;
+export function summarizeOutputs(nodeRuns: NodeRunRow[]): OutputSummary {
+  let videos = 0;
+  let images = 0;
   for (const n of nodeRuns) {
     if (n.status !== "completed") continue;
-    if (n.legacyGenerationId) continue; // generations에서 이미 셌다
     if (n.nodeType === "upscale") continue; // 같은 편의 파생물
     const type = parsedOutputType(n.outputs);
-    if (type === "video") workflowVideos++;
-    else if (type === "image") workflowImages++;
+    if (type === "video") videos++;
+    else if (type === "image") images++;
   }
 
-  return {
-    legacyVideos,
-    legacyImages,
-    workflowVideos,
-    workflowImages,
-    shortformTotal: legacyVideos + workflowVideos,
-    imageTotal: legacyImages + workflowImages,
-  };
+  return { videos, images };
 }
 
 // ── 월별 추이 ────────────────────────────────────────────────
@@ -264,27 +235,23 @@ export interface MonthlyRow {
   /** YYYY-MM */
   month: string;
   runs: number;
-  generations: number;
 }
 
 function monthKey(d: Date): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function monthlyBreakdown(runs: RunRow[], generations: GenerationRow[]): MonthlyRow[] {
+export function monthlyBreakdown(runs: RunRow[]): MonthlyRow[] {
   const map = new Map<string, MonthlyRow>();
-  const get = (m: string) => {
-    let row = map.get(m);
+  for (const r of runs) {
+    const key = monthKey(r.startedAt);
+    let row = map.get(key);
     if (!row) {
-      row = { month: m, runs: 0, generations: 0 };
-      map.set(m, row);
+      row = { month: key, runs: 0 };
+      map.set(key, row);
     }
-    return row;
-  };
-
-  for (const r of runs) get(monthKey(r.startedAt)).runs++;
-  for (const g of generations) get(monthKey(g.createdAt)).generations++;
-
+    row.runs++;
+  }
   return [...map.values()].sort((a, b) => (a.month < b.month ? -1 : 1));
 }
 
@@ -377,21 +344,19 @@ export function renderMarkdown(r: MetricsReport): string {
     "",
     "| 항목 | 값 |",
     "|---|---|",
-    `| **AI 생성 숏폼 편수** | **${o.shortformTotal}편** |`,
-    `| ├ 레거시 생성(generations) | ${o.legacyVideos}편 |`,
-    `| └ 워크플로우 생성 노드 | ${o.workflowVideos}편 |`,
-    `| 이미지 생성물 | ${o.imageTotal}건 (레거시 ${o.legacyImages} / 워크플로우 ${o.workflowImages}) |`,
+    `| **AI 생성 숏폼 편수** | **${o.videos}편** |`,
+    `| 이미지 생성물 | ${o.images}건 |`,
     `| 워크플로우 실행 횟수 | ${rel.total}회 |`,
     `| 템플릿 종수 | 전체 ${r.templateCounts.total}종 / 공개 ${r.templateCounts.published}종 |`,
     "",
-    "> 숏폼 편수는 업스케일 노드를 세지 않습니다(같은 편의 파생물). 레거시 generations와 중복되는 node_run도 제외했습니다.",
+    "> 숏폼 편수는 업스케일 노드를 세지 않습니다(같은 편의 파생물).",
     "",
     "## 월별 추이",
     "",
-    "| 월 | 워크플로우 실행 | 생성물 |",
-    "|---|---|---|"
+    "| 월 | 워크플로우 실행 |",
+    "|---|---|"
   );
-  for (const m of r.monthly) lines.push(`| ${m.month} | ${m.runs} | ${m.generations} |`);
+  for (const m of r.monthly) lines.push(`| ${m.month} | ${m.runs} |`);
   lines.push("");
 
   return lines.join("\n");

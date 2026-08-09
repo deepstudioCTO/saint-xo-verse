@@ -60,3 +60,60 @@ export interface NodeRunLike {
 }
 
 export type RunStatus = "pending" | "running" | "completed" | "failed";
+
+// ── Library(run 결과물 뷰) 공유 타입 — 단일 소스 ─────────────
+// 서버 직렬화(api.library-data)·클라 훅(useLibraryState)·컴포넌트가 전부 여기서 import.
+
+/** workflow_runs.inputs에 기록되는 실행 메타데이터 (JSON) */
+export interface RunInputs {
+  characterId?: string;
+  lookId?: string;
+  lookbookId?: string;
+  musicId?: string;
+  prompt?: string;
+  thumbnailUrl?: string;
+  source?: "home" | "editor";
+}
+
+/** deriveFinalOutput/toLibraryRun이 소비하는 node_run 최소 행 */
+export interface NodeRunOutputRow {
+  nodeId: string | null;
+  nodeType: string | null;
+  status: string | null;
+  /** JSON 문자열 — { url, type } */
+  outputs: string | null;
+}
+
+/** toLibraryRun이 소비하는 workflow_runs 최소 행 */
+export interface WorkflowRunRowLike {
+  id: string;
+  status: string;
+  templateId: string | null;
+  templateSnapshot: string;
+  inputs: string | null;
+  error: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+}
+
+/** Library 그리드·상세 모달·MediaBrowser가 소비하는 run 항목 (API 응답 단위) */
+export interface RunItem {
+  id: string;
+  status: string;
+  outputUrl: string | null;
+  outputType: "image" | "video" | null;
+  thumbnailUrl: string | null;
+  characterId: string | null;
+  lookId: string | null;
+  lookbookId: string | null;
+  musicId: string | null;
+  prompt: string | null;
+  source: "home" | "editor" | null;
+  templateId: string | null;
+  templateName: string | null;
+  templateCategory: string | null;
+  error: string | null;
+  /** ISO 문자열 */
+  startedAt: string;
+  completedAt: string | null;
+}

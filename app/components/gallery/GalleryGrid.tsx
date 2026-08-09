@@ -1,31 +1,31 @@
 import type React from "react";
 import { motion } from "motion/react";
 import { Skeleton } from "~/components/ui/skeleton";
-import { GenerationGridItem } from "./GenerationGridItem";
-import type { Generation } from "~/hooks/useGalleryState";
+import { RunGridItem } from "./RunGridItem";
+import type { RunItem } from "~/lib/workflow/types";
 
 interface GalleryGridProps {
-  generations: Generation[];
+  runs: RunItem[];
   loading: boolean;
   contentReady: boolean;
-  getCharacterName: (memberId: string | null, lookId?: string | null) => string;
-  onGenerationClick: (gen: Generation) => void;
+  getCharacterName: (characterId: string | null, lookId?: string | null) => string;
+  onRunClick: (run: RunItem) => void;
   gridClassName?: string;
   skeletonCount?: number;
   /** Use crossfade skeleton layer (expanded panel style) instead of conditional rendering */
   crossfade?: boolean;
   /** Ref to the grid container for position measurement (FLIP animation) */
   gridRef?: React.Ref<HTMLDivElement>;
-  /** ID of the generation that the flying card is targeting (cell hidden until card lands) */
+  /** ID of the run that the flying card is targeting (cell hidden until card lands) */
   flyingCardTargetId?: string | null;
 }
 
 export function GalleryGrid({
-  generations,
+  runs,
   loading,
   contentReady,
   getCharacterName,
-  onGenerationClick,
+  onRunClick,
   gridClassName = "grid-cols-3 gap-3",
   skeletonCount = 9,
   crossfade = false,
@@ -36,8 +36,8 @@ export function GalleryGrid({
     // Compact style: always mount DOM (for gridRef measurement),
     // control visibility with opacity transition
     const showSkeleton = loading;
-    const showEmpty = !loading && generations.length === 0;
-    const showGrid = !loading && generations.length > 0;
+    const showEmpty = !loading && runs.length === 0;
+    const showGrid = !loading && runs.length > 0;
 
     return (
       <div
@@ -61,15 +61,14 @@ export function GalleryGrid({
 
         {showGrid && (
           <div ref={gridRef} className={`grid ${gridClassName} p-1`}>
-            {generations.map((gen, index) => (
-              <GenerationGridItem
-                key={gen.id}
-                generation={gen}
-                characterName={getCharacterName(gen.memberId, gen.lookId)}
+            {runs.map((run, index) => (
+              <RunGridItem
+                key={run.id}
+                run={run}
+                characterName={getCharacterName(run.characterId, run.lookId)}
                 index={index}
-                isHighlighted={false}
-                isReceivingCard={gen.id === flyingCardTargetId}
-                onClick={() => onGenerationClick(gen)}
+                isReceivingCard={run.id === flyingCardTargetId}
+                onClick={() => onRunClick(run)}
               />
             ))}
           </div>
@@ -93,7 +92,7 @@ export function GalleryGrid({
       </div>
 
       {/* Empty state */}
-      {contentReady && !loading && generations.length === 0 && (
+      {contentReady && !loading && runs.length === 0 && (
         <div className="col-start-1 row-start-1 flex flex-col items-center justify-center py-24">
           <div className="w-16 h-16 rounded-full bg-[--color-border-light] flex items-center justify-center mb-4">
             <svg
@@ -123,22 +122,21 @@ export function GalleryGrid({
       )}
 
       {/* Real grid */}
-      {contentReady && !loading && generations.length > 0 && (
+      {contentReady && !loading && runs.length > 0 && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.4 }}
           className={`col-start-1 row-start-1 grid ${gridClassName} p-1`}
         >
-          {generations.map((gen, index) => (
-            <GenerationGridItem
-              key={gen.id}
-              generation={gen}
-              characterName={getCharacterName(gen.memberId, gen.lookId)}
+          {runs.map((run, index) => (
+            <RunGridItem
+              key={run.id}
+              run={run}
+              characterName={getCharacterName(run.characterId, run.lookId)}
               index={index}
-              isHighlighted={false}
-              isReceivingCard={gen.id === flyingCardTargetId}
-              onClick={() => onGenerationClick(gen)}
+              isReceivingCard={run.id === flyingCardTargetId}
+              onClick={() => onRunClick(run)}
             />
           ))}
         </motion.div>

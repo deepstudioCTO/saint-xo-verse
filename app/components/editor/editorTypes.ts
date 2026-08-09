@@ -103,7 +103,6 @@ export interface EditorProject {
   nodes: string;
   edges: string;
   viewport: string;
-  sourceGenerationId: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -149,7 +148,6 @@ export interface NodeRun {
   error: string | null;
   externalId: string | null;
   externalProvider: string | null;
-  legacyGenerationId: string | null;
   startedAt: Date;
   completedAt: Date | null;
 }

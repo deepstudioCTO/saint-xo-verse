@@ -43,38 +43,3 @@ export interface CharacterImage {
   publicUrl: string;
 }
 
-export interface SkillVideo {
-  id: string;
-  name: string;
-  videoUrl: string;
-  thumbnailUrl: string | null;
-  duration: number;
-}
-
-export interface SkillImage {
-  id: string;
-  name: string | null;
-  publicUrl: string;
-}
-
-export interface Generation {
-  id: string;
-  type: string;
-  memberId: string | null;
-  musicId: string | null;
-  motionVideoId: string | null;
-  conceptImageId: string | null;
-  lookbookId: string | null;
-  lookId: string | null;
-  videoUrl: string | null;
-  outputUrl: string | null;
-  status: string;
-  createdAt: string;
-  motionName: string | null;
-  conceptImageName: string | null;
-  errorMessage: string | null;
-  prompt: string | null;
-  upscaleStatus: string | null;
-  upscaleModel: string | null;
-  upscaledVideoUrl: string | null;
-}

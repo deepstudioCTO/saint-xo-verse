@@ -4,17 +4,13 @@ import { useDraggable } from "@dnd-kit/core";
 import { RevealPanel } from "~/components/common/RevealPanel";
 import { ExpandedPanelShell } from "~/components/common/ExpandedPanelShell";
 
-export type SkillDragItem = {
-  type: "video" | "image";
-  id: string;
-  thumbnailUrl: string;
-  name: string;
-  videoUrl?: string;
-  publicUrl?: string;
-  duration?: number;
-};
+/**
+ * 홈 스킬 = 모션영상/컨셉이미지 카탈로그 (표시용).
+ * 실행은 워크플로우 체계: Generate 시 sourceSkillId로 매핑된 템플릿을 찾거나
+ * buildSkillGraph로 즉석 조립 (useSkillTeaching.resolveSkillGraph).
+ */
 
-type SkillVideo = {
+export type SkillVideo = {
   id: string;
   name: string;
   videoUrl: string;
@@ -22,21 +18,56 @@ type SkillVideo = {
   duration: number;
 };
 
-type SkillImage = {
+export type SkillImage = {
   id: string;
   name: string | null;
   publicUrl: string;
 };
 
+export type SkillTab = "video" | "image";
+
+/** DnD·3카드 Generate가 주고받는 스킬 아이템 */
+export type SkillDragItem = {
+  category: SkillTab;
+  /** motionVideos.id 또는 conceptImages.id */
+  id: string;
+  thumbnailUrl: string;
+  name: string;
+  videoUrl?: string; // video 스킬
+  publicUrl?: string; // image 스킬
+  duration?: number;
+};
+
 interface SkillContentProps {
   videos: SkillVideo[];
   images: SkillImage[];
-  tab: "video" | "image";
+  tab: SkillTab;
   selectedVideoId: string | null;
   selectedImageId: string | null;
-  onTabChange: (tab: "video" | "image") => void;
+  onTabChange: (tab: SkillTab) => void;
   onSelectVideo: (id: string | null) => void;
   onSelectImage: (id: string | null) => void;
+}
+
+export function videoToDragItem(video: SkillVideo): SkillDragItem {
+  return {
+    category: "video",
+    id: video.id,
+    thumbnailUrl: video.thumbnailUrl || "",
+    name: video.name,
+    videoUrl: video.videoUrl,
+    duration: video.duration,
+  };
+}
+
+export function imageToDragItem(image: SkillImage): SkillDragItem {
+  return {
+    category: "image",
+    id: image.id,
+    thumbnailUrl: image.publicUrl,
+    name: image.name || "",
+    publicUrl: image.publicUrl,
+  };
 }
 
 function formatDuration(seconds: number) {
@@ -59,18 +90,9 @@ function VideoSkillItem({
   const [isHovering, setIsHovering] = useState(false);
   const isActive = selected || isHovering;
 
-  const dragData: SkillDragItem = {
-    type: "video",
-    id: video.id,
-    thumbnailUrl: video.thumbnailUrl || "",
-    name: video.name,
-    videoUrl: video.videoUrl,
-    duration: video.duration,
-  };
-
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `skill-video-${video.id}`,
-    data: dragData,
+    data: videoToDragItem(video),
   });
 
   const handleMouseEnter = () => {
@@ -159,17 +181,9 @@ function ImageSkillItem({
   const [isHovering, setIsHovering] = useState(false);
   const isActive = selected || isHovering;
 
-  const dragData: SkillDragItem = {
-    type: "image",
-    id: image.id,
-    thumbnailUrl: image.publicUrl,
-    name: image.name || "",
-    publicUrl: image.publicUrl,
-  };
-
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `skill-image-${image.id}`,
-    data: dragData,
+    data: imageToDragItem(image),
   });
 
   return (
@@ -209,8 +223,8 @@ function SkillTabBar({
   onTabChange,
   trailing,
 }: {
-  tab: "video" | "image";
-  onTabChange: (tab: "video" | "image") => void;
+  tab: SkillTab;
+  onTabChange: (tab: SkillTab) => void;
   trailing?: React.ReactNode;
 }) {
   return (
@@ -299,49 +313,6 @@ const CollapseIcon = (
 
 /* ── Horizontal Panel (single-row bar) ────────────────────── */
 
-function SkillHorizontalRow({
-  contentReady,
-  ...props
-}: SkillContentProps & { contentReady: boolean }) {
-  const { videos, images, tab, selectedVideoId, selectedImageId, onSelectVideo, onSelectImage } = props;
-
-  if (!contentReady) return null;
-
-  if (tab === "video") {
-    return videos.length === 0 ? (
-      <p className="text-center text-neutral-400 text-sm py-4 whitespace-nowrap">No motion videos</p>
-    ) : (
-      <div className="grid grid-flow-col auto-cols-[75px] gap-2">
-        {videos.map((video, i) => (
-          <VideoSkillItem
-            key={video.id}
-            video={video}
-            index={i}
-            selected={selectedVideoId === video.id}
-            onClick={() => onSelectVideo(selectedVideoId === video.id ? null : video.id)}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  return images.length === 0 ? (
-    <p className="text-center text-neutral-400 text-sm py-4 whitespace-nowrap">No concept images</p>
-  ) : (
-    <div className="grid grid-flow-col auto-cols-[75px] gap-2">
-      {images.map((image, i) => (
-        <ImageSkillItem
-          key={image.id}
-          image={image}
-          index={i}
-          selected={selectedImageId === image.id}
-          onClick={() => onSelectImage(selectedImageId === image.id ? null : image.id)}
-        />
-      ))}
-    </div>
-  );
-}
-
 export function SkillHorizontalPanel({
   open,
   onExpand,
@@ -358,7 +329,11 @@ export function SkillHorizontalPanel({
           className="w-full glass flex flex-col overflow-hidden h-[136px]"
         >
           <div className="overflow-x-auto flex-1 min-h-0 p-4">
-            <SkillHorizontalRow contentReady {...contentProps} />
+            <SkillGrid
+              contentReady
+              gridClassName="grid grid-flow-col auto-cols-[75px] gap-2"
+              {...contentProps}
+            />
           </div>
         </motion.div>
       )}

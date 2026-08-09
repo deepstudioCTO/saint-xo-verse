@@ -5,6 +5,7 @@ import {
   uploadThumbnail,
 } from "~/lib/supabase.server";
 import { requireAuthApi } from "~/lib/auth.server";
+import { createSkillTemplate } from "~/lib/skill-template.server";
 
 export async function action({ request, context }: ActionFunctionArgs) {
   if (request.method !== "POST") {
@@ -58,6 +59,23 @@ export async function action({ request, context }: ActionFunctionArgs) {
         duration,
       })
       .returning();
+
+    // 스킬 = 홈 Generate에서 워크플로우로 실행되므로 실행용 템플릿을 함께 생성
+    const thumbnailUrl = thumbnailPath
+      ? `${context.cloudflare.env.SUPABASE_URL}/storage/v1/object/public/motion-videos/${thumbnailPath}`
+      : null;
+    try {
+      await createSkillTemplate(db, {
+        kind: "motion",
+        motionVideoId: inserted.id,
+        name: inserted.name,
+        videoUrl,
+        thumbnailUrl,
+      });
+    } catch (err) {
+      // 템플릿 생성 실패해도 업로드 자체는 성공 — Generate 시 즉석 그래프 폴백이 커버
+      console.error("createSkillTemplate failed (motion):", err);
+    }
 
     return Response.json({
       success: true,

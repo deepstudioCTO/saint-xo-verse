@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-08-08T08:06:15.730Z",
+  "durations": {
+    "counted": 12,
+    "medianSec": 36.644499999999994,
+    "meanSec": 80.12308333333333,
+    "minSec": 31.786,
+    "maxSec": 558.7,
+    "excludedIncomplete": 2,
+    "excludedNegative": 6
+  },
+  "manualBaselineMin": null,
+  "reductionPct": null,
+  "reliability": {
+    "total": 20,
+    "completed": 16,
+    "failed": 2,
+    "unfinished": 2,
+    "successRate": 88.88888888888889,
+    "nodeTotal": 20,
+    "nodeFailed": 1,
+    "nodeFailureRate": 5,
+    "adoptionRate": null
+  },
+  "templateReuse": {
+    "attributedRuns": 1,
+    "unattributedRuns": 19,
+    "attributionRate": 5,
+    "usage": [
+      {
+        "templateId": "71f5bb1a-b4d6-4245-8fd2-2136491d3f51",
+        "name": "룩×음악 조합 데모",
+        "runCount": 1
+      }
+    ],
+    "reusedTemplates": 0,
+    "reuseRate": 0
+  },
+  "outputs": {
+    "videos": 7,
+    "images": 10
+  },
+  "monthly": [
+    {
+      "month": "2026-02",
+      "runs": 7
+    },
+    {
+      "month": "2026-07",
+      "runs": 11
+    },
+    {
+      "month": "2026-08",
+      "runs": 2
+    }
+  ],
+  "templateCounts": {
+    "total": 11,
+    "published": 9
+  }
+}

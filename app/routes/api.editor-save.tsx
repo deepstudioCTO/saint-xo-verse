@@ -12,7 +12,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   try {
     const body = await request.json();
-    const { id, nodes, edges, viewport, sourceGenerationId } = body;
+    const { id, nodes, edges, viewport } = body;
 
     if (!id || typeof nodes !== "string" || typeof edges !== "string") {
       return Response.json({ error: "id, nodes, edges are required" }, { status: 400, headers: authHeaders });
@@ -27,7 +27,6 @@ export async function action({ request, context }: Route.ActionArgs) {
         nodes,
         edges,
         viewport: viewport || '{"x":0,"y":0,"zoom":1}',
-        sourceGenerationId: sourceGenerationId || null,
       })
       .onConflictDoUpdate({
         target: editorProjects.id,
@@ -35,7 +34,6 @@ export async function action({ request, context }: Route.ActionArgs) {
           nodes,
           edges,
           viewport: viewport || '{"x":0,"y":0,"zoom":1}',
-          sourceGenerationId: sourceGenerationId || null,
         },
       });
 

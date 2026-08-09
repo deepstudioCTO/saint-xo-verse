@@ -1,79 +1,74 @@
 import type React from "react";
-import { GlassButton } from "~/components/ui/GlassButton";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "~/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { RevealPanel } from "~/components/common/RevealPanel";
 import { ExpandedPanelShell } from "~/components/common/ExpandedPanelShell";
-import { ResultUploadDialog } from "./ResultUploadDialog";
 import { GalleryGrid } from "./GalleryGrid";
-import type { UseGalleryStateReturn, TypeFilter, SortBy } from "~/hooks/useGalleryState";
-import { SORT_OPTIONS } from "~/hooks/useGalleryState";
+import type { UseLibraryStateReturn, TypeFilter, SortBy } from "~/hooks/useLibraryState";
+import { SORT_OPTIONS } from "~/hooks/useLibraryState";
 
 // ─── Compact Gallery Panel (inside HomeFloatingBar children slot) ─────────
 
 interface GalleryCompactPanelProps {
   open: boolean;
   onExpand: () => void;
-  galleryState: UseGalleryStateReturn;
+  libraryState: UseLibraryStateReturn;
   gridRef?: React.Ref<HTMLDivElement>;
   flyingCardTargetId?: string | null;
 }
 
-export function GalleryCompactPanel({ open, onExpand, galleryState, gridRef, flyingCardTargetId }: GalleryCompactPanelProps) {
+export function GalleryCompactPanel({ open, onExpand, libraryState, gridRef, flyingCardTargetId }: GalleryCompactPanelProps) {
   const {
-    sortedGenerations,
+    sortedRuns,
     loading,
     typeFilter,
     setTypeFilter,
-    handleGenerationClick,
+    handleRunClick,
     getCharacterName,
-  } = galleryState;
+  } = libraryState;
 
   return (
-    <>
-      <RevealPanel open={open} className="h-[75vh]">
-        {(contentReady) => (
-          <>
-            {/* Tab bar + Expand button */}
-            <div className="flex items-center justify-between px-5 pt-4 pb-3">
-              <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
-                <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
-                  <TabsTrigger value="video">Video</TabsTrigger>
-                  <TabsTrigger value="image">Image</TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <button
-                onClick={onExpand}
-                className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
-                title="Expand to full screen"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="15 3 21 3 21 9" />
-                  <polyline points="9 21 3 21 3 15" />
-                  <line x1="21" y1="3" x2="14" y2="10" />
-                  <line x1="3" y1="21" x2="10" y2="14" />
-                </svg>
-              </button>
-            </div>
+    <RevealPanel open={open} className="h-[75vh]">
+      {(contentReady) => (
+        <>
+          {/* Tab bar + Expand button */}
+          <div className="flex items-center justify-between px-5 pt-4 pb-3">
+            <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+              <TabsList>
+                <TabsTrigger value="all">All</TabsTrigger>
+                <TabsTrigger value="video">Video</TabsTrigger>
+                <TabsTrigger value="image">Image</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <button
+              onClick={onExpand}
+              className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
+              title="Expand to full screen"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" />
+                <line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+            </button>
+          </div>
 
-            {/* Scrollable grid */}
-            <div className="overflow-y-auto flex-1 min-h-0 px-5 pb-3">
-              <GalleryGrid
-                generations={sortedGenerations}
-                loading={loading}
-                contentReady={contentReady}
-                getCharacterName={getCharacterName}
-                onGenerationClick={handleGenerationClick}
-                gridRef={gridRef}
-                flyingCardTargetId={flyingCardTargetId}
-              />
-            </div>
-          </>
-        )}
-      </RevealPanel>
-
-    </>
+          {/* Scrollable grid */}
+          <div className="overflow-y-auto flex-1 min-h-0 px-5 pb-3">
+            <GalleryGrid
+              runs={sortedRuns}
+              loading={loading}
+              contentReady={contentReady}
+              getCharacterName={getCharacterName}
+              onRunClick={handleRunClick}
+              gridRef={gridRef}
+              flyingCardTargetId={flyingCardTargetId}
+            />
+          </div>
+        </>
+      )}
+    </RevealPanel>
   );
 }
 
@@ -83,37 +78,32 @@ interface GalleryExpandedPanelProps {
   open: boolean;
   onClose: () => void;
   onCollapse: () => void;
-  galleryState: UseGalleryStateReturn;
-  lookbookId: string;
+  libraryState: UseLibraryStateReturn;
 }
 
-export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, lookbookId }: GalleryExpandedPanelProps) {
+export function GalleryExpandedPanel({ open, onClose, onCollapse, libraryState }: GalleryExpandedPanelProps) {
   const {
-    sortedGenerations,
+    sortedRuns,
     loading,
     typeFilter,
     setTypeFilter,
     sortBy,
     setSortBy,
-    handleGenerationClick,
+    handleRunClick,
     getCharacterName,
     modalOpen,
     deleteTarget,
-    uploadDialogOpen,
-    setUploadDialogOpen,
-    handleUploadComplete,
-    loadedCharacters,
-  } = galleryState;
+  } = libraryState;
 
   return (
     <ExpandedPanelShell
       open={open}
       onClose={onClose}
-      escapeEnabled={!modalOpen && !deleteTarget && !uploadDialogOpen}
+      escapeEnabled={!modalOpen && !deleteTarget}
     >
       {(contentReady) => (
         <>
-          {/* Toolbar: Tabs + Sort + Upload + Collapse */}
+          {/* Toolbar: Tabs + Sort + Collapse */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3">
             <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
               <TabsList>
@@ -135,9 +125,6 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, 
                   ))}
                 </SelectContent>
               </Select>
-              <GlassButton variant="bold" onClick={() => setUploadDialogOpen(true)}>
-                UPLOAD
-              </GlassButton>
               <button
                 onClick={onCollapse}
                 className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
@@ -156,25 +143,16 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, galleryState, 
           {/* Scroll container */}
           <div className="flex-1 overflow-y-auto px-5 pb-5">
             <GalleryGrid
-              generations={sortedGenerations}
+              runs={sortedRuns}
               loading={loading}
               contentReady={contentReady}
               getCharacterName={getCharacterName}
-              onGenerationClick={handleGenerationClick}
+              onRunClick={handleRunClick}
               gridClassName="grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
               skeletonCount={12}
               crossfade
             />
           </div>
-
-          {/* Result Upload Dialog */}
-          <ResultUploadDialog
-            open={uploadDialogOpen}
-            onOpenChange={setUploadDialogOpen}
-            onUploadComplete={handleUploadComplete}
-            characters={loadedCharacters.length > 0 ? loadedCharacters : undefined}
-            lookbookId={lookbookId}
-          />
         </>
       )}
     </ExpandedPanelShell>

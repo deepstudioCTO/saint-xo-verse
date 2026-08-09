@@ -3,15 +3,19 @@ import type { Route } from "./+types/api.workflow-execute";
 import { withDb, workflowTemplates, workflowRuns, nodeRuns } from "~/lib/db.server";
 import { requireAuthApi } from "~/lib/auth.server";
 import { deriveRunStatus } from "~/lib/workflow/deriveRunStatus";
+import { parseRunInputs } from "~/lib/workflow/runInputs";
 import type { GraphNodeLike, GraphEdgeLike } from "~/lib/workflow/types";
 
 /**
  * POST /api/workflow-execute
  *
  * 그래프 전체를 Cloudflare Workflow(GenerationPipeline)로 durable 실행한다.
- * Body: { graph: { nodes, edges }, templateId? }
+ * Body: { graph: { nodes, edges }, templateId?, inputs? }
  * → workflow_run 생성 후 Workflow 인스턴스 create. 실제 Replicate 실행·폴링·업로드는
  *   Workflow 내부에서 진행되며, 클라이언트는 GET으로 상태만 폴링한다.
+ *
+ * inputs = 실행 메타데이터(characterId/lookId/musicId/thumbnailUrl/source 등).
+ * 그래프 실행에는 쓰이지 않고 Library(run 결과물 뷰) 표시에만 쓰인다.
  */
 export async function action({ request, context }: Route.ActionArgs) {
   if (request.method !== "POST") {
@@ -25,6 +29,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const body = (await request.json()) as {
       graph?: { nodes: GraphNodeLike[]; edges: GraphEdgeLike[] };
       templateId?: string;
+      inputs?: unknown;
     };
     const graph = body.graph;
 
@@ -51,7 +56,7 @@ export async function action({ request, context }: Route.ActionArgs) {
           templateId: template?.id,
           templateVersion: template?.currentVersion,
           templateSnapshot: JSON.stringify(graph),
-          inputs: "{}",
+          inputs: JSON.stringify(parseRunInputs(body.inputs)),
           status: "pending",
         })
         .returning();

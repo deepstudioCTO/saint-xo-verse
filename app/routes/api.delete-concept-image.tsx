@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Route } from "./+types/api.delete-concept-image";
 import { getDb } from "~/lib/db.server";
-import { conceptImages, generations } from "../../drizzle/schema";
+import { conceptImages, workflowTemplates } from "../../drizzle/schema";
 import { deleteConceptImage } from "~/lib/supabase.server";
 import { requireAuthApi } from "~/lib/auth.server";
 
@@ -37,12 +37,6 @@ export async function action({ request, context }: Route.ActionArgs) {
       );
     }
 
-    // 이 컨셉 이미지를 참조하는 generations의 conceptImageId를 NULL로 설정
-    await db
-      .update(generations)
-      .set({ conceptImageId: null })
-      .where(eq(generations.conceptImageId, id));
-
     // Storage에서 삭제
     try {
       await deleteConceptImage(
@@ -54,8 +48,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       // Storage 삭제 실패해도 DB 삭제는 진행
     }
 
-    // DB에서 삭제
+    // DB에서 삭제 + 매핑된 스킬 템플릿 정리
     await db.delete(conceptImages).where(eq(conceptImages.id, id));
+    await db.delete(workflowTemplates).where(eq(workflowTemplates.sourceSkillId, id));
 
     return Response.json({ success: true }, { headers: authHeaders });
   } catch (err) {

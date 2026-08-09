@@ -4,7 +4,7 @@ import { useAudioPlayer } from "~/hooks/useAudioPlayer";
 import { GlassButton } from "~/components/ui";
 import { MusicPlayerWidget } from "~/components/music/MusicPlayerWidget";
 
-export type ActivePanel = null | "music-horizontal" | "skill-horizontal" | "skill-compact" | "skill-expanded" | "gallery-horizontal" | "gallery-compact" | "gallery-expanded" | "workflow-expanded" | "runs-expanded" | "pricing-expanded";
+export type ActivePanel = null | "music-horizontal" | "skill-horizontal" | "skill-compact" | "skill-expanded" | "gallery-horizontal" | "gallery-compact" | "gallery-expanded" | "workflow-expanded" | "pricing-expanded";
 
 interface HomeFloatingBarProps {
   characterId: string | null;
@@ -12,18 +12,8 @@ interface HomeFloatingBarProps {
   lookbookId: string;
   activePanel: ActivePanel;
   onPanelChange: (panel: ActivePanel) => void;
-  selectedVideo: {
-    id: string;
-    name: string;
-    videoUrl: string;
-    thumbnailUrl: string | null;
-    duration: number;
-  } | null;
-  selectedImage: {
-    id: string;
-    name: string | null;
-    publicUrl: string;
-  } | null;
+  /** 선택된 스킬(템플릿) 썸네일 — SKILLS 버튼 미리보기 */
+  selectedSkillThumbnailUrl: string | null;
   children?: ReactNode;
 }
 
@@ -31,8 +21,7 @@ export function HomeFloatingBar({
   characterId,
   activePanel,
   onPanelChange,
-  selectedVideo,
-  selectedImage,
+  selectedSkillThumbnailUrl,
   children,
 }: HomeFloatingBarProps) {
   const { currentTrack } = useAudioPlayer();
@@ -109,9 +98,9 @@ export function HomeFloatingBar({
           className="text-left w-full"
         >
           <span className="flex items-center gap-2">
-            {(selectedVideo?.thumbnailUrl || selectedImage?.publicUrl) && (
+            {selectedSkillThumbnailUrl && (
               <img
-                src={(selectedVideo?.thumbnailUrl ?? selectedImage?.publicUrl)!}
+                src={selectedSkillThumbnailUrl}
                 alt=""
                 className="w-5 h-5 rounded-sm object-cover"
               />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { SourceNodeData } from "./editorTypes";
-import type { Generation } from "~/data/types";
+import type { RunItem } from "~/lib/workflow/types";
 
 interface MediaBrowserProps {
   open: boolean;
@@ -9,7 +9,7 @@ interface MediaBrowserProps {
 }
 
 export function MediaBrowser({ open, onClose, onSelect }: MediaBrowserProps) {
-  const [items, setItems] = useState<Generation[]>([]);
+  const [items, setItems] = useState<RunItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,14 +17,14 @@ export function MediaBrowser({ open, onClose, onSelect }: MediaBrowserProps) {
     if (!open) return;
     setLoading(true);
     setError(null);
-    fetch("/api/gallery-data")
+    fetch("/api/library-data")
       .then((res) => {
         if (!res.ok) throw new Error(`${res.status}`);
         return res.json();
       })
-      .then((data) => {
-        const completed = (data.generations || []).filter(
-          (g: Generation) => g.status === "completed" && (g.videoUrl || g.outputUrl)
+      .then((data: { runs?: RunItem[] }) => {
+        const completed = (data.runs || []).filter(
+          (r) => r.status === "completed" && r.outputUrl
         );
         setItems(completed);
       })
@@ -70,9 +70,9 @@ export function MediaBrowser({ open, onClose, onSelect }: MediaBrowserProps) {
           ) : (
             <div className="grid grid-cols-4 gap-2">
               {items.map((item) => {
-                const url = item.outputUrl || item.videoUrl || "";
-                const isVideo = item.type === "video";
-                const name = (isVideo ? item.motionName : item.conceptImageName) || "Untitled";
+                const url = item.outputUrl || "";
+                const isVideo = item.outputType !== "image";
+                const name = item.templateName || item.characterId || "Untitled";
 
                 return (
                   <button

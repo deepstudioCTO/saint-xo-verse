@@ -64,7 +64,11 @@ export function WorkflowRunProvider({ children }: { children: React.ReactNode })
         const res = await fetch("/api/workflow-execute", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(templateId ? { graph, templateId } : { graph }),
+          body: JSON.stringify({
+            graph,
+            ...(templateId ? { templateId } : {}),
+            inputs: { source: "editor" },
+          }),
         });
         if (!res.ok) {
           const j = await res.json().catch(() => ({}));

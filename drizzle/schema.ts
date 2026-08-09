@@ -9,43 +9,6 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-export const generations = pgTable("generations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  predictionId: text("prediction_id"),
-  provider: text("provider").notNull().default("replicate"), // 'replicate' | 'higgsfield'
-  type: text("type").notNull().default("video"), // 'video' | 'image'
-  memberId: text("member_id"), // 선택한 멤버 ID
-  musicId: text("music_id"), // 선택한 음악 ID
-  motionVideoId: uuid("motion_video_id"), // 선택한 모션 비디오 ID
-  conceptImageId: uuid("concept_image_id"), // 참조용 컨셉 이미지 ID (이미지 생성용)
-  lookbookId: text("lookbook_id"), // lookbook ID (nullable for backward compat)
-  lookId: text("look_id"), // look ID (nullable, 정밀 look 추적용)
-  prompt: text("prompt"), // 이미지 생성 프롬프트
-  resolution: text("resolution"), // '1K' | '2K' | '4K'
-  imageUrl: text("image_url").notNull(),
-  motionVideoUrl: text("motion_video_url"), // Replicate 모션 참조 영상
-  motionPresetId: text("motion_preset_id"), // Higgsfield 프리셋 ID
-  status: text("status").notNull().default("pending"), // pending/processing/completed/failed
-  videoUrl: text("video_url"),
-  outputUrl: text("output_url"), // 생성된 이미지 URL (이미지 생성용)
-  outputStoragePath: text("output_storage_path"), // 이미지 Storage 경로
-  storagePath: text("storage_path"), // Supabase Storage 경로 (영구 저장)
-  duration: integer("duration"),
-  errorMessage: text("error_message"),
-  // Upscale fields
-  upscaleStatus: text("upscale_status"), // pending/processing/completed/failed
-  upscaleModel: text("upscale_model"), // 'real-esrgan' | 'topaz'
-  upscalePredictionId: text("upscale_prediction_id"),
-  upscaledVideoUrl: text("upscaled_video_url"),
-  upscaledStoragePath: text("upscaled_storage_path"), // Supabase Storage path
-  upscaleErrorMessage: text("upscale_error_message"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => sql`now()`),
-});
-
 export const motionVideos = pgTable("motion_videos", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull(), // 파일명 또는 자동 생성
@@ -140,7 +103,6 @@ export const editorProjects = pgTable("editor_projects", {
   nodes: text("nodes").notNull().default("[]"),
   edges: text("edges").notNull().default("[]"),
   viewport: text("viewport").notNull().default('{"x":0,"y":0,"zoom":1}'),
-  sourceGenerationId: text("source_generation_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -178,6 +140,9 @@ export const workflowTemplates = pgTable("workflow_templates", {
   thumbnailUrl: text("thumbnail_url"),
   currentVersion: integer("current_version").notNull().default(1),
   isPublished: boolean("is_published").default(false),
+  // 스킬(모션영상/컨셉이미지) 래핑 템플릿이면 원본 skill id — 홈 Generate의 skill→template 매핑 키.
+  // null이면 일반(수제/데모) 템플릿이라 홈 스킬 목록과 무관.
+  sourceSkillId: text("source_skill_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at")
     .defaultNow()
@@ -209,7 +174,6 @@ export const nodeRuns = pgTable("node_runs", {
   error: text("error"),
   externalId: text("external_id"), // Replicate predictionId 등
   externalProvider: text("external_provider"), // "replicate" | "ffmpeg" 등
-  legacyGenerationId: uuid("legacy_generation_id"), // 전환기: 기존 generations 행 매핑
   startedAt: timestamp("started_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });

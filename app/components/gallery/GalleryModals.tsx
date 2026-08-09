@@ -6,24 +6,17 @@ import {
   DialogDescription,
   DialogFooter,
 } from "~/components/ui/dialog";
-import { VideoDetailModal } from "./VideoDetailModal";
-import { ImageDetailModal } from "./ImageDetailModal";
-import type { UseGalleryStateReturn } from "~/hooks/useGalleryState";
+import { RunDetailModal } from "./RunDetailModal";
+import type { UseLibraryStateReturn } from "~/hooks/useLibraryState";
 
 type PickedState = Pick<
-  UseGalleryStateReturn,
-  | "selectedGeneration"
+  UseLibraryStateReturn,
+  | "selectedRun"
   | "modalOpen"
   | "setModalOpen"
   | "getCharacterName"
   | "getTrackName"
   | "handleDeleteRequest"
-  | "handleUpscaleStart"
-  | "handleMusicChange"
-  | "handleMotionChange"
-  | "handleConceptImageChange"
-  | "motionVideoOptions"
-  | "conceptImageOptions"
   | "deleteTarget"
   | "setDeleteTarget"
   | "isDeleting"
@@ -31,64 +24,33 @@ type PickedState = Pick<
 >;
 
 interface GalleryModalsProps {
-  galleryState: PickedState;
+  libraryState: PickedState;
 }
 
-export function GalleryModals({ galleryState }: GalleryModalsProps) {
+export function GalleryModals({ libraryState }: GalleryModalsProps) {
   const {
-    selectedGeneration,
+    selectedRun,
     modalOpen,
     setModalOpen,
     getCharacterName,
     getTrackName,
     handleDeleteRequest,
-    handleUpscaleStart,
-    handleMusicChange,
-    handleMotionChange,
-    handleConceptImageChange,
-    motionVideoOptions,
-    conceptImageOptions,
     deleteTarget,
     setDeleteTarget,
     isDeleting,
     handleDeleteConfirm,
-  } = galleryState;
+  } = libraryState;
 
   return (
     <>
-      {/* Video Detail Modal */}
-      {selectedGeneration?.type !== "image" && (
-        <VideoDetailModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          generation={selectedGeneration}
-          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.lookId)}
-          trackName={getTrackName(selectedGeneration?.musicId || null)}
-          motionName={selectedGeneration?.motionName || "Unknown"}
-          errorMessage={selectedGeneration?.errorMessage || null}
-          onDelete={handleDeleteRequest}
-          onUpscaleStart={handleUpscaleStart}
-          onMusicChange={handleMusicChange}
-          motionVideos={motionVideoOptions}
-          onMotionChange={handleMotionChange}
-        />
-      )}
-
-      {/* Image Detail Modal */}
-      {selectedGeneration?.type === "image" && (
-        <ImageDetailModal
-          open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          generation={selectedGeneration}
-          characterName={getCharacterName(selectedGeneration?.memberId || null, selectedGeneration?.lookId)}
-          conceptImageName={selectedGeneration?.conceptImageName || null}
-          errorMessage={selectedGeneration?.errorMessage || null}
-          onDelete={handleDeleteRequest}
-          conceptImages={conceptImageOptions}
-          onMusicChange={handleMusicChange}
-          onConceptImageChange={handleConceptImageChange}
-        />
-      )}
+      <RunDetailModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        run={selectedRun}
+        characterName={getCharacterName(selectedRun?.characterId ?? null, selectedRun?.lookId)}
+        trackName={getTrackName(selectedRun?.musicId ?? null)}
+        onDelete={handleDeleteRequest}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog

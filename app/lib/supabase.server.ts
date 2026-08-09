@@ -427,3 +427,19 @@ export async function deleteGeneratedImage(
     throw new Error(`Failed to delete generated image: ${error.message}`);
   }
 }
+
+/**
+ * Storage 객체 일괄 삭제 (best-effort — 실패는 로그만, throw하지 않음).
+ * run 삭제 시 산출물 정리에 사용: DB 삭제가 storage 실패에 막히면 안 된다.
+ */
+export async function deleteStorageObjects(
+  context: { env: Record<string, string> },
+  paths: string[]
+): Promise<void> {
+  if (paths.length === 0) return;
+  const supabase = getSupabaseClient(context);
+  const { error } = await supabase.storage.from(MOTION_VIDEOS_BUCKET).remove(paths);
+  if (error) {
+    console.error(`deleteStorageObjects failed (${paths.length} paths):`, error.message);
+  }
+}

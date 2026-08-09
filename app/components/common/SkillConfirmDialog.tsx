@@ -19,7 +19,7 @@ export function SkillConfirmDialog({
   isProducing,
 }: SkillConfirmDialogProps) {
   const [prompt, setPrompt] = useState("");
-  const isImage = item?.type === "image";
+  const isImage = item?.category === "image";
 
   const handleProduce = () => {
     onProduce(isImage ? prompt || undefined : undefined);

@@ -1,5 +1,5 @@
 // Types
-export type { Character, Lookbook, Look, Persona, CharacterImage, SkillVideo, SkillImage, Generation } from "./types";
+export type { Character, Lookbook, Look, Persona, CharacterImage } from "./types";
 
 // Manual data (base, rarely changes)
 export { CHARACTERS, CHARACTERS_BY_ID, createCharactersById } from "./characters";

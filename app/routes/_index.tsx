@@ -10,7 +10,7 @@ import {
   type Look,
   type Persona,
 } from "~/lib/data";
-import { getDb, characterImages, lookbooks, looks, personas, motionVideos, conceptImages, generations, workflowTemplates } from "~/lib/db.server";
+import { getDb, characterImages, lookbooks, looks, personas, motionVideos, conceptImages, workflowRuns, workflowTemplates } from "~/lib/db.server";
 import { getPublicUrl } from "~/lib/supabase.server";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { VideoCanvas } from "~/components/effects/VideoCanvas";
@@ -18,7 +18,7 @@ import { SkillHorizontalPanel, SkillExpandedPanel } from "~/components/skill/Ski
 import { HomeFloatingBar, type ActivePanel } from "~/components/layout/HomeFloatingBar";
 import { GalleryCompactPanel, GalleryExpandedPanel, GalleryHorizontalPanel, GalleryModals } from "~/components/gallery";
 import { MusicHorizontalPanel } from "~/components/music/MusicHorizontalPanel";
-import { useGalleryState } from "~/hooks/useGalleryState";
+import { useLibraryState } from "~/hooks/useLibraryState";
 import { InputImagePanel } from "~/components/common/InputImagePanel";
 import { SkillConfirmDialog } from "~/components/common/SkillConfirmDialog";
 import { CharacterInfoPanel } from "~/components/common/CharacterInfoPanel";
@@ -30,7 +30,6 @@ import { useSkillTeaching } from "~/hooks/useSkillTeaching";
 import { useCharacterImages } from "~/hooks/useCharacterImages";
 import { usePreloadPosters } from "~/hooks/usePreloadPosters";
 import { WorkflowPanel } from "~/components/workflow/WorkflowPanel";
-import { RunsPanel } from "~/components/workflow/RunsPanel";
 import { PricingPanel } from "~/components/pricing/PricingPanel";
 
 const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform }) => {
@@ -45,7 +44,6 @@ const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform })
 
 const PANEL_SHORTCUTS: Record<string, ActivePanel> = {
   w: "workflow-expanded",
-  r: "runs-expanded",
 };
 
 export const meta: Route.MetaFunction = () => [
@@ -136,15 +134,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const [dbVideos, dbConceptImages, storiesResult, dbTemplates] = await Promise.all([
     db.select().from(motionVideos).orderBy(desc(motionVideos.createdAt)),
     db.select().from(conceptImages).orderBy(desc(conceptImages.createdAt)),
-    db.select({ count: sql<number>`count(*)` }).from(generations).where(eq(generations.status, "completed")),
+    db.select({ count: sql<number>`count(*)` }).from(workflowRuns).where(eq(workflowRuns.status, "completed")),
     db.select({
       id: workflowTemplates.id,
       name: workflowTemplates.name,
       category: workflowTemplates.category,
       thumbnailUrl: workflowTemplates.thumbnailUrl,
+      sourceSkillId: workflowTemplates.sourceSkillId,
     }).from(workflowTemplates).where(eq(workflowTemplates.isPublished, true)).orderBy(desc(workflowTemplates.updatedAt)),
   ]);
 
+  // 스킬 카탈로그 (홈 표시용) — 실행은 아래 매핑된 템플릿으로
   const skillVideos = dbVideos.map((v) => ({
     id: v.id,
     name: v.name,
@@ -159,12 +159,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     publicUrl: img.publicUrl,
   }));
 
-  const skillTemplates = dbTemplates.map((t) => ({
-    id: t.id,
-    name: t.name,
-    category: t.category,
-    thumbnailUrl: t.thumbnailUrl,
-  }));
+  // skill id → 실행용 템플릿 id (sourceSkillId 매핑). 스킬 래퍼는 W패널 목록에서 제외
+  const templateIdBySkillId: Record<string, string> = {};
+  for (const t of dbTemplates) {
+    if (t.sourceSkillId) templateIdBySkillId[t.sourceSkillId] = t.id;
+  }
+  const skillTemplates = dbTemplates
+    .filter((t) => !t.sourceSkillId)
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      thumbnailUrl: t.thumbnailUrl,
+    }));
 
   const skillsCount = dbVideos.length;
   const storiesCount = Number(storiesResult[0]?.count || 0);
@@ -187,6 +194,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     skillVideos,
     skillImages,
     skillTemplates,
+    templateIdBySkillId,
   }, { headers: authHeaders });
 }
 
@@ -203,6 +211,7 @@ export default function Home() {
     skillVideos,
     skillImages,
     skillTemplates,
+    templateIdBySkillId,
   } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const revalidator = useRevalidator();
@@ -265,7 +274,7 @@ export default function Home() {
   // Panel state (shared across skill/gallery/music)
   const [activePanel, setActivePanel] = useState<ActivePanel>(null);
   const galleryOpen = activePanel === "gallery-horizontal" || activePanel === "gallery-compact" || activePanel === "gallery-expanded";
-  const galleryState = useGalleryState(galleryOpen);
+  const libraryState = useLibraryState(galleryOpen);
 
   // Unified transition state (replaces separate slideDirection / lookSlideDirection)
   const [transition, setTransition] = useState<{ type: "lookbook" | "look"; direction: number }>({
@@ -298,7 +307,8 @@ export default function Home() {
     selectedImgUrl,
     skillVideos,
     skillImages,
-    galleryState,
+    templateIdBySkillId,
+    libraryState,
     activePanel,
     setActivePanel,
     selectedId,
@@ -366,7 +376,6 @@ export default function Home() {
   const galleryCompactOpen = activePanel === "gallery-compact";
   const galleryExpandedOpen = activePanel === "gallery-expanded";
   const workflowExpandedOpen = activePanel === "workflow-expanded";
-  const runsExpandedOpen = activePanel === "runs-expanded";
   const pricingExpandedOpen = activePanel === "pricing-expanded";
 
   // Keyboard shortcuts → toggle expanded panels
@@ -581,6 +590,31 @@ export default function Home() {
             )}
           </AnimatePresence>
 
+          {/* Prompt input — below cards when image skill selected */}
+          <AnimatePresence>
+            {threeCardMode && skill.selectedSkillImage && (
+              <motion.input
+                key="generate-prompt"
+                type="text"
+                value={generatePrompt}
+                onChange={(e) => setGeneratePrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !skill.isGenerating) {
+                    skill.handleGenerateClick(generatePrompt || undefined);
+                  }
+                }}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="Describe what to generate..."
+                className="absolute z-[30] w-[28vw] min-w-[280px] px-4 py-2.5 text-xs glass rounded-sm text-black/70 placeholder:text-black/30 outline-none text-center"
+                style={{ transform: "translateY(24vh)" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3, delay: 0.1 }}
+              />
+            )}
+          </AnimatePresence>
+
           {/* Generate card — right side in three-card mode */}
           <AnimatePresence>
             {threeCardMode && (
@@ -733,8 +767,7 @@ export default function Home() {
         lookbookId={activeLookbookId}
         activePanel={activePanel}
         onPanelChange={setActivePanel}
-        selectedVideo={skill.selectedSkillVideo}
-        selectedImage={skill.selectedSkillImage}
+        selectedSkillThumbnailUrl={skill.selectedSkillVideo?.thumbnailUrl ?? skill.selectedSkillImage?.publicUrl ?? null}
       >
         <MusicHorizontalPanel open={musicHorizontalOpen} />
         {isSelecting && currentCharacter && (
@@ -753,14 +786,14 @@ export default function Home() {
         )}
         <GalleryHorizontalPanel
           open={galleryHorizontalOpen}
-          galleryState={galleryState}
+          libraryState={libraryState}
           gridRef={skill.galleryGridRef}
           flyingCardTargetId={skill.flyingCardTargetId}
         />
         <GalleryCompactPanel
           open={galleryCompactOpen}
           onExpand={() => setActivePanel("gallery-expanded")}
-          galleryState={galleryState}
+          libraryState={libraryState}
           gridRef={skill.galleryGridRef}
           flyingCardTargetId={skill.flyingCardTargetId}
         />
@@ -786,8 +819,7 @@ export default function Home() {
         open={galleryExpandedOpen}
         onClose={() => setActivePanel(null)}
         onCollapse={() => setActivePanel("gallery-compact")}
-        galleryState={galleryState}
-        lookbookId={activeLookbookId}
+        libraryState={libraryState}
       />
 
       <WorkflowPanel
@@ -796,17 +828,12 @@ export default function Home() {
         templates={skillTemplates}
       />
 
-      <RunsPanel
-        open={runsExpandedOpen}
-        onClose={() => setActivePanel(null)}
-      />
-
       <PricingPanel
         open={pricingExpandedOpen}
         onClose={() => setActivePanel(null)}
       />
 
-      <GalleryModals galleryState={galleryState} />
+      <GalleryModals libraryState={libraryState} />
     </div>
 
     {/* DragOverlay */}

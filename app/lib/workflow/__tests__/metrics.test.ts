@@ -8,7 +8,6 @@ import {
   monthlyBreakdown,
   type RunRow,
   type NodeRunRow,
-  type GenerationRow,
 } from "../metrics";
 
 const run = (
@@ -29,15 +28,8 @@ const node = (
   runId: string,
   nodeType: string,
   status: string,
-  outputs: string | null = null,
-  legacyGenerationId: string | null = null
-): NodeRunRow => ({ runId, nodeType, status, outputs, legacyGenerationId });
-
-const gen = (type: string, status: string, createdAt: string): GenerationRow => ({
-  type,
-  status,
-  createdAt: new Date(createdAt),
-});
+  outputs: string | null = null
+): NodeRunRow => ({ runId, nodeType, status, outputs });
 
 describe("summarizeDurations", () => {
   it("완료 run의 중앙값·평균·최소·최대를 초 단위로 계산", () => {
@@ -176,54 +168,42 @@ describe("summarizeOutputs", () => {
       node("a", "generate", "completed", '{"url":"u","type":"video"}'),
       node("a", "upscale", "completed", '{"url":"u2","type":"video"}'),
     ];
-    const o = summarizeOutputs([], nodes);
-    expect(o.workflowVideos).toBe(1);
-    expect(o.shortformTotal).toBe(1);
-  });
-
-  it("legacyGenerationId가 있는 node_run은 generations와 중복이라 제외", () => {
-    const gens = [gen("video", "completed", "2026-02-01T00:00:00Z")];
-    const nodes = [node("a", "generate", "completed", '{"type":"video"}', "legacy-1")];
-    const o = summarizeOutputs(gens, nodes);
-    expect(o.legacyVideos).toBe(1);
-    expect(o.workflowVideos).toBe(0);
-    expect(o.shortformTotal).toBe(1);
+    const o = summarizeOutputs(nodes);
+    expect(o.videos).toBe(1);
   });
 
   it("미완료 산출물과 파싱 불가 outputs는 세지 않음", () => {
-    const gens = [gen("video", "pending", "2026-02-01T00:00:00Z")];
     const nodes = [
       node("a", "generate", "failed", '{"type":"video"}'),
       node("b", "generate", "completed", "not-json"),
       node("c", "generate", "completed", null),
     ];
-    const o = summarizeOutputs(gens, nodes);
-    expect(o.shortformTotal).toBe(0);
+    const o = summarizeOutputs(nodes);
+    expect(o.videos).toBe(0);
+    expect(o.images).toBe(0);
   });
 
   it("이미지와 영상을 분리 집계", () => {
-    const gens = [
-      gen("image", "completed", "2026-02-01T00:00:00Z"),
-      gen("video", "completed", "2026-02-01T00:00:00Z"),
+    const nodes = [
+      node("a", "generate-image", "completed", '{"type":"image"}'),
+      node("b", "generate", "completed", '{"type":"video"}'),
     ];
-    const nodes = [node("a", "generate-image", "completed", '{"type":"image"}')];
-    const o = summarizeOutputs(gens, nodes);
-    expect(o.imageTotal).toBe(2);
-    expect(o.shortformTotal).toBe(1);
+    const o = summarizeOutputs(nodes);
+    expect(o.images).toBe(1);
+    expect(o.videos).toBe(1);
   });
 });
 
 describe("monthlyBreakdown", () => {
-  it("월별로 run·생성물을 묶고 오름차순 정렬", () => {
+  it("월별로 run을 묶고 오름차순 정렬", () => {
     const runs = [
       run("a", "completed", "2026-08-01T00:00:00Z"),
       run("b", "completed", "2026-07-15T00:00:00Z"),
       run("c", "completed", "2026-08-20T00:00:00Z"),
     ];
-    const gens = [gen("video", "completed", "2026-07-02T00:00:00Z")];
-    expect(monthlyBreakdown(runs, gens)).toEqual([
-      { month: "2026-07", runs: 1, generations: 1 },
-      { month: "2026-08", runs: 2, generations: 0 },
+    expect(monthlyBreakdown(runs)).toEqual([
+      { month: "2026-07", runs: 1 },
+      { month: "2026-08", runs: 2 },
     ]);
   });
 });
