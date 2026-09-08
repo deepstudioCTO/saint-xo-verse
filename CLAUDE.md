@@ -58,6 +58,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 | `export-run-outputs.ts` | 산출물을 `[번호]_[멤버]_[Look]_[스킬]_[트랙]`으로 내려받기. `--since` `--adopted` `--start-index`(제출본 뒤에 이어 붙일 때 필수) |
 | `metrics-report.ts` | `reports/metrics-<날짜>.{md,json}` 생성 |
 | `onboard-haeun.ts` | 하은 온보딩 + lookbook 02 "Beauty" 시드 (멱등) |
+| `compose-shortform.ts` | **네이티브 ffmpeg 음악(+자막) 합성** — Music 노드가 브라우저 전용이라 배치 run 산출물은 음악 미합성 원본이다. `--dir`/`--video`, 트랙은 파일명 꼬리→`--run` 스냅샷→`--track` 순으로 해석. `--subtitles <json>` `--frames` `--fade-out` `--dry-run`. 규칙은 `app/lib/compose-shortform.ts`(vitest)가 단일 소스, 출력은 항상 접미사 새 파일(원본 불변) |
 
 ## 환경 변수
 
@@ -296,6 +297,10 @@ responseHeaders.set("Cross-Origin-Embedder-Policy", "credentialless"); // requir
 ```
 
 **worker 로딩(`audio-merge.ts` `loadFFmpeg`)**: `classWorkerURL`을 same-origin blob으로 **명시 지정** 필수. `@ffmpeg/ffmpeg` 0.12는 워커를 `new URL("./worker.js", import.meta.url)`로 찾는데 Vite dev(`.vite/deps`)에서 경로 해소 실패 → `load()` 무한 hang. esm worker.js는 상대 import를 쓰므로 그대로 blob화 불가 → 상대 import를 절대 CDN URL로 치환 후 blob화(`buildFFmpegWorkerURL`, 워커 스크립트는 same-origin 필수·내부 절대 cross-origin import는 CORS 허용). `FFMPEG_VERSION` 상수는 package.json `@ffmpeg/ffmpeg`와 반드시 일치(메인스레드 클래스↔워커 프로토콜 동일 버전 요구). 미지정 시 dev에서 갤러리 Download-with-music·Music 노드 모두 hang.
+
+**합성은 브라우저에서만 돈다 — 배치 산출물은 원본이다.** `GenerationPipeline`은 executable 노드(generate/upscale)만 실행하고 Music/Subtitle은 무시한다. 그래서 `batch-variation-run.ts`로 만든 run을 `export-run-outputs.ts`로 내려받으면 **음악이 안 붙은 영상**이 나온다(파일명의 트랙 이름은 Music 노드 설정값일 뿐 합성 결과가 아니다). 2026-09-08 실측: 8/10 제출본 숏폼 16편은 같은 모션 소스를 쓴 편끼리 트랙이 달라도 오디오 RMS 프로파일이 완전히 일치했고 그 파형이 모션 소스 영상의 오디오와 같다 — **제출본에도 라이브러리 음악이 들어있지 않다**(들리는 소리는 Kling이 소스에서 넘긴 오디오). 화면을 안 거치고 완성본을 만들려면 `scripts/compose-shortform.ts`를 쓴다.
+
+**자막은 굽지 않는다.** SubtitleNode의 entries는 PreviewNode가 DOM 오버레이(`bottom-4` / `bg-black/70 text-white text-xs px-3 py-1 rounded`)로 그릴 뿐이고 `mergeVideoWithMusic`은 자막을 인자로 받지도 않는다. 전 29 run의 entries는 빈 배열이라 구울 텍스트 자체가 없다. `compose-shortform.ts`의 자막 스타일은 "기존 완성본과 맞춘 값"이 아니라 **이 Preview CSS를 영상 해상도로 환산한 값**이다(`scaleSubtitleStyle`, 노드 폭 280px 기준). Homebrew 슬림 `ffmpeg` 포뮬러에는 drawtext(freetype)·subtitles(libass)가 없어 cue를 Pillow로 PNG 렌더 후 `overlay`로 얹는다 — 폰트는 앱과 같은 Pretendard(`~/Library/Fonts/Pretendard-Regular.otf`), 없으면 Apple SD Gothic Neo로 폴백하고 어떤 폰트를 썼는지 항상 출력한다.
 
 ## 배포
 
