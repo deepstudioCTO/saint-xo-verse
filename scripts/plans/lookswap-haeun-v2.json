@@ -1,0 +1,38 @@
+{
+  "template": "룩 스왑",
+  "_note": "룩스왑 재생성 v2 — 1차 결과(run 348c875e)의 머리 과대 문제 대응. 프롬프트 4종 비교 후 1건 채택. 입력(멤버 포스터·컨셉 컷)은 1차와 동일하게 두어 프롬프트 효과만 분리한다.",
+  "combos": [
+    {
+      "label": "LS2-A",
+      "characterId": "haeun",
+      "lookId": "02_01",
+      "sourceImage": "persona:00_04/lei",
+      "_variant": "역할 재정의 — 마지막 레퍼런스를 '바디 더블'로 승격(비율까지 복사)",
+      "prompt": "You are given 2 reference images with different roles. Reference 1 is the SUBJECT and it is a tight close-up crop: use it ONLY for facial identity — reproduce her face, hairstyle and makeup exactly. Ignore its crop, camera distance and apparent head scale; a close-up carries no information about how large her head should be in a full-body frame. The LAST reference is the STYLING, FRAMING AND BODY-PROPORTION GUIDE: treat it as a body double. Copy its outfit, hair styling direction, lighting, background, color grade, camera shot size and crop, and keep its full-body proportions unchanged — the same head-to-body ratio (about 7.5 head-heights tall), the same head width relative to the shoulders, the same torso and leg length. Do NOT take the last reference's face or facial identity. Output: the subject of reference 1 standing full-body, head to toe in frame, wearing and lit like the last reference, with natural slender adult idol proportions — small head, long legs. Do not enlarge the head; no bobblehead, chibi or child-like proportions. Editorial photo, sharp focus, natural skin texture."
+    },
+    {
+      "label": "LS2-B",
+      "characterId": "haeun",
+      "lookId": "02_01",
+      "sourceImage": "persona:00_04/lei",
+      "_variant": "A + 측정 가능한 수치 제약(머리 ≤ 화면 높이 13%, 어깨 ≥ 머리폭 2.2배)",
+      "prompt": "You are given 2 reference images with different roles. Reference 1 is the SUBJECT and it is a tight close-up crop: use it ONLY for facial identity — reproduce her face, hairstyle and makeup exactly. Ignore its crop, camera distance and apparent head scale; a close-up carries no information about how large her head should be in a full-body frame. The LAST reference is the STYLING, FRAMING AND BODY-PROPORTION GUIDE: treat it as a body double. Copy its outfit, hair styling direction, lighting, background, color grade, camera shot size and crop, and keep its full-body proportions unchanged — the same head-to-body ratio (about 7.5 head-heights tall), the same head width relative to the shoulders, the same torso and leg length. Do NOT take the last reference's face or facial identity. Output: the subject of reference 1 standing full-body, head to toe in frame, wearing and lit like the last reference, with natural slender adult idol proportions — small head, long legs. Do not enlarge the head; no bobblehead, chibi or child-like proportions. Editorial photo, sharp focus, natural skin texture. Measured constraint: the head, from the crown of the skull to the chin, must occupy no more than 13 percent of the total image height, and the shoulders must be at least 2.2 head-widths wide."
+    },
+    {
+      "label": "LS2-C",
+      "characterId": "haeun",
+      "lookId": "02_01",
+      "sourceImage": "persona:00_04/lei",
+      "_variant": "실루엣 고정형 — 마지막 레퍼런스를 base plate로 두고 얼굴만 교체",
+      "prompt": "Face swap onto a body double. The LAST reference image is the base plate: keep its body, its exact silhouette, its scale within the frame, its pose, outfit, lighting, background, color grade and crop EXACTLY as they are — do not resize, redraw or restyle the body or the head outline. Change only the face, hairstyle and makeup, replacing them with those of reference 1, which is a tight close-up used for facial identity only. The head must stay the same size and position it occupies in the last reference; reference 1's close-up crop must not influence head scale or camera distance. Full-body standing editorial photo, head to toe in frame, sharp focus, natural skin texture."
+    },
+    {
+      "label": "LS2-D",
+      "characterId": "haeun",
+      "lookId": "02_01",
+      "sourceImage": "persona:00_04/lei",
+      "_variant": "C + 측정 가능한 수치 제약",
+      "prompt": "Face swap onto a body double. The LAST reference image is the base plate: keep its body, its exact silhouette, its scale within the frame, its pose, outfit, lighting, background, color grade and crop EXACTLY as they are — do not resize, redraw or restyle the body or the head outline. Change only the face, hairstyle and makeup, replacing them with those of reference 1, which is a tight close-up used for facial identity only. The head must stay the same size and position it occupies in the last reference; reference 1's close-up crop must not influence head scale or camera distance. Full-body standing editorial photo, head to toe in frame, sharp focus, natural skin texture. Measured constraint: the head, from the crown of the skull to the chin, must occupy no more than 13 percent of the total image height, and the shoulders must be at least 2.2 head-widths wide."
+    }
+  ]
+}

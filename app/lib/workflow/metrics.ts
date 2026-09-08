@@ -226,6 +226,15 @@ export interface OutputSummary {
    */
   videos: number;
   images: number;
+  /**
+   * 채택(검수 통과)된 run이 만든 영상 편수 = **보고용 숏폼 편수**.
+   * 채택 run 수를 그대로 쓰면 안 된다 — 룩 스왑처럼 영상을 만들지 않는 이미지 템플릿까지
+   * 숏폼으로 세어져 "채택 편수 > 생성 편수"라는 성립 불가능한 표가 나온다.
+   * 채택 run 집합을 넘기지 않으면 셀 수 없으므로 null이다.
+   */
+  adoptedVideos: number | null;
+  /** 채택된 run이 만든 이미지 산출물 수 (룩 스왑 등 이미지 트랙 템플릿의 편수) */
+  adoptedImages: number | null;
 }
 
 function parsedOutputType(raw: string | null): string | null {
@@ -237,18 +246,39 @@ function parsedOutputType(raw: string | null): string | null {
   }
 }
 
-export function summarizeOutputs(nodeRuns: NodeRunRow[]): OutputSummary {
+export function summarizeOutputs(
+  nodeRuns: NodeRunRow[],
+  adoptedIds?: ReadonlySet<string>
+): OutputSummary {
   let videos = 0;
   let images = 0;
+  let adoptedVideos = 0;
+  let adoptedImages = 0;
   for (const n of nodeRuns) {
     if (n.status !== "completed") continue;
     if (n.nodeType === "upscale") continue; // 같은 편의 파생물
     const type = parsedOutputType(n.outputs);
-    if (type === "video") videos++;
-    else if (type === "image") images++;
+    const adopted = adoptedIds?.has(n.runId) === true;
+    if (type === "video") {
+      videos++;
+      if (adopted) adoptedVideos++;
+    } else if (type === "image") {
+      images++;
+      if (adopted) adoptedImages++;
+    }
   }
 
-  return { videos, images };
+  return {
+    videos,
+    images,
+    adoptedVideos: adoptedIds ? adoptedVideos : null,
+    adoptedImages: adoptedIds ? adoptedImages : null,
+  };
+}
+
+/** 채택(검수 통과)된 완료 run의 id 집합 — summarizeOutputs의 두 번째 인자용 */
+export function adoptedRunIds(runs: RunRow[]): Set<string> {
+  return new Set(runs.filter((r) => r.status === "completed" && r.adopted === true).map((r) => r.id));
 }
 
 // ── 월별 추이 ────────────────────────────────────────────────
@@ -369,13 +399,15 @@ export function renderMarkdown(r: MetricsReport): string {
     "",
     "| 항목 | 값 |",
     "|---|---|",
-    `| **AI 생성 숏폼 편수(채택)** | **${rel.adopted}편** |`,
+    `| **AI 생성 숏폼 편수(채택)** | **${o.adoptedVideos === null ? "미산출" : `${o.adoptedVideos}편`}** |`,
     `| 숏폼 생성 건수(채택 전) | ${o.videos}편 |`,
-    `| 이미지 생성물 | ${o.images}건 |`,
+    `| 이미지 산출물(채택) | ${o.adoptedImages === null ? "미산출" : `${o.adoptedImages}건`} |`,
+    `| 이미지 생성물(채택 전) | ${o.images}건 |`,
+    `| 채택된 run | ${rel.adopted}건 |`,
     `| 워크플로우 실행 횟수 | ${rel.total}회 |`,
     `| 템플릿 종수 | 전체 ${r.templateCounts.total}종 / 공개 ${r.templateCounts.published}종 |`,
     "",
-    "> 숏폼 편수는 업스케일 노드를 세지 않습니다(같은 편의 파생물). **보고용 편수는 채택(품질 검수 통과) 기준**이며, 생성 건수는 검수 전 총량입니다.",
+    "> 숏폼 편수는 업스케일 노드를 세지 않습니다(같은 편의 파생물). **보고용 편수는 채택(품질 검수 통과) 기준**이며, 생성 건수는 검수 전 총량입니다. 채택 run 1건이 숏폼 1편이라고 가정하지 않습니다 — 이미지 트랙 템플릿(룩 스왑 등)의 채택분은 숏폼이 아니라 이미지 산출물로 셉니다.",
     "",
     "## 월별 추이",
     "",

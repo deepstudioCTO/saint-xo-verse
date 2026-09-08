@@ -25,6 +25,7 @@ import {
   summarizeReliability,
   summarizeTemplateReuse,
   summarizeOutputs,
+  adoptedRunIds,
   monthlyBreakdown,
   renderMarkdown,
   type MetricsReport,
@@ -78,7 +79,7 @@ async function main() {
     reductionPct: reductionRate(durations.medianSec, manualBaselineMin),
     reliability: summarizeReliability(runRows, nodeRows),
     templateReuse: summarizeTemplateReuse(runRows, templateRows),
-    outputs: summarizeOutputs(nodeRows),
+    outputs: summarizeOutputs(nodeRows, adoptedRunIds(runRows)),
     monthly: monthlyBreakdown(runRows),
     templateCounts: {
       total: templateRows.length,

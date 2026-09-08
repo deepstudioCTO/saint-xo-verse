@@ -5,6 +5,7 @@ import {
   summarizeReliability,
   summarizeTemplateReuse,
   summarizeOutputs,
+  adoptedRunIds,
   monthlyBreakdown,
   type RunRow,
   type NodeRunRow,
@@ -244,6 +245,39 @@ describe("summarizeOutputs", () => {
     const o = summarizeOutputs(nodes);
     expect(o.images).toBe(1);
     expect(o.videos).toBe(1);
+  });
+
+  it("채택 집합을 안 주면 채택 편수는 미산출(null) — 셀 수 없는 것은 세지 않는다", () => {
+    const o = summarizeOutputs([node("a", "generate", "completed", '{"type":"video"}')]);
+    expect(o.adoptedVideos).toBeNull();
+    expect(o.adoptedImages).toBeNull();
+  });
+
+  it("채택 편수는 산출물 종류별로 센다 — 이미지 템플릿 채택분이 숏폼으로 새지 않음", () => {
+    // a=채택된 숏폼, b=미채택 숏폼, c=채택된 룩 스왑(이미지만 생성)
+    const nodes = [
+      node("a", "generate", "completed", '{"type":"video"}'),
+      node("a", "generate-image", "completed", '{"type":"image"}'),
+      node("b", "generate", "completed", '{"type":"video"}'),
+      node("c", "generate-image", "completed", '{"type":"image"}'),
+    ];
+    const o = summarizeOutputs(nodes, new Set(["a", "c"]));
+    expect(o.videos).toBe(2);
+    expect(o.adoptedVideos).toBe(1); // 채택 run은 2건이지만 숏폼은 1편뿐
+    expect(o.images).toBe(2);
+    expect(o.adoptedImages).toBe(2);
+  });
+});
+
+describe("adoptedRunIds", () => {
+  it("완료 + adopted=true인 run만 모은다 (실패한 run은 검수 대상이 된 적이 없다)", () => {
+    const runs = [
+      run("a", "completed", "2026-09-01T00:00:00Z", null, null, true),
+      run("b", "completed", "2026-09-01T00:00:00Z", null, null, false),
+      run("c", "failed", "2026-09-01T00:00:00Z", null, null, true),
+      run("d", "running", "2026-09-01T00:00:00Z", null, null, null),
+    ];
+    expect([...adoptedRunIds(runs)]).toEqual(["a"]);
   });
 });
 

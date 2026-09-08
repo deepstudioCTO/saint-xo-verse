@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-09-08T06:07:28.084Z",
+  "generatedAt": "2026-09-08T06:43:59.159Z",
   "durations": {
-    "counted": 25,
-    "medianSec": 402.168,
-    "meanSec": 335.7671200000001,
+    "counted": 29,
+    "medianSec": 378.161,
+    "meanSec": 302.8984137931035,
     "minSec": 27.872,
     "maxSec": 491.617,
     "excludedIncomplete": 0,
@@ -12,21 +12,21 @@
   "manualBaselineMin": null,
   "reductionPct": null,
   "reliability": {
-    "total": 25,
-    "completed": 24,
+    "total": 29,
+    "completed": 28,
     "failed": 1,
     "unfinished": 0,
-    "successRate": 96,
-    "nodeTotal": 48,
-    "nodeAttempted": 46,
+    "successRate": 96.55172413793103,
+    "nodeTotal": 52,
+    "nodeAttempted": 50,
     "nodeSkipped": 2,
     "nodeFailed": 0,
     "nodeFailureRate": 0,
-    "adopted": 22,
-    "adoptionRate": 91.66666666666666
+    "adopted": 23,
+    "adoptionRate": 82.14285714285714
   },
   "templateReuse": {
-    "attributedRuns": 25,
+    "attributedRuns": 29,
     "unattributedRuns": 0,
     "attributionRate": 100,
     "usage": [
@@ -38,7 +38,7 @@
       {
         "templateId": "23bdd2eb-ffc5-49c7-b7ce-c7ce5753197d",
         "name": "룩 스왑",
-        "runCount": 1
+        "runCount": 5
       },
       {
         "templateId": "1819ce11-e95b-4135-bf04-1cf74ab81310",
@@ -46,12 +46,14 @@
         "runCount": 1
       }
     ],
-    "reusedTemplates": 1,
-    "reuseRate": 33.33333333333333
+    "reusedTemplates": 2,
+    "reuseRate": 66.66666666666666
   },
   "outputs": {
     "videos": 22,
-    "images": 23
+    "images": 27,
+    "adoptedVideos": 22,
+    "adoptedImages": 23
   },
   "monthly": [
     {
@@ -60,7 +62,7 @@
     },
     {
       "month": "2026-09",
-      "runs": 9
+      "runs": 13
     }
   ],
   "templateCounts": {

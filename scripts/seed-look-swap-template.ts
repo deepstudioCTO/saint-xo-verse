@@ -15,6 +15,18 @@
  * ②단일 입력 재현 가능: 입력은 (멤버 룩, 컨셉 레퍼런스) 두 슬롯뿐 — 같은 쌍을 넣으면 같은 결과 계열.
  * ③IP 아이덴티티 유지: 프롬프트가 레퍼런스별 역할을 위치로 못박는다(1=인물, 마지막=스타일/프레이밍).
  *
+ * 프롬프트가 비율까지 못박는 이유(v2, 2026-09-08 재작업):
+ *   1차 결과물(하은)은 머리가 과하게 컸다. 원인은 프롬프트가 아니라 **입력 비대칭**이다 —
+ *   Look 슬롯에 들어가는 멤버 포스터는 8/27 뷰티 촬영의 얼굴 클로즈업뿐이라(전신 컷 부재)
+ *   모델이 "이 인물의 머리는 프레임의 이만큼"이라는 클로즈업의 스케일을 전신 프레임까지 끌고 왔다.
+ *   전신 소재가 생기기 전까지의 대응은 프롬프트로 역할을 더 강하게 가르는 것이다:
+ *   레퍼런스1 = 얼굴 아이덴티티 **전용**(크롭·카메라 거리·머리 스케일은 무시),
+ *   마지막 레퍼런스 = 스타일링 + **바디 더블**(두신 비율·어깨 대비 머리 폭·다리 길이를 그대로).
+ *   같은 컨셉 컷으로 프롬프트 4종을 재생성해 비교했다(scripts/plans/lookswap-haeun-v2.json).
+ *   실측(실루엣 폭 프로파일, 화면 높이 정규화): 1차 두신비 5.9·어깨/머리폭 1.96 →
+ *   A 6.51/2.14 · **B 6.65/2.28(채택)** · C 6.14/1.99 · D 6.57/2.12.
+ *   아래 프롬프트는 채택본 B다 — 역할 재정의에 **측정 가능한 수치 제약**을 더한 쪽이 가장 안정적이었다.
+ *
  * 모델은 gpt-image-2를 **명시**한다. 팔레트 기본값 soul-reference는 refImages.max=1이라
  * 두 번째 레퍼런스가 조용히 버려진다(시드는 노드 UI 경고를 거치지 않는다).
  *
@@ -38,14 +50,24 @@ const NAME = "룩 스왑";
 // W패널은 thumbnail_url을 <img>로 그리고 이름 라벨이 흰색이라, 썸네일이 없으면
 // 빈 회색 카드가 되고 이름도 안 보인다. 이 템플릿의 **실제 검증 실행 결과물**을 쓴다.
 const THUMBNAIL =
-  "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/generated-images/501e3450-1942-40b0-b38c-83b49a08c88e.jpg";
+  "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/generated-images/449e2f56-b6a7-4961-b0d1-3b3b09df8111.jpg";
 
 const SWAP_PROMPT =
   "You are given 2 reference images with different roles. " +
-  "Reference 1 is the SUBJECT: reproduce her face, hairstyle and makeup exactly — this is the only person in the output. " +
-  "The LAST reference is a STYLING AND FRAMING GUIDE ONLY: copy its outfit, hair styling direction, lighting, background, color grade, camera shot size and crop. " +
+  "Reference 1 is the SUBJECT and it is a tight close-up crop: use it ONLY for facial identity — " +
+  "reproduce her face, hairstyle and makeup exactly. Ignore its crop, camera distance and apparent head scale; " +
+  "a close-up carries no information about how large her head should be in a full-body frame. " +
+  "The LAST reference is the STYLING, FRAMING AND BODY-PROPORTION GUIDE: treat it as a body double. " +
+  "Copy its outfit, hair styling direction, lighting, background, color grade, camera shot size and crop, " +
+  "and keep its full-body proportions unchanged — the same head-to-body ratio (about 7.5 head-heights tall), " +
+  "the same head width relative to the shoulders, the same torso and leg length. " +
   "Do NOT take the last reference's face or facial identity. " +
-  "Output: the subject of reference 1 wearing and lit like the last reference. Editorial photo, sharp focus, natural skin texture.";
+  "Output: the subject of reference 1 standing full-body, head to toe in frame, wearing and lit like the last reference, " +
+  "with natural slender adult idol proportions — small head, long legs. " +
+  "Do not enlarge the head; no bobblehead, chibi or child-like proportions. " +
+  "Editorial photo, sharp focus, natural skin texture. " +
+  "Measured constraint: the head, from the crown of the skull to the chin, must occupy no more than "  +
+  "13 percent of the total image height, and the shoulders must be at least 2.2 head-widths wide.";
 
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client);
