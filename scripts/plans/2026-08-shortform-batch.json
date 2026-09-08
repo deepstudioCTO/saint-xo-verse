@@ -1,0 +1,12 @@
+{
+  "template": "모션 컨트롤",
+  "_note": "8월 숏폼 추가분 + 다중 생성 모드 변주 배치. 파일명 규칙 [번호]_[멤버]_[Look]_[스킬]_[트랙].",
+  "combos": [
+    { "label": "17", "characterId": "haeun", "lookId": "02_01", "motion": "Cute Action", "trackId": "1" },
+    { "label": "18", "characterId": "haeun", "lookId": "02_01", "motion": "Smile",       "trackId": "10" },
+    { "label": "19", "characterId": "rumi",  "lookId": "02_01", "motion": "Cute Action", "trackId": "1" },
+    { "label": "20", "characterId": "sumin", "lookId": "02_01", "motion": "Cute Action", "trackId": "1" },
+    { "label": "21", "characterId": "haeun", "lookId": "02_01", "motion": "Dance",       "trackId": "4" },
+    { "label": "22", "characterId": "lei",   "lookId": "00_04", "motion": "Above",       "trackId": "13" }
+  ]
+}

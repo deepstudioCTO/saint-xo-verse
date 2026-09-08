@@ -1,0 +1,13 @@
+{
+  "template": "릴리스 마스터",
+  "_note": "P-2 신규 템플릿 1회 실행 검증 — 22번 컷(Lei/Above)을 재생성 없이 4K 마스터로 후처리",
+  "combos": [
+    {
+      "label": "RM-1",
+      "characterId": "lei",
+      "lookId": "00_04",
+      "trackId": "13",
+      "sourceVideo": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/generated-videos/ae90d016-f290-4c17-a1df-4c3720c461cb.mp4"
+    }
+  ]
+}

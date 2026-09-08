@@ -1,0 +1,7 @@
+{
+  "template": "룩 스왑",
+  "_note": "P-2 신규 템플릿 1회 실행 검증 — 하은에게 레이 00_04 컷의 스타일링/프레이밍을 입힌다",
+  "combos": [
+    { "label": "LS-1", "characterId": "haeun", "lookId": "02_01", "sourceImage": "persona:00_04/lei" }
+  ]
+}
