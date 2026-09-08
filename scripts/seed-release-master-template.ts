@@ -31,6 +31,11 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const NAME = "릴리스 마스터";
 
+// 검증 실행에서 마스터링한 컷(22번 Lei/Above)의 첫 프레임. 썸네일이 없으면 W패널이
+// 빈 회색 카드가 되고 흰색 이름 라벨도 안 보인다.
+const THUMBNAIL =
+  "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/generated-images/ac51170e-4f8c-4c90-b683-fbc35c1ba56d.jpg";
+
 const client = postgres(databaseUrl, { prepare: false });
 const db = drizzle(client);
 
@@ -87,6 +92,7 @@ async function seed() {
   const meta = {
     description: "채택된 컷을 재생성 없이 4K 마스터로 후처리",
     category: "video" as const,
+    thumbnailUrl: THUMBNAIL,
   };
 
   if (existing) {

@@ -1,0 +1,70 @@
+{
+  "generatedAt": "2026-09-08T06:07:28.084Z",
+  "durations": {
+    "counted": 25,
+    "medianSec": 402.168,
+    "meanSec": 335.7671200000001,
+    "minSec": 27.872,
+    "maxSec": 491.617,
+    "excludedIncomplete": 0,
+    "excludedNegative": 0
+  },
+  "manualBaselineMin": null,
+  "reductionPct": null,
+  "reliability": {
+    "total": 25,
+    "completed": 24,
+    "failed": 1,
+    "unfinished": 0,
+    "successRate": 96,
+    "nodeTotal": 48,
+    "nodeAttempted": 46,
+    "nodeSkipped": 2,
+    "nodeFailed": 0,
+    "nodeFailureRate": 0,
+    "adopted": 22,
+    "adoptionRate": 91.66666666666666
+  },
+  "templateReuse": {
+    "attributedRuns": 25,
+    "unattributedRuns": 0,
+    "attributionRate": 100,
+    "usage": [
+      {
+        "templateId": "8393bef8-a707-4bd7-9969-c414f480d9d7",
+        "name": "모션 컨트롤",
+        "runCount": 23
+      },
+      {
+        "templateId": "23bdd2eb-ffc5-49c7-b7ce-c7ce5753197d",
+        "name": "룩 스왑",
+        "runCount": 1
+      },
+      {
+        "templateId": "1819ce11-e95b-4135-bf04-1cf74ab81310",
+        "name": "릴리스 마스터",
+        "runCount": 1
+      }
+    ],
+    "reusedTemplates": 1,
+    "reuseRate": 33.33333333333333
+  },
+  "outputs": {
+    "videos": 22,
+    "images": 23
+  },
+  "monthly": [
+    {
+      "month": "2026-08",
+      "runs": 16
+    },
+    {
+      "month": "2026-09",
+      "runs": 9
+    }
+  ],
+  "templateCounts": {
+    "total": 21,
+    "published": 19
+  }
+}

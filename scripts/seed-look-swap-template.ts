@@ -35,6 +35,11 @@ if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
 const NAME = "룩 스왑";
 
+// W패널은 thumbnail_url을 <img>로 그리고 이름 라벨이 흰색이라, 썸네일이 없으면
+// 빈 회색 카드가 되고 이름도 안 보인다. 이 템플릿의 **실제 검증 실행 결과물**을 쓴다.
+const THUMBNAIL =
+  "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/generated-images/501e3450-1942-40b0-b38c-83b49a08c88e.jpg";
+
 const SWAP_PROMPT =
   "You are given 2 reference images with different roles. " +
   "Reference 1 is the SUBJECT: reproduce her face, hairstyle and makeup exactly — this is the only person in the output. " +
@@ -102,6 +107,7 @@ async function seed() {
         edges,
         category: "image",
         description: "확정 컨셉 컷의 스타일링을 유지한 채 멤버만 교체",
+        thumbnailUrl: THUMBNAIL,
         isPublished: true,
         currentVersion: existing.currentVersion + 1,
       })
@@ -114,6 +120,7 @@ async function seed() {
         name: NAME,
         description: "확정 컨셉 컷의 스타일링을 유지한 채 멤버만 교체",
         category: "image",
+        thumbnailUrl: THUMBNAIL,
         nodes,
         edges,
         viewport: '{"x":0,"y":0,"zoom":0.7}',

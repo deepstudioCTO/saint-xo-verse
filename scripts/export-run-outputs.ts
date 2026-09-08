@@ -14,8 +14,16 @@ import path from "path";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
-const OUT = process.argv[2];
+const argv = process.argv.slice(2);
+const OUT = argv.find((a) => !a.startsWith("--"));
 if (!OUT) throw new Error("출력 디렉토리를 인자로 주세요");
+const optValue = (n: string) => {
+  const i = argv.indexOf(`--${n}`);
+  return i >= 0 ? argv[i + 1] : undefined;
+};
+const since = optValue("since");
+const startIndex = Number(optValue("start-index") ?? 1);
+const adoptedOnly = argv.includes("--adopted");
 
 /** 트랙 id → 제목 (app/data/tracks.ts와 동일) */
 const TRACKS: Record<string, string> = {
@@ -42,10 +50,14 @@ async function main() {
   // 그 산출물은 실제로 존재하는 파일이다. 판단 기준은 run이 아니라 node_run의 완료 여부다.
   const runs = await sql<{ id: string; snapshot: string; started_at: Date }[]>`
     select id, template_snapshot as snapshot, started_at
-    from workflow_runs order by started_at`;
+    from workflow_runs
+    where true
+      ${since ? sql`and started_at >= ${new Date(`${since}T00:00:00Z`)}` : sql``}
+      ${adoptedOnly ? sql`and adopted = true` : sql``}
+    order by started_at`;
 
-  console.log(`완료된 실행 ${runs.length}건`);
-  let idx = 0;
+  console.log(`대상 실행 ${runs.length}건 (번호 ${startIndex}부터)`);
+  let idx = startIndex - 1;
 
   for (const run of runs) {
     idx++;

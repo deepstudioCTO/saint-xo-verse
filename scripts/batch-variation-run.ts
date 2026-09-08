@@ -95,7 +95,7 @@ async function login(): Promise<string> {
 function injectCombo(
   nodes: GraphNodeLike[],
   combo: Combo,
-  personaImageUrl: string,
+  persona: { name: string; imageUrl: string },
   motion: { name: string; url: string; thumbnailUrl: string | null } | null,
   sourceImageUrl: string | null
 ): GraphNodeLike[] {
@@ -107,7 +107,8 @@ function injectCombo(
           ...n.data,
           characterId: combo.characterId,
           lookId: combo.lookId,
-          media: { type: "image", url: personaImageUrl, name: combo.characterId },
+          // name은 export-run-outputs가 파일명에 쓰는 표시 이름 — 제출본 규칙(Sumin/Rumi/Lei)과 맞춘다
+          media: { type: "image", url: persona.imageUrl, name: persona.name },
         },
       };
     }
@@ -231,7 +232,7 @@ async function main() {
       sourceImageUrl = combo.sourceImage;
     }
 
-    const nodes = injectCombo(baseNodes, combo, persona.imageUrl, motion, sourceImageUrl);
+    const nodes = injectCombo(baseNodes, combo, persona, motion, sourceImageUrl);
     jobs.push({ combo, nodes, costUsd: estimateCost(nodes, motion?.duration ?? 10) });
   }
 
