@@ -159,6 +159,14 @@ export const workflowRuns = pgTable("workflow_runs", {
   outputs: text("outputs"), // JSON — 최종 결과물
   status: text("status").notNull().default("pending"), // pending/running/completed/failed
   error: text("error"),
+  /**
+   * 품질 검수 통과 = "완성 숏폼 편수"로 집계되는 산출물 (구현계획서 P2-1b ㉡).
+   * status(=실행이 끝났는가)와 다른 축이다 — completed여도 검수에서 떨어지면 false.
+   * 이 컬럼이 없으면 편수 카운트가 수기가 되고 metrics의 채택률이 영구 null이 된다.
+   */
+  adopted: boolean("adopted").notNull().default(false),
+  /** 채택 시각. 소급 마킹분과 실시간 판정분을 구분하기 위해 남긴다 */
+  adoptedAt: timestamp("adopted_at"),
   startedAt: timestamp("started_at").defaultNow().notNull(),
   completedAt: timestamp("completed_at"),
 });

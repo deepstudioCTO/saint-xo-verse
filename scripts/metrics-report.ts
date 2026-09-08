@@ -55,6 +55,7 @@ async function main() {
     templateId: r.templateId,
     startedAt: r.startedAt,
     completedAt: r.completedAt,
+    adopted: r.adopted,
   }));
   const nodeRows = nodes.map((n) => ({
     runId: n.runId,

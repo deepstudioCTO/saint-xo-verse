@@ -120,6 +120,13 @@
       "when": 1786206548545,
       "tag": "0016_bright_the_initiative",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788846408260,
+      "tag": "0017_rapid_silhouette",
+      "breakpoints": true
     }
   ]
 }

@@ -3,7 +3,7 @@
  *
  * 계획서 P2-1의 3종 지표를 계산한다:
  *   ① 편당 제작 소요시간 — run duration
- *   ② 품질 일관성 — run 성공률 / 노드 실패율 (채택률은 데이터 없음 → 미측정으로 보고)
+ *   ② 품질 일관성 — run 성공률 / 노드 실패율 / 생성물 채택률(workflow_runs.adopted)
  *   ③ 템플릿 재사용률 — 템플릿별 run 횟수
  *
  * 보고서에 들어갈 숫자를 만드는 코드이므로, **셀 수 없는 것은 세지 않고 왜 못 세는지를
@@ -20,6 +20,8 @@ export interface RunRow {
   templateId: string | null;
   startedAt: Date;
   completedAt: Date | null;
+  /** 품질 검수 통과 여부 (workflow_runs.adopted). 컬럼 도입 이전 호출부 무회귀를 위해 optional */
+  adopted?: boolean | null;
 }
 
 export interface NodeRunRow {
@@ -116,11 +118,14 @@ export interface ReliabilitySummary {
   nodeSkipped: number;
   nodeFailed: number;
   nodeFailureRate: number | null;
+  /** 채택(품질 검수 통과)으로 표시된 완료 run 수 */
+  adopted: number;
   /**
-   * 생성물 채택률은 계산하지 않는다 — 채택 여부를 기록하는 컬럼이 없다.
-   * 보고서에 쓰려면 채택 플래그를 먼저 도입해야 한다.
+   * 생성물 채택률 = adopted / completed (%).
+   * 분모는 **완료 run**이다 — 실패한 run은 검수 대상이 된 적이 없다.
+   * 완료 run이 0이면 null(셀 수 없는 것은 세지 않는다).
    */
-  adoptionRate: null;
+  adoptionRate: number | null;
 }
 
 export function summarizeReliability(runs: RunRow[], nodeRuns: NodeRunRow[]): ReliabilitySummary {
@@ -133,6 +138,8 @@ export function summarizeReliability(runs: RunRow[], nodeRuns: NodeRunRow[]): Re
     else unfinished++;
   }
   const decided = completed + failed;
+
+  const adopted = runs.filter((r) => r.status === "completed" && r.adopted === true).length;
 
   const nodeFailed = nodeRuns.filter((n) => n.status === "failed").length;
   const nodeSkipped = nodeRuns.filter((n) => n.status === "skipped").length;
@@ -149,7 +156,8 @@ export function summarizeReliability(runs: RunRow[], nodeRuns: NodeRunRow[]): Re
     nodeSkipped,
     nodeFailed,
     nodeFailureRate: nodeAttempted > 0 ? (nodeFailed / nodeAttempted) * 100 : null,
-    adoptionRate: null,
+    adopted,
+    adoptionRate: completed > 0 ? (adopted / completed) * 100 : null,
   };
 }
 
@@ -327,7 +335,9 @@ export function renderMarkdown(r: MetricsReport): string {
     `| 노드 실패율 | ${fmt(rel.nodeFailureRate)}% |`,
     `| 제외: 미실행(upstream 실패)·실행 예정 | ${rel.nodeSkipped} / ${rel.nodeTotal - rel.nodeAttempted - rel.nodeSkipped}건 |`,
     "",
-    "> 생성물 채택률: **미측정** — 채택 여부를 기록하는 컬럼이 없습니다. 보고서에 쓰려면 채택 플래그를 먼저 도입해야 합니다.",
+    rel.adoptionRate === null
+      ? "> 생성물 채택률: **미산출** — 완료된 run이 없어 분모가 0입니다."
+      : `> 생성물 채택률(품질 검수 통과분 / 완료 run): **${fmt(rel.adoptionRate)}%** (${rel.adopted}/${rel.completed}편)`,
     "",
     "## ③ 템플릿 재사용률",
     "",
@@ -359,12 +369,13 @@ export function renderMarkdown(r: MetricsReport): string {
     "",
     "| 항목 | 값 |",
     "|---|---|",
-    `| **AI 생성 숏폼 편수** | **${o.videos}편** |`,
+    `| **AI 생성 숏폼 편수(채택)** | **${rel.adopted}편** |`,
+    `| 숏폼 생성 건수(채택 전) | ${o.videos}편 |`,
     `| 이미지 생성물 | ${o.images}건 |`,
     `| 워크플로우 실행 횟수 | ${rel.total}회 |`,
     `| 템플릿 종수 | 전체 ${r.templateCounts.total}종 / 공개 ${r.templateCounts.published}종 |`,
     "",
-    "> 숏폼 편수는 업스케일 노드를 세지 않습니다(같은 편의 파생물).",
+    "> 숏폼 편수는 업스케일 노드를 세지 않습니다(같은 편의 파생물). **보고용 편수는 채택(품질 검수 통과) 기준**이며, 생성 건수는 검수 전 총량입니다.",
     "",
     "## 월별 추이",
     "",

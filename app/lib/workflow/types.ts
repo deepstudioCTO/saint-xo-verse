@@ -120,6 +120,8 @@ export interface NodeRunOutputRow {
 export interface WorkflowRunRowLike {
   id: string;
   status: string;
+  /** 품질 검수 통과 플래그 (workflow_runs.adopted) */
+  adopted?: boolean | null;
   templateId: string | null;
   templateSnapshot: string;
   inputs: string | null;
@@ -144,6 +146,8 @@ export interface RunItem {
   templateId: string | null;
   templateName: string | null;
   templateCategory: string | null;
+  /** 품질 검수 통과 = 보고용 "완성 숏폼 편수"에 세는 산출물 */
+  adopted: boolean;
   error: string | null;
   /** ISO 문자열 */
   startedAt: string;

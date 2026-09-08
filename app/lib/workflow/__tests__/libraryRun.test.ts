@@ -53,10 +53,17 @@ describe("toLibraryRun", () => {
       templateId: "t-1",
       templateName: "Dance A",
       templateCategory: "video",
+      adopted: false,
       error: null,
       startedAt: "2026-08-08T01:00:00.000Z",
       completedAt: "2026-08-08T01:02:00.000Z",
     });
+  });
+
+  it("adopted 컬럼이 그대로 실려 Library 배지의 근거가 된다", () => {
+    expect(toLibraryRun({ ...baseRun, adopted: true }, [genOutput]).adopted).toBe(true);
+    // 컬럼 도입 이전 행(undefined)은 미채택으로 읽는다 — 배지가 조용히 켜지면 안 된다
+    expect(toLibraryRun({ ...baseRun, adopted: undefined }, [genOutput]).adopted).toBe(false);
   });
 
   it("pending run — 출력 없음, thumbnailUrl은 inputs에서", () => {

@@ -60,6 +60,7 @@ export function toLibraryRun(
     templateId: run.templateId,
     templateName: templateMeta?.name ?? null,
     templateCategory: templateMeta?.category ?? null,
+    adopted: run.adopted === true,
     error: run.error,
     startedAt: run.startedAt.toISOString(),
     completedAt: run.completedAt ? run.completedAt.toISOString() : null,

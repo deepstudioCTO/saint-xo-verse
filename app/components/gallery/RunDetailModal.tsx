@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { VideoPlayerWithMusic } from "~/components/common/VideoPlayerWithMusic";
 import { pauseBgMusic, resumeBgMusic } from "~/hooks/useAudioPlayer";
@@ -97,7 +97,55 @@ function RunInfoBar({
   );
 }
 
-/* ── Actions: Delete / Download(음악 합성) / Open in Editor ─── */
+/* ── 채택 토글 ───────────────────────────────────────────────
+ * 품질 검수 통과 여부를 사람이 판정해 기록하는 유일한 UI 지점.
+ * 낙관적 갱신 후 실패 시 되돌린다 — 서버가 진실이지만 Library 폴링(6초)을 기다리면
+ * 판정 20편을 연속으로 찍을 때 체감이 무너진다.
+ */
+function AdoptToggle({ run }: { run: RunItem }) {
+  const [adopted, setAdopted] = useState(run.adopted);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => setAdopted(run.adopted), [run.id, run.adopted]);
+
+  if (run.status !== "completed") return null;
+
+  const toggle = async () => {
+    const next = !adopted;
+    setAdopted(next);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/adopt-run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: run.id, adopted: next }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    } catch (err) {
+      console.error("adopt toggle failed:", err);
+      setAdopted(!next);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={toggle}
+      disabled={busy}
+      title="품질 검수 통과 — 보고용 '완성 숏폼 편수'에 집계됩니다"
+      className={`text-xs font-medium px-2 py-1 rounded transition-colors cursor-pointer disabled:opacity-50 ${
+        adopted
+          ? "bg-emerald-600 text-white hover:bg-emerald-700"
+          : "bg-neutral-100 text-neutral-500 hover:bg-neutral-200"
+      }`}
+    >
+      {adopted ? "채택됨" : "채택"}
+    </button>
+  );
+}
+
+/* ── Actions: 채택 / Delete / Download(음악 합성) / Open in Editor ─── */
 
 function RunActions({
   run,
@@ -133,6 +181,8 @@ function RunActions({
 
   return (
     <div className="flex items-center gap-4">
+      <AdoptToggle run={run} />
+
       <button
         onClick={() => onDelete(run.id)}
         disabled={isDownloading}

@@ -178,9 +178,20 @@ export function RunGridItem({
           </div>
         )}
 
+        {/* 채택(품질 검수 통과) 배지 — 보고용 편수에 세는 산출물 표시 */}
+        {isCompleted && run.adopted && (
+          <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-emerald-600/80 backdrop-blur-md rounded text-[9px] font-bold text-white">
+            ADOPTED
+          </div>
+        )}
+
         {/* Image type badge */}
         {isCompleted && !isVideo && (
-          <div className="absolute top-2 right-2 z-30 px-1.5 py-0.5 bg-blue-600/70 backdrop-blur-md rounded text-[9px] font-bold text-white">
+          <div
+            className={`absolute z-30 px-1.5 py-0.5 bg-blue-600/70 backdrop-blur-md rounded text-[9px] font-bold text-white ${
+              run.adopted ? "top-2 right-[70px]" : "top-2 right-2"
+            }`}
+          >
             IMG
           </div>
         )}

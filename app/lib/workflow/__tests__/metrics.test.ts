@@ -15,13 +15,15 @@ const run = (
   status: string,
   startedAt: string,
   completedAt: string | null = null,
-  templateId: string | null = null
+  templateId: string | null = null,
+  adopted: boolean | null = null
 ): RunRow => ({
   id,
   status,
   templateId,
   startedAt: new Date(startedAt),
   completedAt: completedAt ? new Date(completedAt) : null,
+  adopted,
 });
 
 const node = (
@@ -144,8 +146,33 @@ describe("summarizeReliability", () => {
     expect(rel.nodeFailureRate).toBe(100);
   });
 
-  it("채택률은 항상 null (기록 컬럼 없음)", () => {
+  it("완료 run이 없으면 채택률은 null — 셀 수 없는 것은 세지 않는다", () => {
     expect(summarizeReliability([], []).adoptionRate).toBeNull();
+    const onlyFailed = summarizeReliability([run("a", "failed", "2026-08-01T00:00:00Z")], []);
+    expect(onlyFailed.adoptionRate).toBeNull();
+  });
+
+  it("채택률 분모는 완료 run — 실패 run은 검수 대상이 된 적이 없다", () => {
+    const runs = [
+      run("a", "completed", "2026-08-01T00:00:00Z", null, null, true),
+      run("b", "completed", "2026-08-01T00:00:00Z", null, null, true),
+      run("c", "completed", "2026-08-01T00:00:00Z", null, null, false),
+      run("d", "completed", "2026-08-01T00:00:00Z", null, null, null), // 미판정 = 미채택
+      run("e", "failed", "2026-08-01T00:00:00Z", null, null, false),
+    ];
+    const rel = summarizeReliability(runs, []);
+    expect(rel.completed).toBe(4);
+    expect(rel.adopted).toBe(2);
+    expect(rel.adoptionRate).toBe(50);
+  });
+
+  it("실행이 끝나지 않은 run은 adopted여도 채택으로 세지 않는다", () => {
+    const rel = summarizeReliability(
+      [run("a", "running", "2026-08-01T00:00:00Z", null, null, true)],
+      []
+    );
+    expect(rel.adopted).toBe(0);
+    expect(rel.adoptionRate).toBeNull();
   });
 });
 
