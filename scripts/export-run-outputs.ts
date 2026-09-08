@@ -15,8 +15,9 @@ import path from "path";
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 const argv = process.argv.slice(2);
-const OUT = argv.find((a) => !a.startsWith("--"));
+const OUT: string | undefined = argv.find((a) => !a.startsWith("--"));
 if (!OUT) throw new Error("출력 디렉토리를 인자로 주세요");
+const outDir: string = OUT;
 const optValue = (n: string) => {
   const i = argv.indexOf(`--${n}`);
   return i >= 0 ? argv[i + 1] : undefined;
@@ -44,17 +45,21 @@ interface GraphNode {
 }
 
 async function main() {
-  fs.mkdirSync(OUT, { recursive: true });
+  fs.mkdirSync(outDir, { recursive: true });
 
   // run 상태로 거르지 않는다 — 실패한 run도 앞 단계 노드는 성공했을 수 있고,
   // 그 산출물은 실제로 존재하는 파일이다. 판단 기준은 run이 아니라 node_run의 완료 여부다.
-  const runs = await sql<{ id: string; snapshot: string; started_at: Date }[]>`
-    select id, template_snapshot as snapshot, started_at
-    from workflow_runs
-    where true
-      ${since ? sql`and started_at >= ${new Date(`${since}T00:00:00Z`)}` : sql``}
-      ${adoptedOnly ? sql`and adopted = true` : sql``}
-    order by started_at`;
+  // postgres.js 조건부 fragment는 타입이 좁아 조립이 까다롭다 — 전부 읽고 여기서 거른다
+  // (run 수가 수십 단위라 필터를 DB로 미룰 이유가 없다)
+  const sinceDate = since ? new Date(`${since}T00:00:00Z`) : null;
+  const allRuns = await sql<
+    { id: string; snapshot: string; started_at: Date; adopted: boolean }[]
+  >`select id, template_snapshot as snapshot, started_at, adopted
+    from workflow_runs order by started_at`;
+  const runs = allRuns.filter(
+    (r) =>
+      (!sinceDate || r.started_at >= sinceDate) && (!adoptedOnly || r.adopted === true)
+  );
 
   console.log(`대상 실행 ${runs.length}건 (번호 ${startIndex}부터)`);
   let idx = startIndex - 1;
@@ -92,7 +97,7 @@ async function main() {
       const ext = type === "video" ? "mp4" : "jpg";
       // 같은 run에 이미지·영상이 함께 나오므로 종류를 파일명에 남긴다
       const suffix = o.node_type === "upscale" ? "_upscaled" : type === "image" ? "_frame" : "";
-      const file = path.join(OUT, `${stem}${suffix}.${ext}`);
+      const file = path.join(outDir, `${stem}${suffix}.${ext}`);
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -105,7 +110,7 @@ async function main() {
   }
 
   await sql.end();
-  console.log(`\n저장 위치: ${OUT}`);
+  console.log(`\n저장 위치: ${outDir}`);
 }
 
 main().catch((e) => {

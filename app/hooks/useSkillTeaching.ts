@@ -266,6 +266,8 @@ export function useSkillTeaching({
         templateId: graph.templateId,
         templateName: item.name,
         templateCategory: item.category,
+        // 갓 시작한 run은 검수 대상이 아니다 — 채택은 완료 후 사람이 판정한다
+        adopted: false,
         error: null,
         startedAt: new Date().toISOString(),
         completedAt: null,

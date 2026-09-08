@@ -50,6 +50,15 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 ```
 주요 스크립트: `seed-verses.ts` (lookbooks), `seed-verse-characters.ts` (personas), `seed-characters.ts`, `seed-character-images.ts`, `upload-posters.ts`, `upload-character-videos.ts`, `upload-music.ts`
 
+### 실증/보고 운영 스크립트
+| 스크립트 | 용도 |
+|---|---|
+| `batch-variation-run.ts` | 다중 생성 모드 배치 — 템플릿 고정 + (멤버 룩 × 모션 × 트랙) 교체 제출. `--plan scripts/plans/*.json`, `--dry-run`(비용만), `--watch`. **화면과 같은 경로**(로그인 → `/api/workflow-execute`)로만 실행한다 |
+| `mark-adopted.ts` | 채택(품질 검수 통과) 플래그 일괄 마킹. `--list` / `--all-completed` / `--since` / `--ids` / `--unadopt` |
+| `export-run-outputs.ts` | 산출물을 `[번호]_[멤버]_[Look]_[스킬]_[트랙]`으로 내려받기. `--since` `--adopted` `--start-index`(제출본 뒤에 이어 붙일 때 필수) |
+| `metrics-report.ts` | `reports/metrics-<날짜>.{md,json}` 생성 |
+| `onboard-haeun.ts` | 하은 온보딩 + lookbook 02 "Beauty" 시드 (멱등) |
+
 ## 환경 변수
 
 - `DATABASE_URL` — Supabase PostgreSQL Pooler 연결 문자열
@@ -121,7 +130,7 @@ export default [
 ## Lookbook/Look/Persona 시스템
 
 3단 계층: **Lookbook** (최상위, ↑↓ 전환) → **Look** (하위 그룹, ←→ 전환) → **Persona** (캐릭터, 선택 시 ←→ 이동)
-- Lookbook 00: 4 looks (00_01~00_04), Lookbook 01: 1 look (01_01)
+- Lookbook 00: 4 looks (00_01~00_04), Lookbook 01: 1 look (01_01), Lookbook 02: 1 look (02_01)
 - Persona 이동은 look 경계를 넘을 수 있음 (마지막 persona에서 → = 다음 look 첫 persona)
 - URL: `?lookbook=00&look=00_01&selected=sumin` (하위 호환: `?verse=` → `?lookbook=` 리다이렉트)
 - Gallery persona 이름 해소: `personaMap[lookId][characterId]` 우선, fallback으로 전체 look 검색
@@ -206,6 +215,10 @@ export default [
   - Look 00_04: sumin, rumi, geumbi, jiyoon, lei (다른 컨셉)
 - Lookbook 01 "Ojos": 1 look
   - Look 01_01: sumin, rumi, geumbi, lei, siori, yui
+- Lookbook 02 "Beauty": 1 look — 2026.08.27 뷰티 촬영 (`scripts/onboard-haeun.ts`)
+  - Look 02_01: haeun, rumi, sumin. **하은이 플랫폼 데이터에 처음 들어온 지점**
+    (그전까지 실증 IP 4인 중 하은만 없어서 숏폼 조합에 등장할 수 없었다)
+  - 이 촬영은 스틸만 있어 `video`(NOT NULL)는 정면 컷 3초 스틸 클립. 룩북 촬영이 들어오면 교체
 - 영상/포스터: Supabase Storage `characters` 버킷에서 서빙 (DB에 절대 URL 저장)
 - 업로드: `upload-character-videos.ts` / `upload-posters.ts` (파일명 → lookId+characterId 파싱 후 DB 업데이트)
 
@@ -239,12 +252,13 @@ export default [
 | run 상태 종료 판정 | **권위는 `workflow_runs.status`**(파이프라인이 mark-running/finalize/mark-failed로 기록). 폴링 라우트는 `resolveRunStatus(run.status, nodeRuns)` 순수함수에 위임하고, 비종료 구간에서만 `deriveRunStatus` 파생을 쓴다(파생이 completed여도 running으로 낮춤) | 종료 선언 권한을 파생에서 뺏어 조기 완료를 **호출 구조로** 차단. 라우트에 파생 로직 금지 규칙도 준수 |
 | node_run 상태 어휘 | `workflow/types.ts`에 `NodeRunStatus` + `isRunningStatus`/`isTerminalStatus`/`isAttemptedStatus` 단일 정의. `skipped`(upstream 실패로 미실행) 포함 — run 실패 시 `skipUnreachedNodeRuns`가 남은 pending을 닫는다 | 상태 문자열이 컴포넌트·metrics·파이프라인에 흩어지면 상태 추가마다 누락 발생. skipped를 failed로 뭉치면 노드 실패율이 부풀고, pending으로 두면 "Queued..." 스피너가 영원히 남음 |
 | node_runs 쓰기 창구 | 전부 `app/lib/nodeRunStore.server.ts`(planRunNodes/findNodeRun/recordSubmission/completeNodeRun/failNodeRun/failNodeRunAt/skipUnreachedNodeRuns). 파이프라인엔 SQL을 두지 않음 | "행 있으면 update, 없으면 insert"가 제출·실패·스킵 3경로에 복제되면 곧 어긋난다. 파이프라인은 durable step 오케스트레이션만 |
+| 생성물 채택 플래그 | `workflow_runs.adopted`(+`adopted_at`). **보고용 "완성 숏폼 편수" = 채택 편수**이고 실행 성공 편수가 아니다. 쓰기 창구는 `POST /api/adopt-run`(완료 안 된 run은 409)과 `scripts/mark-adopted.ts` 둘뿐. UI는 Library 상세 모달 토글 + 그리드 ADOPTED 배지 | 컬럼이 없으면 편수 카운트가 수기가 되고 metrics 채택률이 영구 null이다. status(실행이 끝났는가)와 다른 축이라 status로 대체할 수 없다 |
 | 노드 실패율 모집단 | `nodeAttempted`(=`isAttemptedStatus`) 기준. `nodeTotal`(원시 행 수)·`nodeSkipped`는 별도 보고 | 사전 실체화로 늘어난 pending 행을 분모에 넣으면 실패율이 조용히 희석됨. 이름은 두고 뜻만 바꾸면 보고서가 틀리므로 필드를 분리 |
 | Run 시 templateId 전송 | `start(nodes, edges, templateId?)` → POST body에 포함. `EditorCanvasInner`의 templateId(entryData 유래)를 `RunControls`가 전달 | 미전송 시 `workflow_runs.template_id`가 전부 null → **템플릿 재사용률 집계 불가**. 소급 복구 안 되므로 지표는 배선 시점부터 유효 |
 | Run 시 실행 메타데이터 | `deriveRunInputs(nodes)`(순수, vitest)가 그래프에서 멤버·룩·트랙·썸네일을 뽑아 `inputs`로 전송. lookId 앞자리가 lookbookId | 에디터 Run이 `{source:"editor"}`만 보내 LIBRARY 카드가 전부 "Unknown"이었다. 조합 정보는 이미 노드에 있으므로 다시 묻지 않고 그래프에서 읽는다. 과거분은 `backfill-run-inputs.ts`가 templateSnapshot에서 재구성 |
 | 노드 비활성화 | `data.disabled === true`면 `planExecutableNodes`가 실행 대상에서 제외(`isDisabled`). UpscaleNode 헤더에 OFF 토글 | 느리고 비싼 단계를 이번 실행만 끄기 위함. 노드를 지우면 "파이프라인에 그 단계가 있다"는 사실이 그래프에서 사라진다 — 꺼진 채로 보이는 편이 구성을 정직하게 드러낸다. 하류는 안 끊긴다(산출물 없는 노드는 건너뛰므로 앞 단계 결과를 받음) |
 | 통합 워크플로우 "모션 컨트롤" | `Look → 이미지생성 → 영상생성 → 업스케일(기본 OFF) → 음악합성 → 자막 → Preview` + `Source(모션) → 첫프레임 → 이미지생성`. 멀티스텝·조합데모는 삭제하고 이 하나로 통합. 이미지 모델 nano-banana | 셋이 같은 파이프라인의 부분집합이라 정본이 모호했다. 템플릿 1종을 재사용해야 재사용률 지표가 성립한다(20개 템플릿을 만들면 0%). gpt-image-2는 "실존 인물 얼굴 재현" 프롬프트를 안전필터가 막아(E005) 8건 중 3건 실패 |
-| 지표 집계 | 순수 로직 `workflow/metrics.ts`(vitest) + `scripts/metrics-report.ts`(DB 읽기·`reports/metrics-<날짜>.{md,json}` 출력). **runs 단일 소스** (generations 제거로 레거시 집계·legacyGenerationId dedupe 삭제). **셀 수 없는 것은 세지 않는다** — 제외 행 수와 사유를 항상 함께 반환(타임스탬프 오염, templateId 커버리지). 채택률은 기록 컬럼이 없어 항상 null, 단축률은 `MANUAL_BASELINE_MIN` 없으면 미산출 | 보고서 실측값의 단일 소스라 추정치가 섞이면 안 됨. 숏폼 편수는 upscale(파생물) 제외 |
+| 지표 집계 | 순수 로직 `workflow/metrics.ts`(vitest) + `scripts/metrics-report.ts`(DB 읽기·`reports/metrics-<날짜>.{md,json}` 출력). **runs 단일 소스** (generations 제거로 레거시 집계·legacyGenerationId dedupe 삭제). **셀 수 없는 것은 세지 않는다** — 제외 행 수와 사유를 항상 함께 반환(타임스탬프 오염, templateId 커버리지). 채택률 = `workflow_runs.adopted` / 완료 run(실패 run은 검수 대상이 된 적이 없어 분모에서 뺀다), 단축률은 `MANUAL_BASELINE_MIN` 없으면 미산출 | 보고서 실측값의 단일 소스라 추정치가 섞이면 안 됨. 숏폼 편수는 upscale(파생물) 제외 |
 | DB 커넥션 | 장시간 Workflow step·고빈도 폴링은 **`withDb`**(`db.server.ts`)로 커넥션 자동 정리 필수. `getDb`는 pool을 안 닫아 Supabase 세션풀(15) 소진(EMAXCONNSESSION) | `getDb`는 짧은 단발 요청에만. Workflow/폴링은 반드시 `withDb` |
 | Replicate 모델 버전 | `app/lib/workflow/providers/replicate.ts`에 중앙화. 버전은 stale 시 422 → `GET /v1/models/{owner}/{name}` latest_version으로 갱신. **해시만으로는 어느 모델인지 알 수 없다** — `GET /v1/predictions`의 `model` 필드로 역추적 (`/versions` 목록은 공식 모델에서 빈 배열) | 버전 해시가 삭제되면 "version does not exist" 422 |
 | 영상 모델 = kling-v3-motion-control | `character_orientation:"image"`(우리 생성 이미지의 방향/자세 기준, **영상 최대 10초** — `"video"`면 30초), `mode:"pro"`(v3에서 1080p). 실행 ~5분. **`keep_original_sound` 기본 true라 모션 영상 원본 오디오가 결과에 딸려온다**(Music 노드 합성과 겹침 — 미해결, 별건) | `character_orientation:"image"`가 생성 이미지를 앵커로 삼기 때문에 첫 프레임 포즈 정합(frame 노드)이 의미를 갖는다. v2.6→v3는 입력 스키마 동일이라 해시 1줄 교체 |
