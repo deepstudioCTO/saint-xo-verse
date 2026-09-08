@@ -24,6 +24,8 @@
  *   ... --run <uuid>         # DB run 스냅샷에서 trackId·자막 entries를 읽는다(DATABASE_URL 필요)
  *   ... --subtitles <json>   # [{start,end,text}] 배열. run에 자막이 없을 때 외부 주입용
  *   ... --frames             # 첫 프레임 + 중간 프레임 PNG도 추출
+ *   ... --frame-at 3.0       # 중간 프레임 시각 지정(기본 길이의 50%).
+ *                            #   50% 지점이 모션블러·전환에 걸리면 증빙으로 못 쓴다
  *   ... --fade-out 0.5       # 끝 페이드(브라우저 규칙에 없음 — 명시할 때만)
  *   ... --suffix _final --dry-run
  *
@@ -78,6 +80,8 @@ const DRY = flag("dry-run");
 const SUFFIX = value("suffix") ?? "_final";
 const FADE = Number(value("fade-out") ?? 0);
 const WANT_FRAMES = flag("frames");
+/** 중간 프레임 시각(초). 기본은 길이의 50% — 그 지점이 흐릿하면 이 값으로 옮긴다 */
+const FRAME_AT = value("frame-at") !== undefined ? Number(value("frame-at")) : null;
 
 function run(bin: string, args: string[]): string {
   const r = spawnSync(bin, args, { encoding: "utf8", maxBuffer: 1 << 28 });
@@ -282,7 +286,7 @@ async function main() {
 
     if (WANT_FRAMES) {
       const first = path.join(path.dirname(video), `${stem}${SUFFIX}_frame01.png`);
-      const midT = Math.max(0, meta.duration * 0.5);
+      const midT = Math.min(Math.max(0, FRAME_AT ?? meta.duration * 0.5), meta.duration);
       const mid = path.join(path.dirname(video), `${stem}${SUFFIX}_frame_mid.png`);
       run(FFMPEG, ["-v", "error", "-y", "-i", outPath, "-frames:v", "1", first]);
       run(FFMPEG, ["-v", "error", "-y", "-ss", midT.toFixed(3), "-i", outPath, "-frames:v", "1", mid]);
