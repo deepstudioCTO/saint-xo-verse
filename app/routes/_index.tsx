@@ -44,6 +44,7 @@ const centerOnCursor: Modifier = ({ activatorEvent, activeNodeRect, transform })
 
 const PANEL_SHORTCUTS: Record<string, ActivePanel> = {
   w: "workflow-expanded",
+  r: "gallery-expanded",
 };
 
 export const meta: Route.MetaFunction = () => [

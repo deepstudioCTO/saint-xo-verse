@@ -146,7 +146,7 @@ export default [
 | 하단 버튼 ↔ 패널 시퀀싱 | `showButtons` + `pendingPanelRef` + `AnimatePresence onExitComplete`로 조율. 열기: 버튼 exit 완료 → 패널 open. 닫기: `anyHorizontalOpen` false 후 300ms 지연 → 버튼 show | 버튼과 패널이 동시에 보이는 것 방지 |
 | Compact↔Expanded 패턴 | 공용 콘텐츠 props 타입 + 공유 서브컴포넌트(TabBar/Grid), 패널별 셸만 다름. `_index.tsx`에서 콜백은 `useCallback`으로 1회 정의 후 양쪽 전달 | DRY — 그리드·탭·콜백 중복 방지 |
 | ExpandedPanelShell | 모든 expanded 패널의 공통 보일러플레이트(backdrop + container + Escape + useContentReady) → render prop 셸로 추출. `escapeEnabled` prop으로 조건부 Escape 지원 (Gallery 모달 등) | 패널 4개가 ~30줄씩 동일 코드 복사 → 62줄 공용 셸 1개로 통합 |
-| 키보드 단축키 테이블 | `_index.tsx`의 per-key if/else → `PANEL_SHORTCUTS: Record<string, ActivePanel>` 선언적 룩업. W→workflow, R→runs. Pricing은 헤더 버튼 전용 | 새 expanded 패널 추가 시 1줄 추가만 필요, 분기 로직 제거 |
+| 키보드 단축키 테이블 | `_index.tsx`의 per-key if/else → `PANEL_SHORTCUTS: Record<string, ActivePanel>` 선언적 룩업. W→workflow, R→Library 확장(gallery-expanded). Pricing은 헤더 버튼 전용 | 새 expanded 패널 추가 시 1줄 추가만 필요, 분기 로직 제거 |
 | 음악 패널 선택 시 닫힘 안 함 | `MusicHorizontalPanel`에서 트랙 클릭 = `selectTrack`만, `onClose` 없음 | 음악은 비교 시청하며 고르는 패턴, 배경클릭/Escape로만 닫힘 |
 | 음악 패널 내 재생 컨트롤 | `MusicHorizontalPanel` 하단에 `MusicControls` 재사용 | Horizontal 패널 열림 시 `MusicPlayerWidget`이 숨겨지므로 패널 자체에 재생 제어 필요 |
 | 패널 항목 선택 시 자동 닫힘 | Skill: 선택(truthy) → `setActivePanel(null)`, 선택 해제(null) → 패널 유지 | 선택 완료 = 패널 용도 종료 (Music은 예외) |
@@ -261,6 +261,7 @@ export default [
 | 노드 비활성화 | `data.disabled === true`면 `planExecutableNodes`가 실행 대상에서 제외(`isDisabled`). UpscaleNode 헤더에 OFF 토글 | 느리고 비싼 단계를 이번 실행만 끄기 위함. 노드를 지우면 "파이프라인에 그 단계가 있다"는 사실이 그래프에서 사라진다 — 꺼진 채로 보이는 편이 구성을 정직하게 드러낸다. 하류는 안 끊긴다(산출물 없는 노드는 건너뛰므로 앞 단계 결과를 받음) |
 | 통합 워크플로우 "모션 컨트롤" | `Look → 이미지생성 → 영상생성 → 업스케일(기본 OFF) → 음악합성 → 자막 → Preview` + `Source(모션) → 첫프레임 → 이미지생성`. 멀티스텝·조합데모는 삭제하고 이 하나로 통합. 이미지 모델 nano-banana | 셋이 같은 파이프라인의 부분집합이라 정본이 모호했다. 템플릿 1종을 재사용해야 재사용률 지표가 성립한다(20개 템플릿을 만들면 0%). gpt-image-2는 "실존 인물 얼굴 재현" 프롬프트를 안전필터가 막아(E005) 8건 중 3건 실패 |
 | 지표 집계 | 순수 로직 `workflow/metrics.ts`(vitest) + `scripts/metrics-report.ts`(DB 읽기·`reports/metrics-<날짜>.{md,json}` 출력). **runs 단일 소스** (generations 제거로 레거시 집계·legacyGenerationId dedupe 삭제). **셀 수 없는 것은 세지 않는다** — 제외 행 수와 사유를 항상 함께 반환(타임스탬프 오염, templateId 커버리지). 채택률 = `workflow_runs.adopted` / 완료 run(실패 run은 검수 대상이 된 적이 없어 분모에서 뺀다), 단축률은 `MANUAL_BASELINE_MIN` 없으면 미산출 | 보고서 실측값의 단일 소스라 추정치가 섞이면 안 됨. 숏폼 편수는 upscale(파생물) 제외. **채택 편수는 산출물 종류별로 센다**(`summarizeOutputs(nodes, adoptedRunIds(runs))`) — 채택 run 수를 숏폼 편수로 쓰면 이미지 템플릿 채택분이 섞여 "채택 23편 > 생성 22편"이라는 성립 불가능한 표가 나온다(2026-09-08 룩스왑 v2에서 실제 발생) |
+| 실행 이력 대시보드·템플릿 비교 | Library 확장 패널의 `Library/Dashboard/Compare` 뷰 탭, 데이터는 `/api/runs-dashboard` 1개. 수치는 `metrics.ts` 함수(`toMetricsSource`→`buildMetricsReport`/`runsDashboard.ts`)를 **스크립트와 공유** — 대시보드와 보고서 숫자가 갈라지면 안 된다. 템플릿 버전 = `template_snapshot` 정규화 해시(`templateVersions.ts`): 좌표·label·입력 슬롯(media/lookId/characterId/trackId/entries)은 빼고 노드·엣지·생성 파라미터만. 라벨 v1,v2…는 첫 실행일 순 | `template_version` 컬럼은 저장 카운터라 "무엇이 실행됐나"를 모른다. 입력 슬롯을 해시에 넣으면 배치(멤버·트랙 교체)마다 버전이 갈라진다. 마이그레이션 없이 기존 컬럼만으로 계산 |
 | DB 커넥션 | 장시간 Workflow step·고빈도 폴링은 **`withDb`**(`db.server.ts`)로 커넥션 자동 정리 필수. `getDb`는 pool을 안 닫아 Supabase 세션풀(15) 소진(EMAXCONNSESSION) | `getDb`는 짧은 단발 요청에만. Workflow/폴링은 반드시 `withDb` |
 | Replicate 모델 버전 | `app/lib/workflow/providers/replicate.ts`에 중앙화. 버전은 stale 시 422 → `GET /v1/models/{owner}/{name}` latest_version으로 갱신. **해시만으로는 어느 모델인지 알 수 없다** — `GET /v1/predictions`의 `model` 필드로 역추적 (`/versions` 목록은 공식 모델에서 빈 배열) | 버전 해시가 삭제되면 "version does not exist" 422 |
 | 영상 모델 = kling-v3-motion-control | `character_orientation:"image"`(우리 생성 이미지의 방향/자세 기준, **영상 최대 10초** — `"video"`면 30초), `mode:"pro"`(v3에서 1080p). 실행 ~5분. **`keep_original_sound` 기본 true라 모션 영상 원본 오디오가 결과에 딸려온다**(Music 노드 합성과 겹침 — 미해결, 별건) | `character_orientation:"image"`가 생성 이미지를 앵커로 삼기 때문에 첫 프레임 포즈 정합(frame 노드)이 의미를 갖는다. v2.6→v3는 입력 스키마 동일이라 해시 1줄 교체 |
@@ -339,7 +340,7 @@ app/
 │   ├── db.server.ts     # Drizzle DB 연결 (getDb 단발 / withDb 커넥션 자동정리) + schema export
 │   ├── editor-loaders.server.ts # 에디터 3개 loader 함수 (run/template/savedProject)
 │   ├── supabase.server.ts  # Storage 헬퍼
-│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs(+resolveFrameThumbnail), topoSort, deriveRunStatus, deriveFinalOutput, injectTemplateInputs, runInputs, libraryRun(toLibraryRun), storagePath, spec(nodeToImageSpec), imageModels(레지스트리), presets, metrics, types(RunItem/RunInputs 단일 정의)
+│   ├── workflow/        # 실행엔진 순수 로직 (서버 Workflow·클라 공유, vitest): resolveUpstreamInputs(+resolveFrameThumbnail), topoSort, deriveRunStatus, deriveFinalOutput, injectTemplateInputs, runInputs, libraryRun(toLibraryRun), storagePath, spec(nodeToImageSpec), imageModels(레지스트리), presets, metrics, runsDashboard, templateVersions(버전 해시·diff), templateCompare, types(RunItem/RunInputs 단일 정의)
 │   │   └── providers/   # 이미지 provider: provider(계약 ImageProvider/ProviderRequest), replicate, soul, select(selectExecution seam)
 ├── hooks/
 │   ├── useAudioPlayer.ts       # 음악 재생 훅

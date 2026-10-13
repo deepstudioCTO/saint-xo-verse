@@ -1,4 +1,5 @@
 import type React from "react";
+import { useEffect, useState } from "react";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "~/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "~/components/ui/tabs";
 import { RevealPanel } from "~/components/common/RevealPanel";
@@ -6,6 +7,11 @@ import { ExpandedPanelShell } from "~/components/common/ExpandedPanelShell";
 import { GalleryGrid } from "./GalleryGrid";
 import type { UseLibraryStateReturn, TypeFilter, SortBy } from "~/hooks/useLibraryState";
 import { SORT_OPTIONS } from "~/hooks/useLibraryState";
+import { useRunsDashboard } from "~/hooks/useRunsDashboard";
+import { RunsDashboardView } from "./RunsDashboardView";
+import { TemplateCompareView } from "./TemplateCompareView";
+
+type LibraryView = "library" | "dashboard" | "compare";
 
 // ─── Compact Gallery Panel (inside HomeFloatingBar children slot) ─────────
 
@@ -95,6 +101,20 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, libraryState }
     deleteTarget,
   } = libraryState;
 
+  // Library / Dashboard(실행 이력) / Compare(템플릿·버전 비교) — 같은 run 데이터의 세 뷰
+  const [view, setView] = useState<LibraryView>("library");
+  const [insightsRequested, setInsightsRequested] = useState(false);
+  useEffect(() => {
+    if (view !== "library") setInsightsRequested(true);
+  }, [view]);
+  useEffect(() => {
+    if (!open) {
+      setInsightsRequested(false);
+      setView("library");
+    }
+  }, [open]);
+  const insights = useRunsDashboard(open && insightsRequested);
+
   return (
     <ExpandedPanelShell
       open={open}
@@ -103,28 +123,44 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, libraryState }
     >
       {(contentReady) => (
         <>
-          {/* Toolbar: Tabs + Sort + Collapse */}
+          {/* Toolbar: View tabs + (Library: type tabs + Sort) + Collapse */}
           <div className="flex items-center justify-between px-5 pt-4 pb-3">
-            <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="video">Video</TabsTrigger>
-                <TabsTrigger value="image">Image</TabsTrigger>
-              </TabsList>
-            </Tabs>
+            <div className="flex items-center gap-4">
+              <Tabs value={view} onValueChange={(v) => setView(v as LibraryView)}>
+                <TabsList>
+                  <TabsTrigger value="library">Library</TabsTrigger>
+                  <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+                  <TabsTrigger value="compare">Compare</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {view === "library" && (
+                <>
+                  <span className="h-4 w-px bg-[--color-border]" />
+                  <Tabs value={typeFilter} onValueChange={(v) => setTypeFilter(v as TypeFilter)}>
+                    <TabsList>
+                      <TabsTrigger value="all">All</TabsTrigger>
+                      <TabsTrigger value="video">Video</TabsTrigger>
+                      <TabsTrigger value="image">Image</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </>
+              )}
+            </div>
             <div className="flex items-center gap-1">
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {view === "library" && (
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <button
                 onClick={onCollapse}
                 className="p-1.5 text-black/40 hover:text-black/70 transition-colors cursor-pointer"
@@ -142,16 +178,26 @@ export function GalleryExpandedPanel({ open, onClose, onCollapse, libraryState }
 
           {/* Scroll container */}
           <div className="flex-1 overflow-y-auto px-5 pb-5">
-            <GalleryGrid
-              runs={sortedRuns}
-              loading={loading}
-              contentReady={contentReady}
-              getCharacterName={getCharacterName}
-              onRunClick={handleRunClick}
-              gridClassName="grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
-              skeletonCount={12}
-              crossfade
-            />
+            {view === "library" ? (
+              <GalleryGrid
+                runs={sortedRuns}
+                loading={loading}
+                contentReady={contentReady}
+                getCharacterName={getCharacterName}
+                onRunClick={handleRunClick}
+                gridClassName="grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4"
+                skeletonCount={12}
+                crossfade
+              />
+            ) : insights.error ? (
+              <div className="text-xs text-red-500 py-8">대시보드를 불러오지 못했습니다 ({insights.error})</div>
+            ) : !insights.data ? (
+              <div className="text-xs text-neutral-400 py-8">불러오는 중…</div>
+            ) : view === "dashboard" ? (
+              <RunsDashboardView dashboard={insights.data.dashboard} />
+            ) : (
+              <TemplateCompareView groups={insights.data.groups} />
+            )}
           </div>
         </>
       )}

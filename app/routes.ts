@@ -19,6 +19,7 @@ export default [
   route("api/library-data", "routes/api.library-data.tsx"),
   route("api/delete-run", "routes/api.delete-run.tsx"),
   route("api/adopt-run", "routes/api.adopt-run.tsx"),
+  route("api/runs-dashboard", "routes/api.runs-dashboard.tsx"),
   route("api/editor-save", "routes/api.editor-save.tsx"),
   route("api/editor-media", "routes/api.editor-media.tsx"),
   route("api/workflow-templates", "routes/api.workflow-templates.tsx"),
