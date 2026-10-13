@@ -307,6 +307,83 @@ export function monthlyBreakdown(runs: RunRow[]): MonthlyRow[] {
   return [...map.values()].sort((a, b) => (a.month < b.month ? -1 : 1));
 }
 
+// ── DB 행 → 집계 입력 / 리포트 조립 ──────────────────────────
+//
+// scripts/metrics-report.ts와 /api/runs-dashboard가 **같은 숫자**를 내도록
+// DB 행 매핑과 리포트 조립까지 여기 둔다. 호출부는 쿼리만 한다.
+
+/** drizzle select 결과를 구조적으로 받는다 (스키마 import 없이 순수 유지) */
+export interface RawRunRow {
+  id: string;
+  status: string;
+  templateId: string | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  adopted?: boolean | null;
+}
+export interface RawNodeRunRow {
+  runId: string;
+  nodeType: string | null;
+  status: string | null;
+  outputs: string | null;
+}
+export interface RawTemplateRow {
+  id: string;
+  name: string;
+  isPublished: boolean | null;
+}
+
+export interface MetricsSource {
+  runs: RunRow[];
+  nodes: NodeRunRow[];
+  templates: TemplateRow[];
+}
+
+export function toMetricsSource(
+  runs: RawRunRow[],
+  nodes: RawNodeRunRow[],
+  templates: RawTemplateRow[]
+): MetricsSource {
+  return {
+    runs: runs.map((r) => ({
+      id: r.id,
+      status: r.status,
+      templateId: r.templateId,
+      startedAt: r.startedAt,
+      completedAt: r.completedAt,
+      adopted: r.adopted,
+    })),
+    nodes: nodes.map((n) => ({
+      runId: n.runId,
+      nodeType: n.nodeType ?? "",
+      status: n.status ?? "",
+      outputs: n.outputs,
+    })),
+    templates: templates.map((t) => ({ id: t.id, name: t.name, isPublished: t.isPublished })),
+  };
+}
+
+export function buildMetricsReport(
+  src: MetricsSource,
+  opts: { generatedAt: string; manualBaselineMin: number | null }
+): MetricsReport {
+  const durations = summarizeDurations(src.runs);
+  return {
+    generatedAt: opts.generatedAt,
+    durations,
+    manualBaselineMin: opts.manualBaselineMin,
+    reductionPct: reductionRate(durations.medianSec, opts.manualBaselineMin),
+    reliability: summarizeReliability(src.runs, src.nodes),
+    templateReuse: summarizeTemplateReuse(src.runs, src.templates),
+    outputs: summarizeOutputs(src.nodes, adoptedRunIds(src.runs)),
+    monthly: monthlyBreakdown(src.runs),
+    templateCounts: {
+      total: src.templates.length,
+      published: src.templates.filter((t) => t.isPublished).length,
+    },
+  };
+}
+
 // ── 리포트 렌더 ──────────────────────────────────────────────
 
 export interface MetricsReport {

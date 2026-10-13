@@ -7,6 +7,8 @@ import {
   summarizeOutputs,
   adoptedRunIds,
   monthlyBreakdown,
+  toMetricsSource,
+  buildMetricsReport,
   type RunRow,
   type NodeRunRow,
 } from "../metrics";
@@ -292,5 +294,57 @@ describe("monthlyBreakdown", () => {
       { month: "2026-07", runs: 1 },
       { month: "2026-08", runs: 2 },
     ]);
+  });
+});
+
+describe("toMetricsSource + buildMetricsReport (스크립트·API 공용 조립)", () => {
+  const rawRuns = [
+    { id: "a", status: "completed", templateId: "t1", startedAt: new Date("2026-08-01T00:00:00Z"), completedAt: new Date("2026-08-01T00:01:00Z"), adopted: true, extra: "무시" },
+    { id: "b", status: "failed", templateId: null, startedAt: new Date("2026-09-01T00:00:00Z"), completedAt: new Date("2026-09-01T00:03:00Z"), adopted: false },
+  ];
+  const rawNodes = [
+    { runId: "a", nodeType: "generate", status: "completed", outputs: JSON.stringify({ url: "u", type: "video" }) },
+    { runId: "b", nodeType: null, status: null, outputs: null },
+  ];
+  const rawTemplates = [
+    { id: "t1", name: "모션", isPublished: true },
+    { id: "t2", name: "미사용", isPublished: false },
+  ];
+
+  it("DB 행에서 집계 필드만 뽑고 null nodeType/status는 빈 문자열로", () => {
+    const src = toMetricsSource(rawRuns, rawNodes, rawTemplates);
+    expect(src.runs[0]).toEqual({
+      id: "a",
+      status: "completed",
+      templateId: "t1",
+      startedAt: rawRuns[0].startedAt,
+      completedAt: rawRuns[0].completedAt,
+      adopted: true,
+    });
+    expect(src.nodes[1]).toEqual({ runId: "b", nodeType: "", status: "", outputs: null });
+    expect(src.templates).toEqual(rawTemplates);
+  });
+
+  it("개별 함수 결과를 그대로 묶는다 (보고서 수치 불변)", () => {
+    const src = toMetricsSource(rawRuns, rawNodes, rawTemplates);
+    const r = buildMetricsReport(src, { generatedAt: "2026-10-13T00:00:00.000Z", manualBaselineMin: 10 });
+    expect(Object.keys(r)).toEqual([
+      "generatedAt",
+      "durations",
+      "manualBaselineMin",
+      "reductionPct",
+      "reliability",
+      "templateReuse",
+      "outputs",
+      "monthly",
+      "templateCounts",
+    ]);
+    expect(r.durations).toEqual(summarizeDurations(src.runs));
+    expect(r.reductionPct).toBe(reductionRate(r.durations.medianSec, 10));
+    expect(r.reliability).toEqual(summarizeReliability(src.runs, src.nodes));
+    expect(r.templateReuse).toEqual(summarizeTemplateReuse(src.runs, src.templates));
+    expect(r.outputs).toEqual({ videos: 1, images: 0, adoptedVideos: 1, adoptedImages: 0 });
+    expect(r.monthly).toEqual(monthlyBreakdown(src.runs));
+    expect(r.templateCounts).toEqual({ total: 2, published: 1 });
   });
 });
