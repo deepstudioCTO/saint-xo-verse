@@ -1,0 +1,22 @@
+{
+ "template": "멤버 무빙 화보",
+ "_note": "실사 → 프로 화보 리터칭(gpt-image-1.5, 얼굴 유사도 0.92~0.97) → i2v 비교 2편(10/13)",
+ "combos": [
+  {
+   "label": "mp-sumin_rt",
+   "characterId": "sumin",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-sumin_gpt15.jpg",
+   "trackId": "2",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her long hair. Same face, same hair, same outfit. Static camera with a very slow push-in, plain studio backdrop, no cuts."
+  },
+  {
+   "label": "mp-rumi_rt",
+   "characterId": "rumi",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-rumi_gpt15.jpg",
+   "trackId": "4",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her long hair. Same face, same hair, same outfit. Static camera with a very slow push-in, plain studio backdrop, no cuts."
+  }
+ ]
+}

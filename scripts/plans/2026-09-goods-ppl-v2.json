@@ -1,0 +1,14 @@
+{
+  "template": "굿즈 PPL",
+  "_note": "굿즈 PPL v2(kling-v3 i2v) — v1 모션 컨트롤 결과 얼굴·손 왜곡으로 전량 불합격(10/13), 영상 단계만 i2v로 교체해 재생성. 멤버 4명 × 1편, 슬라임볼/키링(펜던트) 교차.",
+  "combos": [
+    { "label": "v2-1", "characterId": "sumin", "lookId": "02_01", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg", "trackId": "1",
+      "videoPrompt": "She slowly turns the clear round slime ball in her hand toward the camera to show it off, then gives a small natural smile and a slight head tilt, blinking naturally. The ball stays in the same hand the entire time with the same shape, colors and XO letters. Same face, same outfit. Static camera, very slow push-in, clean bright studio background." },
+    { "label": "v2-2", "characterId": "haeun", "lookId": "02_01", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg", "trackId": "3",
+      "videoPrompt": "She gently lifts the small silver XO keyring pendant a little closer to the camera to show it off, then gives a small natural smile, blinking naturally. The keyring stays pinched between her fingers the whole time, same shape and XO engraving. Same face, same outfit. Static camera, clean bright studio background." },
+    { "label": "v2-3", "characterId": "rumi", "lookId": "02_01", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg", "trackId": "10",
+      "videoPrompt": "She slowly turns the clear round slime ball in her hand toward the camera to show it off, then gives a small natural smile and a slight head tilt, blinking naturally. The ball stays in the same hand the entire time with the same shape, colors and XO letters. Same face, same outfit. Static camera, very slow push-in, clean bright studio background." },
+    { "label": "v2-4", "characterId": "lei", "lookId": "00_04", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg", "trackId": "12",
+      "videoPrompt": "She sways gently to the beat, then brings the small silver XO keyring pendant closer to the camera with her hand and gives a playful wink. The keyring stays pinched between her fingers the whole time, same shape and XO engraving. Same face, same outfit. Static camera, clean bright studio background." }
+  ]
+}

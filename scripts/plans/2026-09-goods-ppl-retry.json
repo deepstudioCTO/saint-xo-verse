@@ -1,0 +1,7 @@
+{
+  "template": "굿즈 PPL",
+  "_note": "28(루미×펜던트×Smile) 얼굴 동일성 이탈 → 모션 교체 재생성 예비분.",
+  "combos": [
+    { "label": "28b", "characterId": "rumi", "lookId": "02_01", "motion": "Cute Action", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg", "trackId": "10" }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "template": "굿즈 PPL",
+  "_note": "신규 템플릿(8종째) 실행 검증 + 9월 숏폼 추가분(27~30). 멤버 × 제품(자사 굿즈) × 모션 교체. 손이 가려지지 않는 모션만.",
+  "combos": [
+    { "label": "27", "characterId": "sumin", "lookId": "02_01", "motion": "Cute Action", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg", "trackId": "1" },
+    { "label": "28", "characterId": "rumi",  "lookId": "02_01", "motion": "Smile",       "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg", "trackId": "10" },
+    { "label": "29", "characterId": "lei",   "lookId": "00_04", "motion": "Touch",       "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg", "trackId": "12" },
+    { "label": "30", "characterId": "haeun", "lookId": "02_01", "motion": "Runway",      "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg", "trackId": "3" }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "template": "굿즈 PPL",
+  "_note": "v2 1차 검수 불합격 2건 재생성(1회). 루미: '돌리기' 동작에서 슬라임볼 뒷면이 투명 유리공으로 바뀜 → 회전 금지, 정면 고정. 레이: 전신 구도라 키링이 안 보이고 끝에 손이 얼굴 가림 → 허리 위 구도·얼굴 옆 고정.",
+  "combos": [
+    {
+      "label": "v2-3r",
+      "characterId": "rumi",
+      "lookId": "02_01",
+      "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg",
+      "trackId": "10",
+      "videoPrompt": "She holds the clear slime ball still beside her face with the same side facing the camera, does not rotate it, then gives a small natural smile and a slight head tilt, blinking naturally. The ball keeps exactly the same colorful contents, sprinkles and XO letters the entire time. Same face, same outfit. Static camera, very slow push-in, clean bright studio background."
+    },
+    {
+      "label": "v2-4r",
+      "characterId": "lei",
+      "lookId": "00_04",
+      "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg",
+      "trackId": "12",
+      "prompt": "You are given 2 reference images with different roles. Reference 1 is the SUBJECT: reproduce her face, hairstyle, makeup and her exact outfit. Reference 2 is the PRODUCT: she is holding it naturally in one hand beside her face at shoulder height, clearly visible to the camera, keeping the product's exact shape, colors, materials and any logo or printed text unchanged and undistorted. Do NOT take any person, face or background from reference 2. Output: a vertical CLOSE-UP shot framed from the waist up (not full body) of the subject of reference 1, in reference 1's outfit, facing the camera, holding the product of reference 2 with one hand, both hands natural with five fingers. Clean bright studio background. Bright commercial product shot, sharp focus on the product.",
+      "videoPrompt": "She sways gently to the beat while holding the small silver XO keyring pendant up beside her face, then gives a playful smile. The keyring stays pinched between her fingers next to her cheek the whole time and never covers her face, same shape and XO engraving. Same face, same outfit. Static camera, clean bright studio background."
+    }
+  ]
+}

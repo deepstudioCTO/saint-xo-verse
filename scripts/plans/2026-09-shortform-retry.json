@@ -1,0 +1,7 @@
+{
+  "template": "모션 컨트롤",
+  "_note": "23(수민×Runway) 의상·배경이 모션 원본으로 넘어감 → 예비분.",
+  "combos": [
+    { "label": "23b", "characterId": "sumin", "lookId": "02_01", "motion": "Smile", "trackId": "7" }
+  ]
+}

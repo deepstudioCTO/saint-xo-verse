@@ -1,0 +1,81 @@
+{
+  "generatedAt": "2026-10-13T07:51:46.863Z",
+  "durations": {
+    "counted": 34,
+    "medianSec": 399.60450000000003,
+    "meanSec": 337.8057941176471,
+    "minSec": 27.872,
+    "maxSec": 651.096,
+    "excludedIncomplete": 0,
+    "excludedNegative": 9
+  },
+  "manualBaselineMin": null,
+  "reductionPct": null,
+  "reliability": {
+    "total": 43,
+    "completed": 42,
+    "failed": 1,
+    "unfinished": 0,
+    "successRate": 97.67441860465115,
+    "nodeTotal": 80,
+    "nodeAttempted": 78,
+    "nodeSkipped": 2,
+    "nodeFailed": 0,
+    "nodeFailureRate": 0,
+    "adopted": 31,
+    "adoptionRate": 73.80952380952381
+  },
+  "templateReuse": {
+    "attributedRuns": 43,
+    "unattributedRuns": 0,
+    "attributionRate": 100,
+    "usage": [
+      {
+        "templateId": "8393bef8-a707-4bd7-9969-c414f480d9d7",
+        "name": "모션 컨트롤",
+        "runCount": 30
+      },
+      {
+        "templateId": "641ebd66-64e7-460d-85f6-a8d0097454f5",
+        "name": "굿즈 PPL",
+        "runCount": 7
+      },
+      {
+        "templateId": "23bdd2eb-ffc5-49c7-b7ce-c7ce5753197d",
+        "name": "룩 스왑",
+        "runCount": 5
+      },
+      {
+        "templateId": "1819ce11-e95b-4135-bf04-1cf74ab81310",
+        "name": "릴리스 마스터",
+        "runCount": 1
+      }
+    ],
+    "reusedTemplates": 3,
+    "reuseRate": 75
+  },
+  "outputs": {
+    "videos": 36,
+    "images": 41,
+    "adoptedVideos": 30,
+    "adoptedImages": 31
+  },
+  "monthly": [
+    {
+      "month": "2026-08",
+      "runs": 16
+    },
+    {
+      "month": "2026-09",
+      "runs": 13
+    },
+    {
+      "month": "2026-10",
+      "runs": 14
+    }
+  ],
+  "templateCounts": {
+    "total": 22,
+    "published": 20
+  }
+}

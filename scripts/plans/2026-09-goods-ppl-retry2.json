@@ -1,0 +1,8 @@
+{
+  "template": "굿즈 PPL",
+  "_note": "펜던트(소형) 3건은 영상 단계에서 제품 소실 → 손에 쥐면 보이는 크기의 슬라임볼로 루미·레이 재생성. Cute Action은 수민 건에서 제품 유지 확인된 모션.",
+  "combos": [
+    { "label": "29", "characterId": "lei",  "lookId": "00_04", "motion": "Cute Action", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg", "trackId": "12" },
+    { "label": "30", "characterId": "rumi", "lookId": "02_01", "motion": "Cute Action", "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg", "trackId": "10" }
+  ]
+}

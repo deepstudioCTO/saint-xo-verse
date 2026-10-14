@@ -1,0 +1,70 @@
+{
+ "template": "멤버 무빙 화보",
+ "_note": "실사 시작 무빙 화보(10/13) — photo/ 헤메스(_a: 6/25·7/6·7/30 상반신)·9/7 컨셉포토(_c) 2:3 크롭을 i2v 첫 프레임으로. AI 스틸 단계 없음.",
+ "combos": [
+  {
+   "label": "mp-sumin_a",
+   "characterId": "sumin",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-sumin_a.jpg",
+   "trackId": "2",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her long hair. Same face, same hair, same outfit. Static camera with a very slow push-in, plain studio backdrop, no cuts."
+  },
+  {
+   "label": "mp-haeun_a",
+   "characterId": "haeun",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-haeun_a.jpg",
+   "trackId": "11",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her long hair. Same face, same hair, same outfit. Static camera with a very slow push-in, plain studio backdrop, no cuts."
+  },
+  {
+   "label": "mp-rumi_a",
+   "characterId": "rumi",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-rumi_a.jpg",
+   "trackId": "4",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her long hair. Same face, same hair, same outfit. Static camera with a very slow push-in, plain studio backdrop, no cuts."
+  },
+  {
+   "label": "mp-lei_a",
+   "characterId": "lei",
+   "lookId": "00_04",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-lei_a.jpg",
+   "trackId": "8",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her long hair. Same face, same hair, same outfit. Static camera with a very slow push-in, plain studio backdrop, no cuts."
+  },
+  {
+   "label": "mp-sumin_c",
+   "characterId": "sumin",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-sumin_c.jpg",
+   "trackId": "5",
+   "videoPrompt": "She holds her playful dance pose and moves gently: a small sway of her shoulders, her arms flow slightly, then she gives a confident small smile to the camera. Same face, same hairstyle, same blue uniform and props. Hands keep five natural fingers. Static camera, clean white studio, no cuts."
+  },
+  {
+   "label": "mp-haeun_c",
+   "characterId": "haeun",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-haeun_c.jpg",
+   "trackId": "1",
+   "videoPrompt": "She holds her playful dance pose and moves gently: a small sway of her shoulders, her arms flow slightly, then she gives a confident small smile to the camera. Same face, same hairstyle, same blue uniform and props. Hands keep five natural fingers. Static camera, clean white studio, no cuts."
+  },
+  {
+   "label": "mp-rumi_c",
+   "characterId": "rumi",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-rumi_c.jpg",
+   "trackId": "9",
+   "videoPrompt": "She holds her playful dance pose and moves gently: a small sway of her shoulders, her arms flow slightly, then she gives a confident small smile to the camera. Same face, same hairstyle, same blue uniform and props. Hands keep five natural fingers. Static camera, clean white studio, no cuts."
+  },
+  {
+   "label": "mp-lei_c",
+   "characterId": "lei",
+   "lookId": "00_04",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-lei_c.jpg",
+   "trackId": "12",
+   "videoPrompt": "She holds her playful dance pose and moves gently: a small sway of her shoulders, her arms flow slightly, then she gives a confident small smile to the camera. Same face, same hairstyle, same blue uniform and props. Hands keep five natural fingers. Static camera, clean white studio, no cuts."
+  }
+ ]
+}

@@ -1,0 +1,8 @@
+{
+  "template": "모션 컨트롤",
+  "_note": "9월 30편 충원 2건. 굿즈 PPL은 영상 단계(kling motion-control)에서 제품이 모션 원본의 빈손 동작에 덮여 7회 중 2회만 유지 → PPL 개선은 10월 과제로 분리.",
+  "combos": [
+    { "label": "29", "characterId": "lei",  "lookId": "00_04", "motion": "Cute Action", "trackId": "12" },
+    { "label": "30", "characterId": "rumi", "lookId": "02_01", "motion": "Touch",       "trackId": "14" }
+  ]
+}

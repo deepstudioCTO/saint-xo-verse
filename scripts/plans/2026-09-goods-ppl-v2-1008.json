@@ -1,0 +1,24 @@
+{
+ "template": "굿즈 PPL",
+ "_note": "PPL v2 2편(수민·하은) 재생성 — 멤버 레퍼런스를 근접 촬영 왜곡이 있는 카탈로그 포스터 대신 10/8 헤메스 원근 교정 화보로 교체(10/14).",
+ "combos": [
+  {
+   "label": "v2-1-1008",
+   "characterId": "sumin",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-slime-ball.jpg",
+   "trackId": "1",
+   "videoPrompt": "She slowly turns the clear round slime ball in her hand toward the camera to show it off, then gives a small natural smile and a slight head tilt, blinking naturally. The ball stays in the same hand the entire time with the same shape, colors and XO letters. Same face, same outfit. Static camera, very slow push-in, clean bright studio background.",
+   "lookImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-1008ed_sumin.jpg"
+  },
+  {
+   "label": "v2-2-1008",
+   "characterId": "haeun",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/goods-xo-pendant.jpg",
+   "trackId": "3",
+   "videoPrompt": "She gently lifts the small silver XO keyring pendant a little closer to the camera to show it off, then gives a small natural smile, blinking naturally. The keyring stays pinched between her fingers the whole time, same shape and XO engraving. Same face, same outfit. Static camera, clean bright studio background.",
+   "lookImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-1008ed_haeun.jpg"
+  }
+ ]
+}

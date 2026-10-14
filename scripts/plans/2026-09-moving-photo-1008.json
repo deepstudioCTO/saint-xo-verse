@@ -1,0 +1,38 @@
+{
+ "template": "멤버 무빙 화보",
+ "_note": "10/8 헤메스 전신+클로즈업 → gpt-image-2 원근 교정 화보(같은날 클로즈업 대비 0.89~0.94) → i2v 4편(10/14). 6/25·7/6 사진은 사용자 지시로 제외.",
+ "combos": [
+  {
+   "label": "mp1008-sumin",
+   "characterId": "sumin",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-1008ed_sumin.jpg",
+   "trackId": "1",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her hair. Same face, same hair, same outfit and accessories. Static camera with a very slow push-in, plain colored studio backdrop, no cuts."
+  },
+  {
+   "label": "mp1008-haeun",
+   "characterId": "haeun",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-1008ed_haeun.jpg",
+   "trackId": "3",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her hair. Same face, same hair, same outfit and accessories. Static camera with a very slow push-in, plain colored studio backdrop, no cuts."
+  },
+  {
+   "label": "mp1008-rumi",
+   "characterId": "rumi",
+   "lookId": "02_01",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-1008ed_rumi.jpg",
+   "trackId": "11",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her hair. Same face, same hair, same outfit and accessories. Static camera with a very slow push-in, plain colored studio backdrop, no cuts."
+  },
+  {
+   "label": "mp1008-lei",
+   "characterId": "lei",
+   "lookId": "00_04",
+   "sourceImage": "https://dloarazwucxtwykqzfow.supabase.co/storage/v1/object/public/motion-videos/concept-images/photo-1008ed_lei.jpg",
+   "trackId": "12",
+   "videoPrompt": "She slowly turns her head slightly toward the camera, gives a soft natural smile and blinks naturally, a gentle breeze moves a few strands of her hair. Same face, same hair, same outfit and accessories. Static camera with a very slow push-in, plain colored studio backdrop, no cuts."
+  }
+ ]
+}

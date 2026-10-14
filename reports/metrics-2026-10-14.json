@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-10-14T06:48:37.339Z",
+  "durations": {
+    "counted": 56,
+    "medianSec": 338.8575,
+    "meanSec": 297.47442857142863,
+    "minSec": 27.872,
+    "maxSec": 651.096,
+    "excludedIncomplete": 0,
+    "excludedNegative": 9
+  },
+  "manualBaselineMin": null,
+  "reductionPct": null,
+  "reliability": {
+    "total": 65,
+    "completed": 64,
+    "failed": 1,
+    "unfinished": 0,
+    "successRate": 98.46153846153847,
+    "nodeTotal": 110,
+    "nodeAttempted": 108,
+    "nodeSkipped": 2,
+    "nodeFailed": 0,
+    "nodeFailureRate": 0,
+    "adopted": 31,
+    "adoptionRate": 48.4375
+  },
+  "templateReuse": {
+    "attributedRuns": 65,
+    "unattributedRuns": 0,
+    "attributionRate": 100,
+    "usage": [
+      {
+        "templateId": "8393bef8-a707-4bd7-9969-c414f480d9d7",
+        "name": "모션 컨트롤",
+        "runCount": 30
+      },
+      {
+        "templateId": "641ebd66-64e7-460d-85f6-a8d0097454f5",
+        "name": "굿즈 PPL",
+        "runCount": 15
+      },
+      {
+        "templateId": "d4c71b73-c339-44b5-854b-f9604ebfe8e8",
+        "name": "멤버 무빙 화보",
+        "runCount": 14
+      },
+      {
+        "templateId": "23bdd2eb-ffc5-49c7-b7ce-c7ce5753197d",
+        "name": "룩 스왑",
+        "runCount": 5
+      },
+      {
+        "templateId": "1819ce11-e95b-4135-bf04-1cf74ab81310",
+        "name": "릴리스 마스터",
+        "runCount": 1
+      }
+    ],
+    "reusedTemplates": 4,
+    "reuseRate": 80
+  },
+  "outputs": {
+    "videos": 58,
+    "images": 49,
+    "adoptedVideos": 30,
+    "adoptedImages": 25
+  },
+  "monthly": [
+    {
+      "month": "2026-08",
+      "runs": 16
+    },
+    {
+      "month": "2026-09",
+      "runs": 13
+    },
+    {
+      "month": "2026-10",
+      "runs": 36
+    }
+  ],
+  "templateCounts": {
+    "total": 23,
+    "published": 21
+  }
+}

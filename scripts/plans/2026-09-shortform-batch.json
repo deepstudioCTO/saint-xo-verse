@@ -1,0 +1,10 @@
+{
+  "template": "모션 컨트롤",
+  "_note": "9월 숏폼 추가분(23~26). 8월분에서 안 쓴 (멤버 × 모션 × 트랙) 조합. 파일명 규칙 [번호]_[멤버]_[Look]_[스킬]_[트랙].",
+  "combos": [
+    { "label": "23", "characterId": "sumin", "lookId": "02_01", "motion": "Runway", "trackId": "5" },
+    { "label": "24", "characterId": "rumi",  "lookId": "02_01", "motion": "Hip",    "trackId": "9" },
+    { "label": "25", "characterId": "lei",   "lookId": "00_04", "motion": "Smile",  "trackId": "11" },
+    { "label": "26", "characterId": "haeun", "lookId": "02_01", "motion": "Touch",  "trackId": "2" }
+  ]
+}
