@@ -48,12 +48,23 @@ interface Combo {
   trackId?: string;
   /** 이미지 생성 프롬프트 덮어쓰기(선택) */
   prompt?: string;
+  /**
+   * Look 노드 이미지 덮어쓰기(선택) — 카탈로그 포스터 대신 원근 교정 화보 등 다른 멤버 사진을 쓸 때.
+   * characterId·lookId는 라이브러리 표시용으로 그대로 남는다.
+   */
+  lookImage?: string;
+  /** 영상 생성(generate) 프롬프트 덮어쓰기(선택) — i2v는 제품별 동작 묘사가 품질을 좌우한다 */
+  videoPrompt?: string;
 }
 
 /** 1회 실행 비용 추정 — Replicate 실측 단가 기준. 실행 전 반드시 눈으로 확인하라고 찍는다 */
 const COST_USD = {
   imageNanoBanana2K: 0.14,
   videoKlingProPerSec: 0.098,
+  /** kling-v3-video i2v standard(720p) — 5초 ≈ $0.84 */
+  videoKlingV3I2VStdPerSec: 0.168,
+  /** kling-v3-video i2v pro(1080p) — 5초 ≈ $1.12 */
+  videoKlingV3I2VProPerSec: 0.224,
   upscaleTopaz: 0.3,
 };
 
@@ -149,6 +160,9 @@ function injectCombo(
     if (n.type === "generate-image" && combo.prompt) {
       return { ...n, data: { ...n.data, prompt: combo.prompt } };
     }
+    if (n.type === "generate" && combo.videoPrompt) {
+      return { ...n, data: { ...n.data, prompt: combo.videoPrompt } };
+    }
     return n;
   });
 }
@@ -166,7 +180,12 @@ function estimateCost(nodes: GraphNodeLike[], motionDurationSec: number): number
     if (n.data?.disabled === true) continue;
     if (n.type === "generate-image") usd += COST_USD.imageNanoBanana2K;
     // kling character_orientation:"image"는 영상 10초 상한 — 모션 길이로 클램프
-    if (n.type === "generate") usd += COST_USD.videoKlingProPerSec * Math.min(motionDurationSec, 10);
+    if (n.type === "generate" && n.data?.videoModel === "kling-v3-i2v") {
+      const sec = n.data?.duration === 10 ? 10 : 5;
+      usd += (n.data?.mode === "pro" ? COST_USD.videoKlingV3I2VProPerSec : COST_USD.videoKlingV3I2VStdPerSec) * sec;
+    } else if (n.type === "generate") {
+      usd += COST_USD.videoKlingProPerSec * Math.min(motionDurationSec, 10);
+    }
     if (n.type === "upscale") usd += COST_USD.upscaleTopaz;
   }
   return usd;
@@ -214,6 +233,7 @@ async function main() {
       (p) => p.lookId === combo.lookId && p.characterId === combo.characterId
     );
     if (!persona) throw new Error(`페르소나 없음: ${combo.lookId}/${combo.characterId}`);
+    const look = combo.lookImage ? { ...persona, imageUrl: combo.lookImage } : persona;
 
     let motion: (typeof allMotions)[number] | null = null;
     if (combo.motion) {
@@ -232,7 +252,7 @@ async function main() {
       sourceImageUrl = combo.sourceImage;
     }
 
-    const nodes = injectCombo(baseNodes, combo, persona, motion, sourceImageUrl);
+    const nodes = injectCombo(baseNodes, combo, look, motion, sourceImageUrl);
     jobs.push({ combo, nodes, costUsd: estimateCost(nodes, motion?.duration ?? 10) });
   }
 
