@@ -80,6 +80,12 @@ export interface GenerateNodeData {
   batchSize?: number;
   /** 프롬프트 자동 보강 (Soul) */
   enhancePrompt?: boolean;
+  /** 영상 모델 (generate 전용). 미지정 = 모션 컨트롤, "kling-v3-i2v" = 이미지만으로 영상 */
+  videoModel?: "motion-control" | "kling-v3-i2v";
+  /** i2v 길이(초) 5|10 */
+  duration?: number;
+  /** i2v 화질 "standard"(720p) | "pro"(1080p) */
+  mode?: string;
 }
 
 export interface UpscaleNodeData {

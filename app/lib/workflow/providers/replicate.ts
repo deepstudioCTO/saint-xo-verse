@@ -27,6 +27,13 @@ export const REPLICATE_MODEL_VERSIONS = {
    * — 버전 해시만 바꾸면 되고 buildVideoInput은 무변경. v3에서 mode:"pro"=1080p.
    */
   video: "15430b300f8c044e8f9e3567fd6daadf6d62e9bb0cee23fdb7969d3b26542f40",
+  /**
+   * kwaivgi/kling-v3-video (image-to-video, start_image 고정형).
+   * 모션 컨트롤과 달리 남의 동작 영상을 덮어씌우지 않아 얼굴·손·소품이 첫 프레임 그대로 유지된다.
+   * 굿즈 PPL v2에서 사용 — 2026-10-13 모델 6종 비교 테스트에서 유일하게 제품 디자인까지 유지.
+   * generate 노드 data.videoModel === "kling-v3-i2v"일 때만 쓰인다.
+   */
+  "kling-v3-i2v": "cadb27bd609b3432e7989ce823fb107570335cd165d83f3bddd26da045944ed3",
   /** lucataco/real-esrgan-video (latest 버전 — 기존 42e594…는 stale로 422). ⚠️ 매우 느림(~11분/영상) */
   "real-esrgan": "3e56ce4b57863bd03048b42bc09bdd4db20d427cca5fde9d8ae4dc60e1bb4775",
   /** topazlabs/video-upscale — 프리미엄 품질, ~40초 (default) */
@@ -66,6 +73,28 @@ export function buildVideoInput(p: VideoParams): Record<string, unknown> {
     prompt: p.prompt || "a person performing the motion naturally",
     mode: "pro",
     character_orientation: "image",
+  };
+}
+
+/** generate 노드 영상 모델. 미지정이면 모션 컨트롤(back-compat) */
+export type VideoModel = "motion-control" | "kling-v3-i2v";
+
+export interface I2VParams {
+  image: string;
+  prompt?: string;
+  duration?: number; // 5 | 10
+  mode?: string; // "standard"(720p) | "pro"(1080p)
+}
+
+export function buildI2VInput(p: I2VParams): Record<string, unknown> {
+  return {
+    start_image: p.image,
+    prompt: p.prompt || "natural subtle motion, same face, same outfit, static camera",
+    negative_prompt:
+      "extra hands, extra fingers, deformed hands, face morphing, different person, object disappearing, text, watermark",
+    duration: p.duration === 10 ? 10 : 5,
+    mode: p.mode === "pro" ? "pro" : "standard",
+    generate_audio: false,
   };
 }
 
@@ -176,6 +205,21 @@ export function buildReplicateRequest(
 
   if (nodeType === "generate") {
     if (!resolved.image) return { ok: false, reason: "이미지 소스 연결 필요" };
+    if (d.videoModel === "kling-v3-i2v") {
+      // i2v는 첫 프레임 이미지만 받는다 — 모션 영상 불필요
+      return {
+        ok: true,
+        request: {
+          version: REPLICATE_MODEL_VERSIONS["kling-v3-i2v"],
+          input: buildI2VInput({
+            image: resolved.image,
+            prompt: typeof d.prompt === "string" ? d.prompt : undefined,
+            duration: typeof d.duration === "number" ? d.duration : undefined,
+            mode: typeof d.mode === "string" ? d.mode : undefined,
+          }),
+        },
+      };
+    }
     if (!resolved.sourceVideo) return { ok: false, reason: "모션 영상 소스 연결 필요" };
     return {
       ok: true,

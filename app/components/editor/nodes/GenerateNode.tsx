@@ -239,11 +239,15 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
     ? refCount > 0
       ? `${refCount} image${refCount > 1 ? "s" : ""}`
       : "이미지 소스 연결"
-    : resolved.image && resolved.sourceVideo
-      ? "ready"
-      : !resolved.image
-        ? "이미지 연결"
-        : "모션 영상 연결";
+    : data.videoModel === "kling-v3-i2v"
+      ? resolved.image
+        ? "ready · 이미지→영상"
+        : "첫 프레임 이미지 연결"
+      : resolved.image && resolved.sourceVideo
+        ? "ready"
+        : !resolved.image
+          ? "이미지 연결"
+          : "모션 영상 연결";
 
   return (
     <div className="bg-[#1a1a1a] rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.4)] border border-white/[0.08] w-[240px]">

@@ -170,6 +170,41 @@ describe("buildReplicateRequest", () => {
     if (good.ok) expect(good.request.version).toBe(REPLICATE_MODEL_VERSIONS.video);
   });
 
+  it("generate + videoModel=kling-v3-i2v: 이미지만으로 ok, start_image·5초·standard·무음", () => {
+    const r = buildReplicateRequest(
+      "generate",
+      { videoModel: "kling-v3-i2v", prompt: "p" },
+      { ...empty, image: "i" }
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.request.version).toBe(REPLICATE_MODEL_VERSIONS["kling-v3-i2v"]);
+      expect(r.request.input).toMatchObject({
+        start_image: "i",
+        prompt: "p",
+        duration: 5,
+        mode: "standard",
+        generate_audio: false,
+      });
+      expect(r.request.input.video).toBeUndefined();
+    }
+  });
+
+  it("generate + videoModel=kling-v3-i2v: duration 10·pro 반영, 이미지 없으면 실패", () => {
+    const r = buildReplicateRequest(
+      "generate",
+      { videoModel: "kling-v3-i2v", duration: 10, mode: "pro" },
+      { ...empty, image: "i" }
+    );
+    expect(r.ok && r.request.input).toMatchObject({ duration: 10, mode: "pro" });
+    expect(buildReplicateRequest("generate", { videoModel: "kling-v3-i2v" }, empty).ok).toBe(false);
+  });
+
+  it("generate: videoModel 미지정은 기존 모션 컨트롤 그대로 (무회귀)", () => {
+    const r = buildReplicateRequest("generate", {}, { ...empty, image: "i", sourceVideo: "v" });
+    expect(r.ok && r.request.version).toBe(REPLICATE_MODEL_VERSIONS.video);
+  });
+
   it("upscale: producedVideo 사용, model=topaz 반영", () => {
     const r = buildReplicateRequest("upscale", { model: "topaz" }, { ...empty, producedVideo: "pv" });
     expect(r.ok).toBe(true);
