@@ -22,14 +22,16 @@ export interface PollResult {
  * 전송 계층 요청 (discriminated union, 직렬화/로깅 가능).
  * - replicate: {version, input} — 기존 ReplicateRequest와 동형(+태그)
  * - soul: {modelPath, body} — POST platform.higgsfield.ai/{modelPath}
+ * - genjutsu: {path, body} — POST api.higgsfield.ai/{path} (영상 모션 트랜스퍼)
  */
 export type ProviderRequest =
   | { provider: "replicate"; version: string; input: Record<string, unknown> }
-  | { provider: "soul"; modelPath: string; body: Record<string, unknown> };
+  | { provider: "soul"; modelPath: string; body: Record<string, unknown> }
+  | { provider: "genjutsu"; path: string; body: Record<string, unknown> };
 
 export interface ImageProvider {
   /** node_runs.externalProvider 에 기록 */
-  readonly id: "replicate" | "soul";
+  readonly id: "replicate" | "soul" | "genjutsu";
   /** 제출 → 외부 작업 id. step.do 안에서 호출(정확히-한-번 보장은 파이프라인이) */
   submit(req: ProviderRequest, env: Record<string, string>): Promise<{ externalId: string }>;
   /** 폴링 1회. step.do 안에서 호출. transient 실패는 processing으로 폴백 */

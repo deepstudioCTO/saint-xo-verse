@@ -65,7 +65,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - `DATABASE_URL` — Supabase PostgreSQL Pooler 연결 문자열
 - `SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_KEY` — Supabase
 - `REPLICATE_TOKEN` — Replicate API
-- `HF_API_KEY` / `HF_API_SECRET` — Higgsfield Cloud API (Soul provider). 발급: cloud.higgsfield.ai/api-keys
+- `HF_API_KEY` / `HF_API_SECRET` — Higgsfield API (Soul 이미지 + Genjutsu 영상 provider 공용). 발급·잔액: open.higgsfield.ai (API keys / Billing — 웹 구독 크레딧과 별개)
 - `CLOUDFLARE_API_TOKEN` — cto-b0b 계정 API 토큰 (`.dev.vars`에 설정)
 
 ## 기술 스택
@@ -80,7 +80,7 @@ export $(grep -v '^#' .env | xargs) && npx tsx scripts/<script-name>.ts
 - Cloudflare Workflows (durable execution — 노드 그래프 실행 오케스트레이터, `wrangler.json` workflows 바인딩)
 - ffmpeg.wasm (브라우저 영상 트리밍 + 음악 합성, SharedArrayBuffer 필요)
 - Replicate API (kling-video, nano-banana-pro, real-esrgan, topaz)
-- Higgsfield Cloud API (Soul Reference — 이미지 생성 provider, style_id/seed 네이티브)
+- Higgsfield API (Soul Reference 이미지 provider + Genjutsu 모션 트랜스퍼 영상 provider — 모션 컨트롤 기본)
 - vitest (순수 로직 단위 테스트 — `app/lib/workflow` 한정, `npm test`)
 - 폰트: Orbitron (영문) + Pretendard (한글)
 
@@ -270,6 +270,7 @@ export default [
 | 모델 back-compat | `resolveImageModel(data)`: model 없음→**nano-banana**(레거시 템플릿·기존 테스트 무회귀), 알수없음→nano. 팔레트 새 노드 `makeData`→**soul-reference**(문서의 "기본 Soul") | absent와 신규노드 기본값이 다른 이유: 레거시 무회귀 vs 신규는 Soul 선호 |
 | gpt-image-2 | `openai/gpt-image-2`(Replicate, OpenAI 키 불필요 — 프록시). 다중 레퍼런스(`input_images`) + 지시 준수가 강해 **포즈 참조 템플릿의 기본 모델**. 같은 Replicate provider 안에서도 body가 달라 `replicateImageRequest(spec, modelId)`가 분기(미지정·미지 모델→nano body, 무회귀). **`resolution`→`quality`(low/medium/high)로 매핑**하고 노드 UI는 `resolutionLabel`로 "Quality"라 표시 | quality 전용 필드를 새로 파면 node.data·`ImageGenerationSpec`·`style_presets` 컬럼까지 늘어난다(마이그레이션 발생). 기존 필드 재사용 + 라벨 교체가 비용 대비 정확 |
 | 포즈 참조 템플릿의 모델 명시 | frame이 붙은 이미지 생성 노드는 시드에서 `model`을 **반드시 명시**(gpt-image-2 또는 nano-banana) | 팔레트 기본값 soul-reference는 `refImages.max=1`이라 포즈 참조가 조용히 버려진다(노드 경고는 뜨지만 시드는 UI를 거치지 않음) |
+| Genjutsu(Higgsfield) 영상 provider = 모션 컨트롤 기본값 | `providers/genjutsu.ts`, `POST api.higgsfield.ai/higgsfield/genjutsu/motion-transfer/v1.0`(헤더 `Authorization: Key {HF_API_KEY}:{HF_API_SECRET}` — Soul과 같은 키, base·헤더만 다름). `resolveVideoModel`: generate 노드 **videoModel 미지정·미지 값 → genjutsu**, Kling은 `"motion-control"`을 명시해야만. 입력은 Kling과 동일(이미지 1장+모션 영상)이라 템플릿 그래프 무변경. **프롬프트는 videoModel을 genjutsu로 명시한 노드만 전송**(레거시 노드 prompt는 Kling 전용 "fixed camera" 문구). 원본 4초 이상·30초까지(Kling 10초 상한 없음), 720p 청구 실측 ≈$0.68/초 | 2026-10-21 채택 Kling 결과 3건과 같은 입력 비교에서 모션·표정 충실도 우위·원본 공간 유지·장소 이미지로 공간 교체 가능. 나이·성별+노출 의상 묘사 프롬프트는 nsfw 차단(실측)이라 기본 무프롬프트. 의상 실루엣이 원본과 다르면 원본 의상이 섞이는 약점 |
 | Soul(Higgsfield) provider | 모델 `higgsfield-ai/soul/reference`(레퍼런스 1장+style). base `platform.higgsfield.ai`, 인증 헤더 `hf-api-key`/`hf-secret`(env `HF_API_KEY`/`HF_API_SECRET`). 제출 `POST /{modelPath}`→`request_id`, 폴링 `GET /requests/{id}/status`(completed→`images[0].url`, nsfw/failed→환불). 스타일목록 `/api/soul-styles` 프록시. `refImages.max=1`이라 2장↑이면 노드 경고+첫장만 | 다중레퍼런스는 nano-banana 선택. 상세 [[higgsfield-soul-api]] 메모리 |
 | GenerateNode 동적 필드 | 이미지일 때 모델 `<select>` + `IMAGE_MODELS[model].fields[]` 선언적 조건부 렌더(모델별 필드 다름). 모델 전환 시 비율/해상도 stale 보정. 필드는 controlled-from-data. 스타일 피커는 raw fetch+모듈캐시(`/api/soul-styles`) | 영상(generate)은 kling 고정·편집필드 없음 |
 | 업스케일 모델 | **default=topaz**(~41초). 옵션: SeedVR2(zsxkib, one-step, ~34초·$0.011 최저가) / real-esrgan(~11분, 느림). 실측 벤치 기준 | real-esrgan은 해상도 낮춰도 느림(프레임 오버헤드). SeedVR2 입력은 `media`(video_path/video 아님) |

@@ -7,8 +7,15 @@ import { useNodeRun } from "../workflowRun";
 import { useResolvedInputs } from "../useResolvedInputs";
 import { IMAGE_MODELS, resolveImageModel, type ImageModelDef, type ImageModelId } from "~/lib/workflow/imageModels";
 import { isRunningStatus } from "~/lib/workflow/types";
+import { resolveVideoModel, type VideoModel } from "~/lib/workflow/providers/replicate";
 
 type GenerateNodeType = Node<GenerateNodeData, "generate">;
+
+const VIDEO_MODEL_OPTIONS: { id: VideoModel; label: string }[] = [
+  { id: "genjutsu", label: "Higgsfield Genjutsu" },
+  { id: "motion-control", label: "Kling Motion Control" },
+  { id: "kling-v3-i2v", label: "Kling i2v (이미지만)" },
+];
 
 // ── Soul 스타일 목록: 모듈 캐시(노드 N개여도 fetch 1회) ─────────────
 interface SoulStyle {
@@ -207,6 +214,7 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
   );
 
   const model = isImage ? resolveImageModel(data) : null;
+  const videoModel = isImage ? null : resolveVideoModel(data);
 
   const onModelChange = useCallback(
     (nextId: ImageModelId) => {
@@ -239,7 +247,7 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
     ? refCount > 0
       ? `${refCount} image${refCount > 1 ? "s" : ""}`
       : "이미지 소스 연결"
-    : data.videoModel === "kling-v3-i2v"
+    : videoModel === "kling-v3-i2v"
       ? resolved.image
         ? "ready · 이미지→영상"
         : "첫 프레임 이미지 연결"
@@ -327,6 +335,24 @@ export function GenerateNode({ id, data }: NodeProps<GenerateNodeType>) {
           <ImageParamFields model={model} data={data} set={set} />
           <PresetBar data={data} set={set} />
         </>
+      )}
+
+      {videoModel && (
+        <div className="px-3 py-2 border-t border-white/[0.08]">
+          <Field label="Model">
+            <select
+              className={selectCls}
+              value={videoModel}
+              onChange={(e) => set({ videoModel: e.target.value as VideoModel })}
+            >
+              {VIDEO_MODEL_OPTIONS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
       )}
 
       {refWarning && (

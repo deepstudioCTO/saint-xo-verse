@@ -30,6 +30,7 @@ import postgres from "postgres";
 import fs from "fs";
 import { workflowRuns } from "../drizzle/schema";
 import type { GraphEdgeLike, GraphNodeLike } from "../app/lib/workflow/types";
+import { resolveVideoModel } from "../app/lib/workflow/providers/replicate";
 
 interface Combo {
   label?: string;
@@ -66,6 +67,8 @@ const COST_USD = {
   /** kling-v3-video i2v pro(1080p) — 5초 ≈ $1.12 */
   videoKlingV3I2VProPerSec: 0.224,
   upscaleTopaz: 0.3,
+  /** Higgsfield Genjutsu 720p — 2026-10-21 청구 실측 5초 $3.40·10초 $6.81 (표시가 "from $0.159/s"는 최저 해상도 기준) */
+  videoGenjutsu720PerSec: 0.681,
 };
 
 const argv = process.argv.slice(2);
@@ -180,11 +183,15 @@ function estimateCost(nodes: GraphNodeLike[], motionDurationSec: number): number
     if (n.data?.disabled === true) continue;
     if (n.type === "generate-image") usd += COST_USD.imageNanoBanana2K;
     // kling character_orientation:"image"는 영상 10초 상한 — 모션 길이로 클램프
-    if (n.type === "generate" && n.data?.videoModel === "kling-v3-i2v") {
+    const videoModel = n.type === "generate" ? resolveVideoModel(n.data) : null;
+    if (videoModel === "kling-v3-i2v") {
       const sec = n.data?.duration === 10 ? 10 : 5;
       usd += (n.data?.mode === "pro" ? COST_USD.videoKlingV3I2VProPerSec : COST_USD.videoKlingV3I2VStdPerSec) * sec;
-    } else if (n.type === "generate") {
+    } else if (videoModel === "motion-control") {
       usd += COST_USD.videoKlingProPerSec * Math.min(motionDurationSec, 10);
+    } else if (videoModel === "genjutsu") {
+      // Genjutsu는 원본 길이를 따른다(30초 초과분은 잘림)
+      usd += COST_USD.videoGenjutsu720PerSec * Math.min(motionDurationSec, 30);
     }
     if (n.type === "upscale") usd += COST_USD.upscaleTopaz;
   }

@@ -53,9 +53,9 @@ describe("selectExecution — generate-image provider 분기", () => {
   });
 });
 
-describe("selectExecution — generate/upscale은 항상 replicate(무회귀)", () => {
-  it("generate(video): 이미지+모션 → replicate video 버전", () => {
-    const r = selectExecution("generate", {}, { ...empty, image: "i", sourceVideo: "v" });
+describe("selectExecution — Kling 명시 generate/upscale은 replicate(무회귀)", () => {
+  it("generate(video, motion-control 명시): 이미지+모션 → replicate video 버전", () => {
+    const r = selectExecution("generate", { videoModel: "motion-control" }, { ...empty, image: "i", sourceVideo: "v" });
     expect(r.ok).toBe(true);
     if (r.ok) {
       expect(r.provider.id).toBe("replicate");

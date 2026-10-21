@@ -76,8 +76,20 @@ export function buildVideoInput(p: VideoParams): Record<string, unknown> {
   };
 }
 
-/** generate 노드 영상 모델. 미지정이면 모션 컨트롤(back-compat) */
-export type VideoModel = "motion-control" | "kling-v3-i2v";
+/**
+ * generate 노드 영상 모델.
+ * - "genjutsu": Higgsfield Genjutsu 모션 트랜스퍼 — **모션 컨트롤 기본값**(미지정도 이것)
+ * - "motion-control": Kling v3 모션 컨트롤(이전 기본값, 명시해야만 쓰인다)
+ * - "kling-v3-i2v": 이미지만으로 영상
+ */
+export type VideoModel = "genjutsu" | "motion-control" | "kling-v3-i2v";
+
+/** node.data.videoModel → 실행 모델. 미지정·미지 값은 genjutsu (2026-10-21 Kling 비교 후 기본값 전환) */
+export function resolveVideoModel(data: Record<string, unknown> | undefined): VideoModel {
+  const v = data?.videoModel;
+  if (v === "kling-v3-i2v" || v === "motion-control") return v;
+  return "genjutsu";
+}
 
 export interface I2VParams {
   image: string;
@@ -205,7 +217,7 @@ export function buildReplicateRequest(
 
   if (nodeType === "generate") {
     if (!resolved.image) return { ok: false, reason: "이미지 소스 연결 필요" };
-    if (d.videoModel === "kling-v3-i2v") {
+    if (resolveVideoModel(d) === "kling-v3-i2v") {
       // i2v는 첫 프레임 이미지만 받는다 — 모션 영상 불필요
       return {
         ok: true,
